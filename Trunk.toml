@@ -1,0 +1,22 @@
+# Trunk configuration for building the Leptos frontend
+
+[build]
+target = "index.html"
+dist = "dist"
+release = false
+
+[watch]
+watch = ["crates/randscan-frontend/src", "index.html"]
+ignore = ["target", "dist"]
+
+[serve]
+address = "127.0.0.1"
+port = 8080
+open = false
+proxy_backend = "http://localhost:3000/api"
+proxy_rewrite = "/api"
+
+[[hooks]]
+stage = "build"
+command = "sh"
+command_arguments = ["-c", "wasm-bindgen --target web --out-dir dist/pkg target/wasm32-unknown-unknown/release/randscan_frontend.wasm"]

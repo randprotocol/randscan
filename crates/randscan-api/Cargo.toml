@@ -1,0 +1,31 @@
+[package]
+name = "randscan-api"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "randscan-api"
+path = "src/main.rs"
+
+[dependencies]
+randscan-core = { workspace = true }
+randscan-db = { workspace = true }
+randscan-indexer = { workspace = true }
+randscan-ws = { workspace = true }
+tokio = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+config = { workspace = true }
+dotenvy = { workspace = true }

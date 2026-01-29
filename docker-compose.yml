@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: randscan-postgres
+    environment:
+      POSTGRES_USER: randscan
+      POSTGRES_PASSWORD: randscan
+      POSTGRES_DB: randscan
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U randscan"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: randscan-api
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgres://randscan:randscan@postgres:5432/randscan
+      RPC_URL: http://host.docker.internal:8899
+      API_HOST: 0.0.0.0
+      API_PORT: 3000
+      RUST_LOG: info
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
