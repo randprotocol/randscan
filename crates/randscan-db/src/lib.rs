@@ -82,9 +82,31 @@ pub async fn create_pool(config: &DatabaseConfig) -> Result<PgPool> {
 }
 
 /// Run database migrations
-/// Note: In production, run migrations manually with sqlx-cli
-pub async fn run_migrations(_pool: &PgPool) -> Result<()> {
-    // Migrations are run via sqlx-cli in production
-    // sqlx migrate run
+pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    // Check if tables already exist
+    let table_exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'blocks')"
+    )
+    .fetch_one(pool)
+    .await
+    .map_err(|e| DbError::Query(e.to_string()))?;
+
+    if table_exists {
+        tracing::info!("Database tables already exist, skipping migration");
+        return Ok(());
+    }
+
+    tracing::info!("Running initial database migration...");
+
+    // Embedded migration SQL
+    let migration_sql = include_str!("../../../migrations/001_initial_schema.sql");
+
+    // Execute migration
+    sqlx::raw_sql(migration_sql)
+        .execute(pool)
+        .await
+        .map_err(|e| DbError::Query(format!("Migration failed: {}", e)))?;
+
+    tracing::info!("Database migration completed successfully");
     Ok(())
 }
