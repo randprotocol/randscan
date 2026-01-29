@@ -250,6 +250,13 @@ impl BlockProcessor {
                     db::insert_commitment(db, c, tx_id).await?;
                 }
             }
+            TransactionPayloadResponse::Mint { to, amount } => {
+                // Mint is similar to transfer - it credits tokens to an address
+                db::insert_tx_transfer(db, tx_id, to, *amount as i64).await?;
+
+                // Ensure recipient account exists
+                db::upsert_account(db, to, 0, 0, 0, false, None, 0, 0).await.ok();
+            }
         }
 
         Ok(())
