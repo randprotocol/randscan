@@ -102,6 +102,15 @@ impl ApiError {
             code: Some("INTERNAL_ERROR".into()),
         }
     }
+
+    /// Generic error with `code` derived from `error` (`invalid_credentials` -> `INVALID_CREDENTIALS`).
+    pub fn new(error: &str, message: &str) -> Self {
+        Self {
+            error: error.into(),
+            message: message.into(),
+            code: Some(error.to_ascii_uppercase()),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

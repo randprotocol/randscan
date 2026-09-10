@@ -11,6 +11,10 @@ use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    if std::env::args().nth(1).as_deref() == Some("hash-password") {
+        return hash_password_cli().await;
+    }
+
     dotenvy::dotenv().ok();
     tracing_subscriber::fmt()
         .with_env_filter(
@@ -45,16 +49,36 @@ async fn main() -> Result<()> {
         }
     });
 
+    let api_config = Arc::new(ApiConfig::from_env());
     let state = AppState {
         db: db_pool,
         indexer,
         ws_manager,
+        config: api_config.clone(),
+        limiter: Arc::new(randscan_api::ratelimit::RateLimiter::new()),
     };
     let app = create_router(state);
 
-    let api_config = ApiConfig::from_env();
     info!("listening on {}", api_config.listen_addr);
     let listener = tokio::net::TcpListener::bind(api_config.listen_addr).await?;
-    axum::serve(listener, app).await?;
+    axum::serve(
+        listener,
+        app.into_make_service_with_connect_info::<std::net::SocketAddr>(),
+    )
+    .await?;
+    Ok(())
+}
+
+/// `randscan-api hash-password` reads one line from stdin and prints the argon2id PHC string.
+/// Operators use it with the password-reset runbook in the README.
+async fn hash_password_cli() -> Result<()> {
+    let mut line = String::new();
+    std::io::stdin().read_line(&mut line)?;
+    let password = line.trim_end_matches(['\r', '\n']).to_string();
+    randscan_api::auth::validate_password(&password).map_err(|e| anyhow::anyhow!(e))?;
+    let hash = randscan_api::auth::hash_password(password)
+        .await
+        .map_err(|e| anyhow::anyhow!("{}", e))?;
+    println!("{}", hash);
     Ok(())
 }
