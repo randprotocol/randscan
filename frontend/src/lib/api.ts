@@ -64,7 +64,12 @@ function buildQuery(params: Record<string, QueryValue>): string {
   return qs ? `?${qs}` : '';
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
+/**
+ * Performs the fetch shared by `request()` and `requestVoid()`: builds the URL, sends the
+ * request same-origin, maps a thrown fetch error to `ApiError(0, ...)`, and throws
+ * `ApiError(response.status, ...)` on a non-2xx response.
+ */
+async function send(path: string, init?: RequestInit): Promise<Response> {
   const url = `${API_BASE_URL}${API_PREFIX}${path}`;
 
   let response: Response;
@@ -91,7 +96,11 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     throw new ApiError(response.status, body);
   }
 
-  return (await response.json()) as T;
+  return response;
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  return (await (await send(path, init)).json()) as T;
 }
 
 // ---------------------------------------------------------------------------
@@ -236,20 +245,7 @@ function jsonInit(method: string, body?: unknown): RequestInit {
 }
 
 async function requestVoid(path: string, init: RequestInit): Promise<void> {
-  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
-    ...init,
-    credentials: 'same-origin',
-    headers: { Accept: 'application/json', ...init.headers },
-  });
-  if (!response.ok) {
-    let body: Partial<ApiErrorBody> = {};
-    try {
-      body = (await response.json()) as Partial<ApiErrorBody>;
-    } catch {
-      // no JSON body
-    }
-    throw new ApiError(response.status, body);
-  }
+  await send(path, init);
 }
 
 export async function signup(email: string, password: string): Promise<User> {
