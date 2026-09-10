@@ -61,7 +61,6 @@ pub fn extract_api_key(headers: &HeaderMap) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use axum::http::HeaderMap;
 
     #[test]
     fn keys_have_the_documented_shape() {

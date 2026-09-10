@@ -2,7 +2,9 @@
 
 use anyhow::Result;
 use randscan_api::{create_router, ApiConfig, AppState};
-use randscan_db::{create_pool, run_migrations, DatabaseConfig, DbPool};
+use randscan_db::{
+    create_pool, delete_all_expired_sessions, run_migrations, DatabaseConfig, DbPool,
+};
 use randscan_indexer::{Broadcaster, IndexerConfig, IndexerService};
 use randscan_ws::WsManager;
 use std::sync::Arc;
@@ -58,6 +60,25 @@ async fn main() -> Result<()> {
         limiter: Arc::new(randscan_api::ratelimit::RateLimiter::new()),
     };
     state.limiter.clone().spawn_sweeper();
+
+    // Compute the dummy password hash now, on a blocking-pool thread, so the first failed
+    // login (unknown email) does not pay for it inline and block a runtime worker thread.
+    tokio::task::spawn_blocking(|| {
+        randscan_api::auth::dummy_hash();
+    });
+
+    // Session reaper: delete expired sessions once at startup, then every hour.
+    let reaper_db = state.db.clone();
+    tokio::spawn(async move {
+        loop {
+            match delete_all_expired_sessions(reaper_db.inner()).await {
+                Ok(n) => tracing::debug!("session reaper: deleted {} expired session(s)", n),
+                Err(e) => tracing::warn!("session reaper: {}", e),
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
+        }
+    });
+
     let app = create_router(state);
 
     info!("listening on {}", api_config.listen_addr);

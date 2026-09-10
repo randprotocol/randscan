@@ -115,7 +115,10 @@ fn with_headers(mut res: Response, limit: u32, remaining: u32) -> Response {
 /// Every `/api/v1` request: per-key when a key is presented (401 if it is unknown or revoked),
 /// otherwise per-IP.
 pub async fn api_limit(State(state): State<AppState>, mut req: Request, next: Next) -> Response {
-    let (id, limit) = match auth::extract_api_key(req.headers()) {
+    // `key_id` carries the authenticated key's row id (if any) into the decision match below,
+    // so that `record_api_key_use` is only spawned when the request is actually allowed
+    // through — a 429'd request must not count as usage.
+    let (id, limit, key_id) = match auth::extract_api_key(req.headers()) {
         Some(key) => {
             if !auth::is_key_shaped(&key) {
                 return AppError::unauthorized("invalid_api_key", "malformed API key")
@@ -131,34 +134,50 @@ pub async fn api_limit(State(state): State<AppState>, mut req: Request, next: Ne
                 Err(e) => return AppError::from(e).into_response(),
             };
             req.extensions_mut().insert(ApiKeyId(row.id));
-            let pool = state.db.inner().clone();
-            let key_id = row.id;
-            tokio::spawn(async move {
-                if let Err(e) = db::record_api_key_use(&pool, key_id).await {
-                    tracing::warn!("record api key use: {}", e);
-                }
-            });
-            (format!("key:{}", row.id), state.config.key_rpm)
+            (
+                format!("key:{}", row.id),
+                state.config.key_rpm,
+                Some(row.id),
+            )
         }
-        None => (format!("ip:{}", ip_of(&state, &req)), state.config.anon_rpm),
+        None => (
+            format!("ip:{}", ip_of(&state, &req)),
+            state.config.anon_rpm,
+            None,
+        ),
     };
 
     match state.limiter.check(&id, limit, unix_now()) {
-        Decision::Allowed { remaining } => with_headers(next.run(req).await, limit, remaining),
-        Decision::Limited { retry_after } => {
-            AppError::TooManyRequests { retry_after }.into_response()
+        Decision::Allowed { remaining } => {
+            if let Some(key_id) = key_id {
+                let pool = state.db.inner().clone();
+                tokio::spawn(async move {
+                    if let Err(e) = db::record_api_key_use(&pool, key_id).await {
+                        tracing::warn!("record api key use: {}", e);
+                    }
+                });
+            }
+            with_headers(next.run(req).await, limit, remaining)
         }
+        Decision::Limited { retry_after } => with_headers(
+            AppError::TooManyRequests { retry_after }.into_response(),
+            limit,
+            0,
+        ),
     }
 }
 
 /// Login and signup: a tighter per-IP budget on top of `api_limit`.
 pub async fn auth_limit(State(state): State<AppState>, req: Request, next: Next) -> Response {
     let id = format!("auth:{}", ip_of(&state, &req));
-    match state.limiter.check(&id, state.config.auth_rpm, unix_now()) {
+    let limit = state.config.auth_rpm;
+    match state.limiter.check(&id, limit, unix_now()) {
         Decision::Allowed { .. } => next.run(req).await,
-        Decision::Limited { retry_after } => {
-            AppError::TooManyRequests { retry_after }.into_response()
-        }
+        Decision::Limited { retry_after } => with_headers(
+            AppError::TooManyRequests { retry_after }.into_response(),
+            limit,
+            0,
+        ),
     }
 }
 

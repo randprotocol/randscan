@@ -89,7 +89,11 @@ export function AuthForm({ mode }: AuthFormProps) {
           />
           {mode === 'signup' && <p className="mt-1.5 text-xs text-mute">At least 10 characters.</p>}
         </div>
-        {error && <div className="form-error">{error}</div>}
+        {error && (
+          <div className="form-error" role="alert">
+            {error}
+          </div>
+        )}
         <button type="submit" disabled={busy} className="btn-primary w-full justify-center disabled:opacity-60">
           {busy ? 'Please wait…' : text.button}
         </button>

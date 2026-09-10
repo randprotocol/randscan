@@ -21,6 +21,8 @@ async fn anonymous_requests_are_limited_per_ip() {
     let (status, headers, body) = call(&app, json_req("GET", "/api/v1/health", None, None)).await;
     assert_eq!(status, 429);
     assert!(headers.contains_key("retry-after"));
+    assert_eq!(headers["x-ratelimit-limit"], "3");
+    assert_eq!(headers["x-ratelimit-remaining"], "0");
     assert_eq!(body["error"], "rate_limited");
 
     // A different client IP has its own budget.

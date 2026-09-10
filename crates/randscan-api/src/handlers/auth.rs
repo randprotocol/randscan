@@ -12,7 +12,7 @@ use crate::{
 };
 use axum::{
     extract::State,
-    http::{request::Parts, HeaderMap, StatusCode},
+    http::{request::Parts, StatusCode},
     response::IntoResponse,
     Json,
 };
@@ -28,14 +28,15 @@ struct Origin {
 }
 
 impl Origin {
-    fn from_parts(state: &AppState, headers: &HeaderMap, parts: &Parts) -> Self {
+    fn from_parts(state: &AppState, parts: &Parts) -> Self {
         Self {
-            user_agent: headers
+            user_agent: parts
+                .headers
                 .get("user-agent")
                 .and_then(|v| v.to_str().ok())
                 .map(|s| s.to_string()),
             ip: client_ip(
-                headers,
+                &parts.headers,
                 peer_addr(&parts.extensions),
                 state.config.trust_proxy,
             ),
@@ -83,7 +84,7 @@ pub async fn signup(
         }
         Err(e) => return Err(e.into()),
     };
-    let origin = Origin::from_parts(&state, &parts.headers, &parts);
+    let origin = Origin::from_parts(&state, &parts);
     let jar = start_session(&state, jar, &user, origin).await?;
     Ok((
         StatusCode::CREATED,
@@ -120,7 +121,7 @@ pub async fn login(
     let user = db::get_user(state.db.inner(), user.id)
         .await?
         .unwrap_or(user);
-    let origin = Origin::from_parts(&state, &parts.headers, &parts);
+    let origin = Origin::from_parts(&state, &parts);
     let jar = start_session(&state, jar, &user, origin).await?;
     Ok((
         StatusCode::OK,
@@ -132,12 +133,14 @@ pub async fn login(
 }
 
 /// POST /api/v1/auth/logout
-pub async fn logout(
-    State(state): State<AppState>,
-    AuthUser(_user): AuthUser,
-    jar: CookieJar,
-) -> ApiResult<impl IntoResponse> {
+///
+/// Idempotent: it never requires a valid session (no `AuthUser` extractor). With no
+/// `randscan_session` cookie, or one that names a session that is already gone, this still
+/// clears the cookie and returns 204 — logging out twice, or logging out after the session
+/// already expired, is not an error.
+pub async fn logout(State(state): State<AppState>, jar: CookieJar) -> ApiResult<impl IntoResponse> {
     if let Some(c) = jar.get(crate::auth::SESSION_COOKIE) {
+        // `delete_session` is a no-op (not an error) when no session matches the hash.
         db::delete_session(state.db.inner(), &hash_secret(c.value())).await?;
     }
     let jar = jar.add(clear_session_cookie(state.config.cookie_secure));

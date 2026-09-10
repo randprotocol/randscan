@@ -47,7 +47,6 @@ services:
     ports:
       - "3001:3001"
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:3000
       NEXT_PUBLIC_WS_URL: ws://localhost:3000/ws
     depends_on:
       - api

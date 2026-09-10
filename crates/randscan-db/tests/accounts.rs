@@ -172,3 +172,110 @@ async fn api_keys_lifecycle() {
         .revoked_at
         .is_some());
 }
+
+#[tokio::test]
+async fn delete_all_expired_sessions_removes_only_expired() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let u = db::create_user(&pool, &unique_email(), "hash")
+        .await
+        .unwrap();
+    let live = format!("{:0>64}", format!("{:x}", u.id * 13 + 1));
+    let dead = format!("{:0>64}", format!("{:x}", u.id * 13 + 2));
+    db::create_session(
+        &pool,
+        &live,
+        u.id,
+        Utc::now() + Duration::days(1),
+        Some("ua"),
+        Some("1.2.3.4"),
+    )
+    .await
+    .unwrap();
+    db::create_session(
+        &pool,
+        &dead,
+        u.id,
+        Utc::now() - Duration::days(1),
+        None,
+        None,
+    )
+    .await
+    .unwrap();
+
+    let deleted = db::delete_all_expired_sessions(&pool).await.unwrap();
+    assert!(
+        deleted >= 1,
+        "expected at least the expired session removed"
+    );
+
+    assert!(db::get_session_user(&pool, &dead).await.unwrap().is_none());
+    let (s, _) = db::get_session_user(&pool, &live).await.unwrap().unwrap();
+    assert_eq!(s.user_id, u.id);
+}
+
+/// Build a maintenance-DB connection URL (same host/credentials, `postgres` database) from
+/// `DATABASE_URL`, and one for a scratch database with the given name.
+fn maintenance_and_scratch_urls(scratch_db: &str) -> (String, String) {
+    let base = std::env::var("DATABASE_URL").expect("DATABASE_URL");
+    let idx = base.rfind('/').expect("DATABASE_URL has a path");
+    let prefix = &base[..idx];
+    (
+        format!("{prefix}/postgres"),
+        format!("{prefix}/{scratch_db}"),
+    )
+}
+
+#[tokio::test]
+async fn concurrent_migrations_do_not_race() {
+    if std::env::var("DATABASE_URL").is_err() {
+        eprintln!("skipping: DATABASE_URL unset");
+        return;
+    }
+
+    let nanos = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let scratch_db = format!("randscan_mig_{nanos}");
+    let (maintenance_url, scratch_url) = maintenance_and_scratch_urls(&scratch_db);
+
+    let admin_pool = PgPoolOptions::new()
+        .max_connections(1)
+        .connect(&maintenance_url)
+        .await
+        .expect("connect to maintenance database");
+    sqlx::query(&format!("CREATE DATABASE {scratch_db}"))
+        .execute(&admin_pool)
+        .await
+        .expect("create scratch database");
+
+    let pool = PgPoolOptions::new()
+        .max_connections(8)
+        .connect(&scratch_url)
+        .await
+        .expect("connect to scratch database");
+
+    let mut handles = Vec::new();
+    for _ in 0..8 {
+        let pool = pool.clone();
+        handles.push(tokio::spawn(async move { run_migrations(&pool).await }));
+    }
+    for h in handles {
+        h.await.expect("task join").expect("run_migrations");
+    }
+
+    let versions: Vec<i32> =
+        sqlx::query_scalar("SELECT version FROM schema_migrations ORDER BY version")
+            .fetch_all(&pool)
+            .await
+            .unwrap();
+    assert_eq!(versions, vec![1, 2]);
+
+    pool.close().await;
+    sqlx::query(&format!("DROP DATABASE IF EXISTS {scratch_db}"))
+        .execute(&admin_pool)
+        .await
+        .expect("drop scratch database");
+}

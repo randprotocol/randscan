@@ -46,20 +46,29 @@ pub fn clear_session_cookie(secure: bool) -> Cookie<'static> {
 }
 
 /// Client address for logging and rate limiting.
+///
+/// With `trust_proxy`, only the LAST `X-Forwarded-For` entry is honoured: that is the
+/// entry our own reverse proxy wrote (see `deploy/Caddyfile`, which overwrites the
+/// header with the peer address), whereas earlier entries are client-controlled and
+/// must not be trusted. The chosen entry is used only if it parses as a valid
+/// `std::net::IpAddr`; otherwise (or without `trust_proxy`, or with no header) we fall
+/// back to the socket peer address.
 pub fn client_ip(
     headers: &HeaderMap,
     peer: Option<SocketAddr>,
     trust_proxy: bool,
 ) -> Option<String> {
     if trust_proxy {
-        if let Some(first) = headers
+        if let Some(last) = headers
             .get("x-forwarded-for")
             .and_then(|v| v.to_str().ok())
-            .and_then(|v| v.split(',').next())
+            .and_then(|v| v.split(',').next_back())
             .map(str::trim)
             .filter(|s| !s.is_empty())
         {
-            return Some(first.to_string());
+            if let Ok(ip) = last.parse::<std::net::IpAddr>() {
+                return Some(ip.to_string());
+            }
         }
     }
     peer.map(|p| p.ip().to_string())
@@ -154,14 +163,33 @@ mod tests {
             client_ip(&h, Some(peer), false).as_deref(),
             Some("10.0.0.5")
         );
-        assert_eq!(
-            client_ip(&h, Some(peer), true).as_deref(),
-            Some("203.0.113.9")
-        );
+        // Only the LAST entry (written by our own proxy) is trusted.
+        assert_eq!(client_ip(&h, Some(peer), true).as_deref(), Some("10.0.0.1"));
         assert_eq!(
             client_ip(&HeaderMap::new(), Some(peer), true).as_deref(),
             Some("10.0.0.5")
         );
         assert_eq!(client_ip(&HeaderMap::new(), None, true), None);
+
+        // Non-IP last entry falls back to the peer address.
+        let mut garbage = HeaderMap::new();
+        garbage.insert("x-forwarded-for", "garbage".parse().unwrap());
+        assert_eq!(
+            client_ip(&garbage, Some(peer), true).as_deref(),
+            Some("10.0.0.5")
+        );
+
+        // A single entry is used as-is.
+        let mut single = HeaderMap::new();
+        single.insert("x-forwarded-for", "203.0.113.9".parse().unwrap());
+        assert_eq!(
+            client_ip(&single, Some(peer), true).as_deref(),
+            Some("203.0.113.9")
+        );
+
+        // IPv6 entries are honoured too.
+        let mut v6 = HeaderMap::new();
+        v6.insert("x-forwarded-for", "::1".parse().unwrap());
+        assert_eq!(client_ip(&v6, Some(peer), true).as_deref(), Some("::1"));
     }
 }

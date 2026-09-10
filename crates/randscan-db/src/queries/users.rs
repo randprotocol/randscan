@@ -69,7 +69,7 @@ pub async fn create_session(
     .bind(user_id)
     .bind(expires_at)
     .bind(user_agent.map(|s| s.chars().take(256).collect::<String>()))
-    .bind(ip)
+    .bind(ip.map(|s| s.chars().take(64).collect::<String>()))
     .execute(pool)
     .await?;
     Ok(())
@@ -146,6 +146,15 @@ pub async fn delete_expired_sessions(pool: &PgPool, user_id: i64) -> Result<()> 
         .execute(pool)
         .await?;
     Ok(())
+}
+
+/// Delete every expired session across all users. Used by the background reaper task.
+/// Returns the number of rows deleted.
+pub async fn delete_all_expired_sessions(pool: &PgPool) -> Result<u64> {
+    let res = sqlx::query("DELETE FROM sessions WHERE expires_at <= NOW()")
+        .execute(pool)
+        .await?;
+    Ok(res.rows_affected())
 }
 
 pub async fn list_api_keys(pool: &PgPool, user_id: i64) -> Result<Vec<ApiKeyRow>> {

@@ -56,8 +56,16 @@ async fn create_use_list_revoke() {
         .unwrap();
     let (status, _, _) = call(&app, req).await;
     assert_eq!(status, 200);
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await; // usage is recorded asynchronously
-    let (_, _, list) = call(&app, json_req("GET", "/api/v1/keys", None, Some(&cookie))).await;
+    // Usage is recorded asynchronously; poll instead of sleeping a fixed amount.
+    let mut list = serde_json::Value::Null;
+    for _ in 0..40 {
+        let (_, _, l) = call(&app, json_req("GET", "/api/v1/keys", None, Some(&cookie))).await;
+        if l[0]["request_count"] == 1 {
+            list = l;
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
     assert_eq!(list[0]["request_count"], 1);
     assert!(list[0]["last_used_at"].is_string());
 

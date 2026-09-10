@@ -112,6 +112,17 @@ async fn signup_login_me_logout() {
     )
     .await;
     assert_eq!(status, 200, "first session still valid");
+
+    // Logout is idempotent: repeating it with the same (already-invalidated) cookie still
+    // returns 204, and so does logging out with no cookie at all.
+    let (status, _, _) = call(
+        &app,
+        json_req("POST", "/api/v1/auth/logout", None, Some(&cookie2)),
+    )
+    .await;
+    assert_eq!(status, 204, "logging out twice");
+    let (status, _, _) = call(&app, json_req("POST", "/api/v1/auth/logout", None, None)).await;
+    assert_eq!(status, 204, "logging out with no cookie");
 }
 
 #[tokio::test]

@@ -70,10 +70,14 @@ Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed 
 ### Operator runbook: reset a password
 
 ```bash
-echo 'new password here' | randscan-api hash-password      # prints $argon2id$...
+read -rs PW && printf '%s' "$PW" | randscan-api hash-password      # prints $argon2id$...
 psql "$DATABASE_URL" -c "UPDATE users SET password_hash = '<paste>' WHERE email = 'user@example.com';" \
                      -c "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');"
 ```
+
+`read -rs` prompts for the new password without echoing it, and `printf` (rather than `echo`)
+avoids appending a trailing newline — together this keeps the password out of shell history and
+process listings.
 
 ## Deploy on a node
 

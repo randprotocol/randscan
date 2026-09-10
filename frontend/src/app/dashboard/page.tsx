@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
@@ -145,9 +144,14 @@ export default function DashboardPage() {
         <p className="pb-3 text-xs text-mute">
           Up to 10 active keys. Keyed requests get 600 requests per minute; anonymous traffic gets
           60 per IP. See the{' '}
-          <Link href="https://github.com/randprotocol/randscan/blob/main/docs/api.md" className="link">
+          <a
+            href="https://github.com/randprotocol/randscan/blob/main/docs/api.md"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="link"
+          >
             API guide
-          </Link>
+          </a>
           .
         </p>
       </Panel>

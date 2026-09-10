@@ -63,31 +63,70 @@ const MIGRATIONS: &[(i32, &str)] = &[
     (2, include_str!("../../../migrations/002_accounts.sql")),
 ];
 
+/// Advisory lock key used to serialize migration runs across concurrent callers. The
+/// constant spells "RANDSCAN" in ASCII bytes, reinterpreted as a signed 64-bit integer.
+const MIGRATION_LOCK_KEY: i64 = 0x52414E445343414E;
+
 /// Apply every migration that `schema_migrations` does not record yet, each in its own transaction.
 ///
 /// Databases created before the runner existed have `blocks` but no `schema_migrations`; they are
 /// recorded as version 1 first.
+///
+/// Concurrent callers (e.g. multiple test binaries running in parallel against a fresh
+/// database) would otherwise race on `CREATE TABLE IF NOT EXISTS schema_migrations` and
+/// on applying the same migration twice. To prevent that, the whole runner executes on a
+/// single pooled connection while holding a Postgres advisory lock (`pg_advisory_lock`),
+/// which is released on every exit path, including errors.
 pub async fn run_migrations(pool: &PgPool) -> Result<()> {
+    let mut conn = pool.acquire().await?;
+
+    sqlx::query("SELECT pg_advisory_lock($1)")
+        .bind(MIGRATION_LOCK_KEY)
+        .execute(&mut *conn)
+        .await?;
+
+    let result = run_migrations_locked(&mut conn).await;
+
+    if let Err(e) = sqlx::query("SELECT pg_advisory_unlock($1)")
+        .bind(MIGRATION_LOCK_KEY)
+        .execute(&mut *conn)
+        .await
+    {
+        tracing::warn!("failed to release migration advisory lock: {}", e);
+    }
+
+    result
+}
+
+/// The body of `run_migrations`, executed on a single connection while the advisory lock
+/// from `run_migrations` is held.
+///
+/// Each migration's statements and its `schema_migrations` insert are wrapped in a plain
+/// `BEGIN`/`COMMIT`/`ROLLBACK` on that same connection, rather than `sqlx::Transaction`
+/// (whose `Executor` impl over a reborrowed `&mut PgConnection` hits a known rustc/sqlx
+/// higher-ranked-trait-bound inference limitation once this function is spawned onto a
+/// task, surfacing as "implementation of `Executor` is not general enough").
+async fn run_migrations_locked(conn: &mut sqlx::PgConnection) -> Result<()> {
     sqlx::query(
         "CREATE TABLE IF NOT EXISTS schema_migrations (
             version INTEGER PRIMARY KEY,
             applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
         )",
     )
-    .execute(pool)
+    .execute(&mut *conn)
     .await?;
 
     let blocks_exist: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'blocks')",
     )
-    .fetch_one(pool)
+    .fetch_one(&mut *conn)
     .await?;
 
     if blocks_exist {
         let ok: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'blocks' AND column_name = 'justify_view')",
         )
-        .fetch_one(pool)
+        .fetch_one(&mut *conn)
         .await?;
         if !ok {
             return Err(DbError::Migration(
@@ -95,12 +134,12 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
             ));
         }
         sqlx::query("INSERT INTO schema_migrations (version) VALUES (1) ON CONFLICT DO NOTHING")
-            .execute(pool)
+            .execute(&mut *conn)
             .await?;
     }
 
     let applied: Vec<i32> = sqlx::query_scalar("SELECT version FROM schema_migrations")
-        .fetch_all(pool)
+        .fetch_all(&mut *conn)
         .await?;
 
     for (version, sql) in MIGRATIONS {
@@ -108,16 +147,33 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
             continue;
         }
         tracing::info!("applying migration {}", version);
-        let mut tx = pool.begin().await?;
-        sqlx::raw_sql(sql)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| DbError::Migration(format!("migration {}: {}", version, e)))?;
-        sqlx::query("INSERT INTO schema_migrations (version) VALUES ($1)")
+
+        sqlx::query("BEGIN").execute(&mut *conn).await?;
+
+        // Executed via the fully-qualified `Executor` form (rather than `sqlx::raw_sql(sql)
+        // .execute(&mut *conn)`) to pin the `Database` type eagerly: with the method-call
+        // form, rustc's trait solver fails to prove `Executor` is implemented generally
+        // enough once this function's future is spawned onto a new task (observed as
+        // "implementation of `Executor` is not general enough"), because `RawSql`'s
+        // `Execute` impl is generic over every `Database`, not just `Postgres`.
+        if let Err(e) =
+            <&mut sqlx::PgConnection as sqlx::Executor>::execute(&mut *conn, sqlx::raw_sql(sql))
+                .await
+        {
+            let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+            return Err(DbError::Migration(format!("migration {}: {}", version, e)));
+        }
+
+        if let Err(e) = sqlx::query("INSERT INTO schema_migrations (version) VALUES ($1)")
             .bind(version)
-            .execute(&mut *tx)
-            .await?;
-        tx.commit().await?;
+            .execute(&mut *conn)
+            .await
+        {
+            let _ = sqlx::query("ROLLBACK").execute(&mut *conn).await;
+            return Err(e.into());
+        }
+
+        sqlx::query("COMMIT").execute(&mut *conn).await?;
     }
     Ok(())
 }

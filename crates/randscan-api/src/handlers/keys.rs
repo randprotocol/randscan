@@ -52,6 +52,10 @@ pub async fn create_key(
         ));
     }
     let pool = state.db.inner();
+    // The 10-key cap is a courtesy limit, not a security boundary: this count-then-insert
+    // is not atomic, so two concurrent creates for the same user can both pass this check
+    // and briefly leave the user with 11 active keys. That is accepted — nothing relies on
+    // the cap being exact, and the user can simply revoke one to get back under it.
     if db::count_active_api_keys(pool, user.id).await? >= MAX_ACTIVE_KEYS {
         return Err(AppError::conflict(
             "key_limit",
