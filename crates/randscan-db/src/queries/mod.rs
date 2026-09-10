@@ -5,6 +5,7 @@ mod nodes;
 mod programs;
 mod stats;
 mod transactions;
+mod users;
 mod validators;
 
 pub use accounts::*;
@@ -14,4 +15,5 @@ pub use nodes::*;
 pub use programs::*;
 pub use stats::*;
 pub use transactions::*;
+pub use users::*;
 pub use validators::*;

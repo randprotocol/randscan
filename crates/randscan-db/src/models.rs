@@ -269,3 +269,32 @@ impl NodeGeoRow {
         }
     }
 }
+
+#[derive(Debug, Clone, FromRow)]
+pub struct UserRow {
+    pub id: i64,
+    pub email: String,
+    pub password_hash: String,
+    pub created_at: DateTime<Utc>,
+    pub last_login_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct SessionRow {
+    pub token_hash: String,
+    pub user_id: i64,
+    pub expires_at: DateTime<Utc>,
+    pub last_seen_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct ApiKeyRow {
+    pub id: i64,
+    pub user_id: i64,
+    pub name: String,
+    pub prefix: String,
+    pub created_at: DateTime<Utc>,
+    pub last_used_at: Option<DateTime<Utc>>,
+    pub request_count: i64,
+    pub revoked_at: Option<DateTime<Utc>>,
+}
