@@ -2,6 +2,7 @@
 
 mod account;
 mod api;
+mod auth;
 mod block;
 mod node;
 mod program;
@@ -12,6 +13,7 @@ mod ws;
 
 pub use account::*;
 pub use api::*;
+pub use auth::*;
 pub use block::*;
 pub use node::*;
 pub use program::*;
