@@ -1,6 +1,7 @@
 use crate::{handlers, state::AppState};
 use axum::{
     extract::{ws::WebSocketUpgrade, State},
+    middleware,
     response::IntoResponse,
     routing::get,
     Router,
@@ -35,7 +36,11 @@ pub fn create_router(state: AppState) -> Router {
         .route("/programs", get(handlers::list_programs))
         .route("/programs/:id", get(handlers::get_program))
         .route("/nodes", get(handlers::list_nodes))
-        .route("/search", get(handlers::search));
+        .route("/search", get(handlers::search))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::ratelimit::api_limit,
+        ));
 
     Router::new()
         .nest("/api/v1", api)

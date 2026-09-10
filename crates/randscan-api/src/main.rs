@@ -57,6 +57,7 @@ async fn main() -> Result<()> {
         config: api_config.clone(),
         limiter: Arc::new(randscan_api::ratelimit::RateLimiter::new()),
     };
+    state.limiter.clone().spawn_sweeper();
     let app = create_router(state);
 
     info!("listening on {}", api_config.listen_addr);
