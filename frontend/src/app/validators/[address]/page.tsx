@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { DetailSkeleton } from '@/components/Loading';
@@ -15,7 +16,8 @@ import {
   formatTimestamp,
 } from '@/lib/utils';
 
-export default function ValidatorDetailPage({ params }: { params: { address: string } }) {
+export default function ValidatorDetailPage() {
+  const params = useParams<{ address: string }>();
   const address = decodeURIComponent(params.address);
   const { data: validator, error, isLoading, mutate } = useValidator(address);
 

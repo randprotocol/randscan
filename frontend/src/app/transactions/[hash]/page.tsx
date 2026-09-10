@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { KindBadge } from '@/components/KindBadge';
@@ -16,7 +17,8 @@ import {
 } from '@/lib/utils';
 import type { Receipt, TransactionDetail } from '@/types';
 
-export default function TransactionDetailPage({ params }: { params: { hash: string } }) {
+export default function TransactionDetailPage() {
+  const params = useParams<{ hash: string }>();
   const hash = decodeURIComponent(params.hash);
   const { data: tx, error, isLoading, mutate } = useTransaction(hash);
 

@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { DetailSkeleton } from '@/components/Loading';
@@ -9,7 +10,8 @@ import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/compo
 import { isNotFound, useProgram } from '@/hooks/useApi';
 import { formatNumber } from '@/lib/utils';
 
-export default function ProgramDetailPage({ params }: { params: { id: string } }) {
+export default function ProgramDetailPage() {
+  const params = useParams<{ id: string }>();
   const id = decodeURIComponent(params.id);
   const { data: program, error, isLoading, mutate } = useProgram(id);
 

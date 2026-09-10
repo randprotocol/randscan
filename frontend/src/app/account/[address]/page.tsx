@@ -1,5 +1,6 @@
 'use client';
 
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { useState } from 'react';
 import { Hash } from '@/components/Hash';
@@ -13,7 +14,8 @@ import { formatAmount, formatNumber, formatStake } from '@/lib/utils';
 
 const PAGE_SIZE = 25;
 
-export default function AccountDetailPage({ params }: { params: { address: string } }) {
+export default function AccountDetailPage() {
+  const params = useParams<{ address: string }>();
   const address = decodeURIComponent(params.address);
   const [page, setPage] = useState(1);
 
