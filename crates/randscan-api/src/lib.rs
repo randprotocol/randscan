@@ -3,6 +3,7 @@
 pub mod auth;
 pub mod error;
 pub mod handlers;
+pub mod mail;
 pub mod ratelimit;
 pub mod routes;
 pub mod state;
@@ -26,6 +27,10 @@ pub struct ApiConfig {
     pub key_rpm: u32,
     /// Login/signup attempts per minute per IP (0 disables).
     pub auth_rpm: u32,
+    /// Site origin used in emailed links, without a trailing slash.
+    pub public_url: String,
+    /// `From` header for outbound mail.
+    pub mail_from: String,
 }
 
 impl Default for ApiConfig {
@@ -37,6 +42,8 @@ impl Default for ApiConfig {
             anon_rpm: 60,
             key_rpm: 600,
             auth_rpm: 10,
+            public_url: "https://randscan.org".to_string(),
+            mail_from: "RandScan <no-reply@randscan.org>".to_string(),
         }
     }
 }
@@ -75,6 +82,16 @@ impl ApiConfig {
             anon_rpm: num("ANON_RATE_LIMIT_RPM", d.anon_rpm),
             key_rpm: num("KEY_RATE_LIMIT_RPM", d.key_rpm),
             auth_rpm: num("AUTH_RATE_LIMIT_RPM", d.auth_rpm),
+            public_url: std::env::var("PUBLIC_URL")
+                .ok()
+                .map(|v| v.trim().trim_end_matches('/').to_string())
+                .filter(|v| !v.is_empty())
+                .unwrap_or(d.public_url),
+            mail_from: std::env::var("MAIL_FROM")
+                .ok()
+                .map(|v| v.trim().to_string())
+                .filter(|v| !v.is_empty())
+                .unwrap_or(d.mail_from),
         }
     }
 }

@@ -20,6 +20,8 @@ pub fn create_router(state: AppState) -> Router {
     let auth_public = Router::new()
         .route("/auth/signup", post(handlers::signup))
         .route("/auth/login", post(handlers::login))
+        .route("/auth/forgot", post(handlers::forgot_password))
+        .route("/auth/reset", post(handlers::reset_password))
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::ratelimit::auth_limit,
@@ -47,6 +49,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/search", get(handlers::search))
         .route("/auth/logout", post(handlers::logout))
         .route("/auth/me", get(handlers::me))
+        .route("/auth/password", post(handlers::change_password))
         .route("/keys", get(handlers::list_keys).post(handlers::create_key))
         .route("/keys/:id", delete(handlers::revoke_key))
         .merge(auth_public)

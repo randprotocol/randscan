@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { DetailSkeleton } from '@/components/Loading';
 import { DetailRow, ErrorState, PageHeader, Panel } from '@/components/States';
+import { ChangePasswordForm } from '@/components/PasswordForms';
 import { useApiKeys, useMe } from '@/hooks/useApi';
 import * as api from '@/lib/api';
 import { copyToClipboard, formatDateTime, formatNumber } from '@/lib/utils';
@@ -191,6 +192,10 @@ export default function DashboardPage() {
           ))}
         </Panel>
       )}
+
+      <Panel title="Change password">
+        <ChangePasswordForm />
+      </Panel>
 
       <Panel title="Account">
         <DetailRow label="Email">{me.email}</DetailRow>

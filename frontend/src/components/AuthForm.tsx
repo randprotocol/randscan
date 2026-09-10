@@ -88,6 +88,13 @@ export function AuthForm({ mode }: AuthFormProps) {
             className="input"
           />
           {mode === 'signup' && <p className="mt-1.5 text-xs text-mute">At least 10 characters.</p>}
+          {mode === 'login' && (
+            <p className="mt-1.5 text-right text-xs">
+              <Link href="/forgot" className="link">
+                Forgot your password?
+              </Link>
+            </p>
+          )}
         </div>
         {error && (
           <div className="form-error" role="alert">

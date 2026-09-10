@@ -328,9 +328,16 @@ way for machines.
 | `POST /auth/login` | `{ "email", "password" }` | 200 `{ "user" }`, sets cookie |
 | `POST /auth/logout` | | 204 |
 | `GET /auth/me` | | 200 `{ "user" }` or 401 |
+| `POST /auth/forgot` | `{ "email" }` | 202 always (503 `email_disabled` if the explorer has no mail provider) |
+| `POST /auth/reset` | `{ "token", "password" }` | 200 `{ "user" }`, sets cookie; 400 `invalid_token` / `weak_password` |
+| `POST /auth/password` | `{ "current_password", "new_password" }` | 204; signs out every other session |
 | `GET /keys` | | `ApiKey[]` (never includes the secret) |
 | `POST /keys` | `{ "name" }` | 201 `ApiKey` plus `key`, once |
 | `DELETE /keys/:id` | | 204 |
+
+Password reset: `/auth/forgot` emails a single-use link to `/reset?token=…` that is valid for one
+hour and answers 202 whether or not the address is registered. `/auth/reset` logs the user out
+everywhere and signs them in with a fresh cookie. Both share the sign-in rate limit.
 
 `user`: `{ id, email, created_at, last_login_at }`. `ApiKey`: `{ id, name, prefix, created_at,
 last_used_at, request_count, revoked_at }`. Passwords are 10 to 128 characters.

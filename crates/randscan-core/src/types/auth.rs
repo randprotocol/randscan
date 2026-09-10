@@ -51,6 +51,23 @@ pub struct CreateKeyRequest {
     pub name: String,
 }
 
+#[derive(Debug, Clone, Deserialize)]
+pub struct ForgotPasswordRequest {
+    pub email: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ResetPasswordRequest {
+    pub token: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct ChangePasswordRequest {
+    pub current_password: String,
+    pub new_password: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

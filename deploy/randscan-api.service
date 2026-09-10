@@ -5,6 +5,7 @@ Wants=postgresql.service
 
 [Service]
 EnvironmentFile=/etc/randscan/api.env
+EnvironmentFile=-/etc/randscan/api.secrets.env
 ExecStart=/usr/local/bin/randscan-api
 Restart=always
 RestartSec=3

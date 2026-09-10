@@ -224,3 +224,76 @@ pub async fn record_api_key_use(pool: &PgPool, id: i64) -> Result<()> {
     .await?;
     Ok(())
 }
+
+// ---------------------------------------------------------------------------
+// Password resets and password changes
+// ---------------------------------------------------------------------------
+
+/// Issue a reset token for `user_id`, replacing any earlier unused token so only the latest
+/// link works. `token_hash` is the SHA-256 hex of the secret; the secret is never stored.
+pub async fn create_password_reset(
+    pool: &PgPool,
+    user_id: i64,
+    token_hash: &str,
+    expires_at: DateTime<Utc>,
+) -> Result<()> {
+    sqlx::query("DELETE FROM password_resets WHERE user_id = $1 AND used_at IS NULL")
+        .bind(user_id)
+        .execute(pool)
+        .await?;
+    sqlx::query(
+        "INSERT INTO password_resets (token_hash, user_id, expires_at) VALUES ($1, $2, $3)",
+    )
+    .bind(token_hash)
+    .bind(user_id)
+    .bind(expires_at)
+    .execute(pool)
+    .await?;
+    Ok(())
+}
+
+/// Atomically mark a reset token used and return its user, or `None` when the token is
+/// unknown, already used, or expired (the caller treats all three the same).
+pub async fn consume_password_reset(pool: &PgPool, token_hash: &str) -> Result<Option<i64>> {
+    Ok(sqlx::query_scalar(
+        "UPDATE password_resets SET used_at = NOW()
+         WHERE token_hash = $1 AND used_at IS NULL AND expires_at > NOW()
+         RETURNING user_id",
+    )
+    .bind(token_hash)
+    .fetch_optional(pool)
+    .await?)
+}
+
+pub async fn delete_expired_password_resets(pool: &PgPool) -> Result<u64> {
+    let res =
+        sqlx::query("DELETE FROM password_resets WHERE expires_at <= NOW() OR used_at IS NOT NULL")
+            .execute(pool)
+            .await?;
+    Ok(res.rows_affected())
+}
+
+pub async fn update_password(pool: &PgPool, user_id: i64, password_hash: &str) -> Result<()> {
+    sqlx::query("UPDATE users SET password_hash = $2 WHERE id = $1")
+        .bind(user_id)
+        .bind(password_hash)
+        .execute(pool)
+        .await?;
+    Ok(())
+}
+
+/// Log a user out everywhere, optionally keeping one session (the caller's own).
+pub async fn delete_user_sessions(
+    pool: &PgPool,
+    user_id: i64,
+    keep_token_hash: Option<&str>,
+) -> Result<u64> {
+    let res = sqlx::query(
+        "DELETE FROM sessions WHERE user_id = $1 AND ($2::text IS NULL OR token_hash <> $2)",
+    )
+    .bind(user_id)
+    .bind(keep_token_hash)
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected())
+}

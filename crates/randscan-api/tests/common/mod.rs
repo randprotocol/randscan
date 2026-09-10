@@ -8,7 +8,7 @@ use axum::{
     Router,
 };
 use http_body_util::BodyExt;
-use randscan_api::{create_router, ratelimit::RateLimiter, ApiConfig, AppState};
+use randscan_api::{create_router, mail::MailSender, ratelimit::RateLimiter, ApiConfig, AppState};
 use randscan_db::{run_migrations, DbPool};
 use randscan_indexer::{Broadcaster, IndexerConfig, IndexerService};
 use randscan_ws::WsManager;
@@ -30,6 +30,13 @@ pub fn test_config() -> ApiConfig {
 }
 
 pub async fn test_app(cfg: ApiConfig) -> Option<(Router, PgPool)> {
+    test_app_with_mailer(cfg, None).await
+}
+
+pub async fn test_app_with_mailer(
+    cfg: ApiConfig,
+    mailer: Option<Arc<dyn MailSender>>,
+) -> Option<(Router, PgPool)> {
     let url = std::env::var("DATABASE_URL").ok()?;
     let pool = PgPoolOptions::new()
         .max_connections(4)
@@ -49,6 +56,7 @@ pub async fn test_app(cfg: ApiConfig) -> Option<(Router, PgPool)> {
         ws_manager: Arc::new(WsManager::new()),
         config: Arc::new(cfg),
         limiter: Arc::new(RateLimiter::new()),
+        mailer,
     };
     Some((create_router(state), pool))
 }

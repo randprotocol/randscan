@@ -278,3 +278,25 @@ export function createKey(name: string): Promise<CreatedApiKey> {
 export function revokeKey(id: number): Promise<void> {
   return requestVoid(`/keys/${id}`, jsonInit('DELETE'));
 }
+
+// ---------------------------------------------------------------------------
+// Password reset and change
+// ---------------------------------------------------------------------------
+
+/** Always resolves (202) whether or not the address is registered; 503 when email is disabled. */
+export function forgotPassword(email: string): Promise<void> {
+  return requestVoid('/auth/forgot', jsonInit('POST', { email }));
+}
+
+/** Consumes the emailed token, sets the password and signs the user in. */
+export async function resetPassword(token: string, password: string): Promise<User> {
+  const res = await request<{ user: User }>('/auth/reset', jsonInit('POST', { token, password }));
+  return res.user;
+}
+
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return requestVoid(
+    '/auth/password',
+    jsonInit('POST', { current_password: currentPassword, new_password: newPassword })
+  );
+}

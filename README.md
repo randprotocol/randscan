@@ -50,6 +50,9 @@ indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERV
 | `RUST_LOG` | `info` | log filter |
 | `COOKIE_SECURE` | `true` | set the session cookie `Secure` (requires https; use `false` for local http) |
 | `TRUST_PROXY` | `false` | read the client IP from `X-Forwarded-For` (true behind Caddy/nginx) |
+| `PUBLIC_URL` | `https://randscan.org` | site origin used in password-reset links |
+| `MAIL_FROM` | `RandScan <no-reply@randscan.org>` | sender of password-reset email (domain must be verified in Resend) |
+| `RESEND_API_KEY` | unset | Resend API key; unset disables password reset by email |
 | `ANON_RATE_LIMIT_RPM` | `60` | requests per minute per IP for anonymous traffic |
 | `KEY_RATE_LIMIT_RPM` | `600` | requests per minute per API key |
 | `AUTH_RATE_LIMIT_RPM` | `10` | sign-in/sign-up attempts per minute per IP |
@@ -66,6 +69,15 @@ examples in [docs/api.md](docs/api.md).
 
 Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed requests use
 `Authorization: Bearer rsk_...`. Details and quotas in [docs/api.md](docs/api.md).
+
+### Password reset
+
+Users reset their own password from `/forgot`: the API emails a single-use link (valid one hour)
+through [Resend](https://resend.com) when `RESEND_API_KEY` is set, and signed-in users can change
+their password from `/dashboard`. On a node deployed with `deploy/vps-setup.sh`, put the key in
+`/etc/randscan/api.secrets.env` (created empty by the script, never overwritten) and restart
+`randscan-api`. Without a key the site reports that reset by email is not enabled and the
+runbook below is the fallback.
 
 ### Operator runbook: reset a password
 

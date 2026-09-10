@@ -29,7 +29,7 @@ async fn migrations_are_versioned_and_idempotent() {
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(versions, vec![1, 2]);
+    assert_eq!(versions, vec![1, 2, 3]);
 
     for table in ["users", "sessions", "api_keys"] {
         let exists: bool = sqlx::query_scalar(
@@ -271,11 +271,105 @@ async fn concurrent_migrations_do_not_race() {
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(versions, vec![1, 2]);
+    assert_eq!(versions, vec![1, 2, 3]);
 
     pool.close().await;
     sqlx::query(&format!("DROP DATABASE IF EXISTS {scratch_db}"))
         .execute(&admin_pool)
         .await
         .expect("drop scratch database");
+}
+
+#[tokio::test]
+async fn password_resets_are_single_use_and_replace_earlier_tokens() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let u = db::create_user(&pool, &unique_email(), "hash")
+        .await
+        .unwrap();
+    let h = |n: i64| format!("{:0>64}", format!("{:x}", u.id * 31 + n));
+
+    db::create_password_reset(&pool, u.id, &h(1), Utc::now() + Duration::hours(1))
+        .await
+        .unwrap();
+    db::create_password_reset(&pool, u.id, &h(2), Utc::now() + Duration::hours(1))
+        .await
+        .unwrap();
+    // Issuing a second token invalidates the first.
+    assert_eq!(
+        db::consume_password_reset(&pool, &h(1)).await.unwrap(),
+        None
+    );
+    assert_eq!(
+        db::consume_password_reset(&pool, &h(2)).await.unwrap(),
+        Some(u.id)
+    );
+    // Single use.
+    assert_eq!(
+        db::consume_password_reset(&pool, &h(2)).await.unwrap(),
+        None
+    );
+    // Expired tokens are never consumed.
+    db::create_password_reset(&pool, u.id, &h(3), Utc::now() - Duration::minutes(1))
+        .await
+        .unwrap();
+    assert_eq!(
+        db::consume_password_reset(&pool, &h(3)).await.unwrap(),
+        None
+    );
+    // Unknown token.
+    assert_eq!(
+        db::consume_password_reset(&pool, &h(99)).await.unwrap(),
+        None
+    );
+    // The reaper removes used and expired rows.
+    let n = db::delete_expired_password_resets(&pool).await.unwrap();
+    assert!(n >= 2, "removed used + expired rows, got {n}");
+}
+
+#[tokio::test]
+async fn update_password_and_delete_sessions_except_current() {
+    let Some(pool) = test_pool().await else {
+        return;
+    };
+    let u = db::create_user(&pool, &unique_email(), "old")
+        .await
+        .unwrap();
+    db::update_password(&pool, u.id, "new").await.unwrap();
+    assert_eq!(
+        db::get_user(&pool, u.id)
+            .await
+            .unwrap()
+            .unwrap()
+            .password_hash,
+        "new"
+    );
+
+    let s1 = format!("{:0>64}", format!("{:x}", u.id * 37 + 1));
+    let s2 = format!("{:0>64}", format!("{:x}", u.id * 37 + 2));
+    for s in [&s1, &s2] {
+        db::create_session(&pool, s, u.id, Utc::now() + Duration::days(1), None, None)
+            .await
+            .unwrap();
+    }
+    assert_eq!(
+        db::delete_user_sessions(&pool, u.id, Some(&s1))
+            .await
+            .unwrap(),
+        1
+    );
+    assert!(
+        db::get_session_user(&pool, &s1).await.unwrap().is_some(),
+        "kept"
+    );
+    assert!(
+        db::get_session_user(&pool, &s2).await.unwrap().is_none(),
+        "deleted"
+    );
+    assert_eq!(
+        db::delete_user_sessions(&pool, u.id, None).await.unwrap(),
+        1
+    );
+    assert!(db::get_session_user(&pool, &s1).await.unwrap().is_none());
 }

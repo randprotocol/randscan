@@ -3,7 +3,8 @@
 use anyhow::Result;
 use randscan_api::{create_router, ApiConfig, AppState};
 use randscan_db::{
-    create_pool, delete_all_expired_sessions, run_migrations, DatabaseConfig, DbPool,
+    create_pool, delete_all_expired_sessions, delete_expired_password_resets, run_migrations,
+    DatabaseConfig, DbPool,
 };
 use randscan_indexer::{Broadcaster, IndexerConfig, IndexerService};
 use randscan_ws::WsManager;
@@ -52,12 +53,36 @@ async fn main() -> Result<()> {
     });
 
     let api_config = Arc::new(ApiConfig::from_env());
+    // The Resend key is read here and handed straight to the mailer; it never lives in
+    // `ApiConfig` (which derives Debug) or in logs.
+    let mailer: Option<Arc<dyn randscan_api::mail::MailSender>> =
+        match std::env::var("RESEND_API_KEY")
+            .ok()
+            .map(|k| k.trim().to_string())
+            .filter(|k| !k.is_empty())
+        {
+            Some(key) => {
+                info!(
+                    "password reset enabled via Resend, from {}",
+                    api_config.mail_from
+                );
+                Some(Arc::new(randscan_api::mail::ResendMailer::new(
+                    key,
+                    api_config.mail_from.clone(),
+                )))
+            }
+            None => {
+                info!("RESEND_API_KEY unset: password reset disabled");
+                None
+            }
+        };
     let state = AppState {
         db: db_pool,
         indexer,
         ws_manager,
         config: api_config.clone(),
         limiter: Arc::new(randscan_api::ratelimit::RateLimiter::new()),
+        mailer,
     };
     state.limiter.clone().spawn_sweeper();
 
@@ -74,6 +99,10 @@ async fn main() -> Result<()> {
             match delete_all_expired_sessions(reaper_db.inner()).await {
                 Ok(n) => tracing::debug!("session reaper: deleted {} expired session(s)", n),
                 Err(e) => tracing::warn!("session reaper: {}", e),
+            }
+            match delete_expired_password_resets(reaper_db.inner()).await {
+                Ok(n) => tracing::debug!("reset reaper: deleted {} stale reset token(s)", n),
+                Err(e) => tracing::warn!("reset reaper: {}", e),
             }
             tokio::time::sleep(std::time::Duration::from_secs(3600)).await;
         }

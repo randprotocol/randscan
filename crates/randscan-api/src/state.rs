@@ -1,4 +1,4 @@
-use crate::{ratelimit::RateLimiter, ApiConfig};
+use crate::{mail::MailSender, ratelimit::RateLimiter, ApiConfig};
 use randscan_db::DbPool;
 use randscan_indexer::IndexerService;
 use randscan_ws::WsManager;
@@ -11,4 +11,6 @@ pub struct AppState {
     pub ws_manager: Arc<WsManager>,
     pub config: Arc<ApiConfig>,
     pub limiter: Arc<RateLimiter>,
+    /// `None` when no mail provider is configured (password reset disabled).
+    pub mailer: Option<Arc<dyn MailSender>>,
 }

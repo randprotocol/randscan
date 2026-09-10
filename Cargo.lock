@@ -1554,6 +1554,7 @@ dependencies = [
  "randscan-db",
  "randscan-indexer",
  "randscan-ws",
+ "reqwest",
  "serde",
  "serde_json",
  "sha2",

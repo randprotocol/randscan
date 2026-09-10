@@ -51,11 +51,24 @@ API_HOST=127.0.0.1
 API_PORT=3000
 COOKIE_SECURE=true
 TRUST_PROXY=true
+PUBLIC_URL=https://$DOMAIN
+MAIL_FROM=RandScan <no-reply@$DOMAIN>
 POLL_INTERVAL_MS=1000
 BATCH_SIZE=200
 RUST_LOG=info,sqlx=warn,tower_http=warn
 ENV
 chmod 600 $ENV_DIR/api.env
+
+# Secrets live in a file this script never rewrites (the systemd unit loads it after api.env).
+if [ ! -f $ENV_DIR/api.secrets.env ]; then
+    cat > $ENV_DIR/api.secrets.env <<'SECRETS'
+# Secrets for randscan-api. Not managed by vps-setup.sh; survives redeploys.
+# Password-reset email through Resend (https://resend.com): create an API key with sending
+# access for a verified domain and put it here, then `systemctl restart randscan-api`.
+#RESEND_API_KEY=re_...
+SECRETS
+    chmod 600 $ENV_DIR/api.secrets.env
+fi
 
 # --- build ----------------------------------------------------------------------------------
 source /root/.cargo/env
