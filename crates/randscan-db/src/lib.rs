@@ -54,19 +54,36 @@ pub async fn create_pool(config: &DatabaseConfig) -> Result<PgPool> {
         .map_err(|e| DbError::Connection(e.to_string()))
 }
 
-/// Schema version string embedded in the `indexer_state` bootstrap; bump when the schema changes.
-const SCHEMA_SQL: &str = include_str!("../../../migrations/001_initial_schema.sql");
+/// Embedded migrations in order. Add new files here; never edit an applied one.
+const MIGRATIONS: &[(i32, &str)] = &[
+    (
+        1,
+        include_str!("../../../migrations/001_initial_schema.sql"),
+    ),
+    (2, include_str!("../../../migrations/002_accounts.sql")),
+];
 
-/// Create the schema if the `blocks` table does not exist yet.
+/// Apply every migration that `schema_migrations` does not record yet, each in its own transaction.
+///
+/// Databases created before the runner existed have `blocks` but no `schema_migrations`; they are
+/// recorded as version 1 first.
 pub async fn run_migrations(pool: &PgPool) -> Result<()> {
-    let exists: bool = sqlx::query_scalar(
+    sqlx::query(
+        "CREATE TABLE IF NOT EXISTS schema_migrations (
+            version INTEGER PRIMARY KEY,
+            applied_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+        )",
+    )
+    .execute(pool)
+    .await?;
+
+    let blocks_exist: bool = sqlx::query_scalar(
         "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'blocks')",
     )
     .fetch_one(pool)
     .await?;
 
-    if exists {
-        // Sanity check that this is the SHRUGG schema and not the legacy one.
+    if blocks_exist {
         let ok: bool = sqlx::query_scalar(
             "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'blocks' AND column_name = 'justify_view')",
         )
@@ -77,14 +94,30 @@ pub async fn run_migrations(pool: &PgPool) -> Result<()> {
                 "database has the legacy schema; drop and recreate the database".into(),
             ));
         }
-        tracing::info!("Database schema present");
-        return Ok(());
+        sqlx::query("INSERT INTO schema_migrations (version) VALUES (1) ON CONFLICT DO NOTHING")
+            .execute(pool)
+            .await?;
     }
 
-    tracing::info!("Creating database schema");
-    sqlx::raw_sql(SCHEMA_SQL)
-        .execute(pool)
-        .await
-        .map_err(|e| DbError::Migration(e.to_string()))?;
+    let applied: Vec<i32> = sqlx::query_scalar("SELECT version FROM schema_migrations")
+        .fetch_all(pool)
+        .await?;
+
+    for (version, sql) in MIGRATIONS {
+        if applied.contains(version) {
+            continue;
+        }
+        tracing::info!("applying migration {}", version);
+        let mut tx = pool.begin().await?;
+        sqlx::raw_sql(sql)
+            .execute(&mut *tx)
+            .await
+            .map_err(|e| DbError::Migration(format!("migration {}: {}", version, e)))?;
+        sqlx::query("INSERT INTO schema_migrations (version) VALUES ($1)")
+            .bind(version)
+            .execute(&mut *tx)
+            .await?;
+        tx.commit().await?;
+    }
     Ok(())
 }
