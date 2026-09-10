@@ -1,4 +1,5 @@
 mod accounts;
+mod auth;
 mod blocks;
 mod health;
 mod nodes;
@@ -9,6 +10,7 @@ mod transactions;
 mod validators;
 
 pub use accounts::*;
+pub use auth::*;
 pub use blocks::*;
 pub use health::*;
 pub use nodes::*;

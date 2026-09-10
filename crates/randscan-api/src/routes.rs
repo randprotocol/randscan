@@ -3,7 +3,7 @@ use axum::{
     extract::{ws::WebSocketUpgrade, State},
     middleware,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Router,
 };
 use randscan_ws::WsState;
@@ -17,6 +17,14 @@ async fn ws_upgrade(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl
 }
 
 pub fn create_router(state: AppState) -> Router {
+    let auth_public = Router::new()
+        .route("/auth/signup", post(handlers::signup))
+        .route("/auth/login", post(handlers::login))
+        .layer(middleware::from_fn_with_state(
+            state.clone(),
+            crate::ratelimit::auth_limit,
+        ));
+
     let api = Router::new()
         .route("/health", get(handlers::health))
         .route("/stats", get(handlers::get_stats))
@@ -37,6 +45,9 @@ pub fn create_router(state: AppState) -> Router {
         .route("/programs/:id", get(handlers::get_program))
         .route("/nodes", get(handlers::list_nodes))
         .route("/search", get(handlers::search))
+        .route("/auth/logout", post(handlers::logout))
+        .route("/auth/me", get(handlers::me))
+        .merge(auth_public)
         .layer(middleware::from_fn_with_state(
             state.clone(),
             crate::ratelimit::api_limit,
