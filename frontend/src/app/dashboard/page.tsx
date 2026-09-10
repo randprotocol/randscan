@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useSWRConfig } from 'swr';
 import { DetailSkeleton } from '@/components/Loading';
 import { DetailRow, ErrorState, PageHeader, Panel } from '@/components/States';
@@ -26,9 +26,10 @@ export default function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
+  const signingOut = useRef(false);
 
   useEffect(() => {
-    if (!meLoading && me === null) router.replace('/login');
+    if (!meLoading && me === null && !signingOut.current) router.replace('/login');
   }, [me, meLoading, router]);
 
   if (meError) return <ErrorState onRetry={() => void mutate('me')} />;
@@ -63,9 +64,15 @@ export default function DashboardPage() {
   };
 
   const onLogout = async () => {
-    await api.logout();
-    await mutate('me', null, { revalidate: false });
-    router.push('/');
+    signingOut.current = true;
+    try {
+      await api.logout();
+      await mutate('me', null, { revalidate: false });
+      router.push('/');
+    } catch (err) {
+      signingOut.current = false;
+      setError(err instanceof api.ApiError ? err.message : 'Request failed');
+    }
   };
 
   const active = (keys ?? []).filter((k) => !k.revoked_at);
