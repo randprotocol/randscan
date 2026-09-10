@@ -3,7 +3,7 @@ use axum::{
     extract::{ws::WebSocketUpgrade, State},
     middleware,
     response::IntoResponse,
-    routing::{get, post},
+    routing::{delete, get, post},
     Router,
 };
 use randscan_ws::WsState;
@@ -47,6 +47,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/search", get(handlers::search))
         .route("/auth/logout", post(handlers::logout))
         .route("/auth/me", get(handlers::me))
+        .route("/keys", get(handlers::list_keys).post(handlers::create_key))
+        .route("/keys/:id", delete(handlers::revoke_key))
         .merge(auth_public)
         .layer(middleware::from_fn_with_state(
             state.clone(),
