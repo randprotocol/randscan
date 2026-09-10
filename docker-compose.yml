@@ -30,6 +30,7 @@ services:
       RPC_URL: http://host.docker.internal:8545
       API_HOST: 0.0.0.0
       API_PORT: 3000
+      COOKIE_SECURE: "false"
       RUST_LOG: info
     depends_on:
       postgres:
@@ -40,6 +41,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: http://api:3000
     container_name: randscan-frontend
     ports:
       - "3001:3001"

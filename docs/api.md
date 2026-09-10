@@ -7,9 +7,10 @@ a script, a bot, an exchange backend, or a wallet without running their own `shr
 Base URL: `https://randscan.org/api/v1`
 WebSocket: `wss://randscan.org/ws`
 
-No API key is needed today. Every endpoint is read-only. Please keep polling to a sensible rate
-(one request per second per endpoint is plenty; new blocks arrive roughly every 3 to 4 seconds) and
-use the WebSocket feed instead of tight polling when you need to react to new blocks.
+Public read endpoints need no key. Anonymous traffic is limited to 60 requests per minute per IP.
+For more, create a free account at https://randscan.org/signup and an API key at
+https://randscan.org/dashboard: keyed requests get 600 requests per minute. Use the WebSocket feed
+instead of tight polling when you need to react to new blocks.
 
 ## Conventions
 
@@ -284,6 +285,56 @@ base58 query as an address.
 [{ "type": "account", "id": "2nRd…", "title": "Account", "subtitle": "99.998007775 SHRUGG", "url": "/account/2nRd…" }]
 ```
 
+## Authentication and API keys
+
+1. Sign up at https://randscan.org/signup (email and password; no verification email).
+2. On https://randscan.org/dashboard create a key. It looks like `rsk_` followed by 48 letters and
+   digits and is shown once. Store it like a password; revoke it from the dashboard if it leaks.
+3. Send it on every request, either way:
+
+   ```bash
+   curl -H "Authorization: Bearer rsk_..." https://randscan.org/api/v1/stats
+   curl -H "X-API-Key: rsk_..." https://randscan.org/api/v1/stats
+   ```
+
+A request that carries an unknown or revoked key is refused with 401 `invalid_api_key`; it is not
+downgraded to anonymous, so a typo is caught immediately. Keys cannot manage keys or read your
+account: those endpoints accept only the browser session.
+
+Each account may hold 10 active keys. The dashboard shows when a key was last used and how many
+requests it has made.
+
+### Quotas
+
+| identity | limit |
+|---|---|
+| anonymous, per IP | 60 requests per minute |
+| API key | 600 requests per minute |
+| sign-in and sign-up, per IP | 10 attempts per minute |
+
+Limits are fixed 60-second windows. Every response includes `X-RateLimit-Limit` and
+`X-RateLimit-Remaining`. Over the limit you get 429 with a `Retry-After` header and body
+`{"error":"rate_limited",...}`; wait that many seconds and retry. Need more? Open an issue on the
+repository with your use case.
+
+### Account endpoints
+
+These are what the website uses; you can drive them from scripts too, but keys are the intended
+way for machines.
+
+| method and path | body | result |
+|---|---|---|
+| `POST /auth/signup` | `{ "email", "password" }` | 201 `{ "user" }`, sets cookie `randscan_session` |
+| `POST /auth/login` | `{ "email", "password" }` | 200 `{ "user" }`, sets cookie |
+| `POST /auth/logout` | | 204 |
+| `GET /auth/me` | | 200 `{ "user" }` or 401 |
+| `GET /keys` | | `ApiKey[]` (never includes the secret) |
+| `POST /keys` | `{ "name" }` | 201 `ApiKey` plus `key`, once |
+| `DELETE /keys/:id` | | 204 |
+
+`user`: `{ id, email, created_at, last_login_at }`. `ApiKey`: `{ id, name, prefix, created_at,
+last_used_at, request_count, revoked_at }`. Passwords are 10 to 128 characters.
+
 ## WebSocket feed
 
 Connect to `wss://randscan.org/ws` and send JSON messages. Channels: `blocks`, `transactions`,
@@ -329,8 +380,8 @@ feed has no replay.
 
 ## Rate limits and reliability
 
-- There is no enforced rate limit today. Abusive traffic will be blocked at the proxy. Per-key
-  quotas for registered users are planned; the read endpoints above will stay public.
+- Rate limits are enforced per IP and per API key; see [Quotas](#quotas) above. Abusive traffic
+  will also be blocked at the proxy.
 - The explorer runs next to a full node. `GET /health` reports `indexer.lag`; during a resync the
   lists are still served from the database, so a nonzero lag means the newest blocks are missing,
   not that older data is wrong.

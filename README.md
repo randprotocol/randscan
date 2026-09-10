@@ -30,6 +30,8 @@ npm ci
 NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_WS_URL=ws://localhost:3000/ws npm run dev   # :3001
 ```
 
+Set `COOKIE_SECURE=false` in `.env` for local http so sign-in works.
+
 The schema (`migrations/001_initial_schema.sql`) is created automatically on first start. The
 indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERVAL_MS`.
 
@@ -46,6 +48,11 @@ indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERV
 | `NODES_INTERVAL_SECS` | `60` | peer list / geolocation refresh interval |
 | `NODE_PUBLIC_IP` | auto-detected | public IP of the node the explorer runs on |
 | `RUST_LOG` | `info` | log filter |
+| `COOKIE_SECURE` | `true` | set the session cookie `Secure` (requires https; use `false` for local http) |
+| `TRUST_PROXY` | `false` | read the client IP from `X-Forwarded-For` (true behind Caddy/nginx) |
+| `ANON_RATE_LIMIT_RPM` | `60` | requests per minute per IP for anonymous traffic |
+| `KEY_RATE_LIMIT_RPM` | `600` | requests per minute per API key |
+| `AUTH_RATE_LIMIT_RPM` | `10` | sign-in/sign-up attempts per minute per IP |
 
 ## API
 
@@ -56,6 +63,17 @@ WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are str
 (1 SHRUGG = 10^9 units); timestamps are `timestamp_ms`. Full shapes in
 `docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`; a guide for integrators with
 examples in [docs/api.md](docs/api.md).
+
+Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed requests use
+`Authorization: Bearer rsk_...`. Details and quotas in [docs/api.md](docs/api.md).
+
+### Operator runbook: reset a password
+
+```bash
+echo 'new password here' | randscan-api hash-password      # prints $argon2id$...
+psql "$DATABASE_URL" -c "UPDATE users SET password_hash = '<paste>' WHERE email = 'user@example.com';" \
+                     -c "DELETE FROM sessions WHERE user_id = (SELECT id FROM users WHERE email = 'user@example.com');"
+```
 
 ## Deploy on a node
 
