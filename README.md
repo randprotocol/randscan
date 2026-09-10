@@ -54,7 +54,8 @@ REST under `/api/v1` (`health`, `stats`, `blocks`, `blocks/latest`, `blocks/:id`
 `validators`, `validators/:address`, `programs`, `programs/:id`, `nodes`, `search?q=`) and a
 WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are strings of units
 (1 SHRUGG = 10^9 units); timestamps are `timestamp_ms`. Full shapes in
-`docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`.
+`docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`; a guide for integrators with
+examples in [docs/api.md](docs/api.md).
 
 ## Deploy on a node
 
