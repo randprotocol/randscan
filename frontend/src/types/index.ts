@@ -308,3 +308,29 @@ export type ServerMessage =
   | ServerNewBlockMessage
   | ServerNewTransactionMessage
   | ServerStatsUpdateMessage;
+
+// ---------------------------------------------------------------------------
+// Accounts and API keys
+// ---------------------------------------------------------------------------
+
+export interface User {
+  id: number;
+  email: string;
+  created_at: string;
+  last_login_at: string | null;
+}
+
+export interface ApiKey {
+  id: number;
+  name: string;
+  prefix: string;
+  created_at: string;
+  last_used_at: string | null;
+  request_count: number;
+  revoked_at: string | null;
+}
+
+/** Returned once at creation; `key` is the full secret. */
+export interface CreatedApiKey extends ApiKey {
+  key: string;
+}

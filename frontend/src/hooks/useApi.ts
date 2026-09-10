@@ -5,6 +5,7 @@ import * as api from '@/lib/api';
 import type {
   AccountDetail,
   AccountTransaction,
+  ApiKey,
   BlockDetail,
   BlockSummary,
   Health,
@@ -17,6 +18,7 @@ import type {
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
+  User,
   Validator,
   ValidatorDetail,
 } from '@/types';
@@ -234,4 +236,32 @@ export function useSearch(
     () => api.search((q as string).trim()),
     { ...defaultConfig, ...config }
   );
+}
+
+// ---------------------------------------------------------------------------
+// Accounts and API keys
+// ---------------------------------------------------------------------------
+
+/** The signed-in user, or `null` when there is no session. Never retries a 401. */
+export function useMe(config?: SWRConfiguration): SWRResponse<User | null> {
+  return useSWR<User | null>(
+    'me',
+    async () => {
+      try {
+        return await api.getMe();
+      } catch (err) {
+        if (err instanceof api.ApiError && err.status === 401) return null;
+        throw err;
+      }
+    },
+    { ...defaultConfig, shouldRetryOnError: false, ...config }
+  );
+}
+
+export function useApiKeys(enabled: boolean, config?: SWRConfiguration): SWRResponse<ApiKey[]> {
+  return useSWR<ApiKey[]>(enabled ? 'keys' : null, api.listKeys, {
+    ...defaultConfig,
+    shouldRetryOnError: false,
+    ...config,
+  });
 }

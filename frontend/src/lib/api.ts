@@ -2,8 +2,10 @@ import type {
   AccountDetail,
   AccountTransaction,
   ApiErrorBody,
+  ApiKey,
   BlockDetail,
   BlockSummary,
+  CreatedApiKey,
   Health,
   NetworkStats,
   NodeInfo,
@@ -14,15 +16,17 @@ import type {
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
+  User,
   Validator,
   ValidatorDetail,
 } from '@/types';
 
 /**
- * Base URL for the REST API. An empty string (the default) means same-origin,
- * so requests go to `/api/v1/...` and are served by the reverse proxy.
+ * Requests always go to the same origin (`/api/v1/...`). In production Caddy proxies them;
+ * in development `next.config.js` rewrites them to `NEXT_PUBLIC_API_URL`. Same-origin is what
+ * lets the session cookie work.
  */
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
+export const API_BASE_URL = '';
 
 const API_PREFIX = '/api/v1';
 
@@ -67,6 +71,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     response = await fetch(url, {
       ...init,
+      credentials: 'same-origin',
       headers: { Accept: 'application/json', ...init?.headers },
     });
   } catch (cause) {
@@ -216,4 +221,64 @@ export function getNodes(): Promise<NodeInfo[]> {
 
 export function search(q: string): Promise<SearchResult[]> {
   return request<SearchResult[]>(`/search${buildQuery({ q })}`);
+}
+
+// ---------------------------------------------------------------------------
+// Accounts and API keys (cookie session; same-origin only)
+// ---------------------------------------------------------------------------
+
+function jsonInit(method: string, body?: unknown): RequestInit {
+  return {
+    method,
+    headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  };
+}
+
+async function requestVoid(path: string, init: RequestInit): Promise<void> {
+  const response = await fetch(`${API_BASE_URL}${API_PREFIX}${path}`, {
+    ...init,
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json', ...init.headers },
+  });
+  if (!response.ok) {
+    let body: Partial<ApiErrorBody> = {};
+    try {
+      body = (await response.json()) as Partial<ApiErrorBody>;
+    } catch {
+      // no JSON body
+    }
+    throw new ApiError(response.status, body);
+  }
+}
+
+export async function signup(email: string, password: string): Promise<User> {
+  const res = await request<{ user: User }>('/auth/signup', jsonInit('POST', { email, password }));
+  return res.user;
+}
+
+export async function login(email: string, password: string): Promise<User> {
+  const res = await request<{ user: User }>('/auth/login', jsonInit('POST', { email, password }));
+  return res.user;
+}
+
+export function logout(): Promise<void> {
+  return requestVoid('/auth/logout', jsonInit('POST'));
+}
+
+export async function getMe(): Promise<User> {
+  const res = await request<{ user: User }>('/auth/me');
+  return res.user;
+}
+
+export function listKeys(): Promise<ApiKey[]> {
+  return request<ApiKey[]>('/keys');
+}
+
+export function createKey(name: string): Promise<CreatedApiKey> {
+  return request<CreatedApiKey>('/keys', jsonInit('POST', { name }));
+}
+
+export function revokeKey(id: number): Promise<void> {
+  return requestVoid(`/keys/${id}`, jsonInit('DELETE'));
 }

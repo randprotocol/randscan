@@ -136,6 +136,27 @@
     border-color: var(--color-text-mute);
   }
 
+  /* -- forms ------------------------------------------------------------ */
+
+  .input {
+    @apply w-full rounded border border-border bg-surface px-3 py-2 text-sm text-text placeholder-mute transition-colors;
+  }
+
+  .input:focus {
+    border-color: var(--color-accent);
+    outline: none;
+  }
+
+  .field-label {
+    @apply mb-1.5 block text-xs font-medium uppercase tracking-wide text-mute;
+  }
+
+  .form-error {
+    @apply rounded border px-3 py-2 text-sm;
+    border-color: var(--color-accent-3);
+    color: var(--color-accent-3);
+  }
+
   /* -- links ------------------------------------------------------------ */
 
   .link {
