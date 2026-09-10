@@ -2,11 +2,11 @@
 
 import { cn } from '@/lib/utils';
 
-interface Column<T> {
+export interface Column<T> {
   key: string;
   header: string;
   className?: string;
-  render?: (item: T, index: number) => React.ReactNode;
+  render: (item: T, index: number) => React.ReactNode;
 }
 
 interface DataTableProps<T> {
@@ -34,25 +34,25 @@ export function DataTable<T>({
 
   if (data.length === 0) {
     return (
-      <div className={cn('rounded-xl border border-dark-700 bg-dark-800', className)}>
-        <div className="flex h-48 items-center justify-center">
-          <p className="text-dark-400">{emptyMessage}</p>
+      <div className={cn('card', className)}>
+        <div className="flex h-40 items-center justify-center">
+          <p className="text-sm text-mute">{emptyMessage}</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className={cn('overflow-hidden rounded-xl border border-dark-700 bg-dark-800', className)}>
+    <div className={cn('card overflow-hidden', className)}>
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-dark-700 bg-dark-900/50">
+            <tr className="border-b border-border">
               {columns.map((column) => (
                 <th
                   key={column.key}
                   className={cn(
-                    'px-4 py-3 text-left text-sm font-medium text-dark-300',
+                    'whitespace-nowrap px-4 py-2.5 text-left text-[11px] font-medium uppercase tracking-wide text-mute',
                     column.className
                   )}
                 >
@@ -61,27 +61,22 @@ export function DataTable<T>({
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-dark-700">
+          <tbody>
             {data.map((item, index) => (
               <tr
                 key={keyExtractor(item)}
                 onClick={() => onRowClick?.(item)}
                 className={cn(
-                  'transition-colors',
-                  onRowClick && 'cursor-pointer hover:bg-dark-700/50'
+                  'border-b border-border-soft transition-colors last:border-0 hover:bg-bg-soft',
+                  onRowClick && 'cursor-pointer'
                 )}
               >
                 {columns.map((column) => (
                   <td
                     key={column.key}
-                    className={cn(
-                      'whitespace-nowrap px-4 py-3 text-sm',
-                      column.className
-                    )}
+                    className={cn('whitespace-nowrap px-4 py-3 text-sm', column.className)}
                   >
-                    {column.render
-                      ? column.render(item, index)
-                      : null}
+                    {column.render(item, index)}
                   </td>
                 ))}
               </tr>
@@ -100,24 +95,24 @@ interface DataTableSkeletonProps {
 
 export function DataTableSkeleton({ columns, rows }: DataTableSkeletonProps) {
   return (
-    <div className="overflow-hidden rounded-xl border border-dark-700 bg-dark-800">
+    <div className="card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full">
+        <table className="w-full border-collapse">
           <thead>
-            <tr className="border-b border-dark-700 bg-dark-900/50">
+            <tr className="border-b border-border">
               {Array.from({ length: columns }).map((_, i) => (
-                <th key={i} className="px-4 py-3">
-                  <div className="h-4 w-20 animate-pulse rounded bg-dark-700" />
+                <th key={i} className="px-4 py-2.5">
+                  <div className="h-3 w-16 animate-pulse rounded bg-bg-soft" />
                 </th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-dark-700">
+          <tbody>
             {Array.from({ length: rows }).map((_, rowIndex) => (
-              <tr key={rowIndex}>
+              <tr key={rowIndex} className="border-b border-border-soft last:border-0">
                 {Array.from({ length: columns }).map((_, colIndex) => (
                   <td key={colIndex} className="px-4 py-3">
-                    <div className="h-4 w-24 animate-pulse rounded bg-dark-700" />
+                    <div className="h-3.5 w-24 animate-pulse rounded bg-bg-soft" />
                   </td>
                 ))}
               </tr>

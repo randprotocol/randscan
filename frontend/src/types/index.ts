@@ -1,270 +1,310 @@
-// Network Statistics
-export interface NetworkStats {
-  block_height: number;
-  slot: number;
-  epoch: number;
-  epoch_progress: number;
-  tps: number;
-  average_tps: number;
-  total_transactions: number;
-  active_validators: number;
-  total_stake: string;
-  atlas_price?: number;
-  shrug_price?: number;
-}
+// RandScan API types — mirrors the `/api/v1` contract served by randscan-api.
+// All amounts are decimal strings of smallest units (SHRUGG has 9 decimals).
+// All timestamps are `timestamp_ms`: milliseconds since the Unix epoch.
 
-// Block Types
-export interface BlockSummary {
-  slot: number;
-  blockhash: string;
-  parent_slot: number;
-  timestamp: number;
-  transaction_count: number;
-  leader: string;
-  rewards: string;
-}
+export type TransactionKind = 'transfer' | 'mint' | 'deploy' | 'call';
 
-export interface BlockDetail {
-  slot: number;
-  blockhash: string;
-  parent_slot: number;
-  parent_blockhash: string;
-  timestamp: number;
-  transaction_count: number;
-  leader: string;
-  leader_identity?: string;
-  rewards: string;
-  fee_rewards: string;
-  transactions: TransactionSummary[];
-  qc_hash?: string;
-  qc_slot?: number;
-  previous_blockhash: string;
-}
+export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
-// Transaction Types
-export type TransactionStatus = 'success' | 'failed' | 'pending';
-export type TransactionType = 'transfer' | 'stake' | 'vote' | 'program' | 'system' | 'unknown';
+export type AccountRole = 'sender' | 'recipient';
 
-export interface TransactionSummary {
-  signature: string;
-  slot: number;
-  timestamp: number;
-  status: TransactionStatus;
-  type: TransactionType;
-  fee: string;
-  signer: string;
-  is_private: boolean;
-}
+export type SearchResultType =
+  | 'block'
+  | 'transaction'
+  | 'account'
+  | 'validator'
+  | 'program';
 
-export interface TransactionInstruction {
-  program_id: string;
-  program_name?: string;
-  accounts: string[];
-  data: string;
-  decoded?: Record<string, unknown>;
-}
-
-export interface TransactionDetail {
-  signature: string;
-  slot: number;
-  block_time: number;
-  status: TransactionStatus;
-  type: TransactionType;
-  fee: string;
-  signer: string;
-  signers: string[];
-  recent_blockhash: string;
-  instructions: TransactionInstruction[];
-  log_messages: string[];
-  pre_balances: string[];
-  post_balances: string[];
-  pre_token_balances: TokenBalance[];
-  post_token_balances: TokenBalance[];
-  is_private: boolean;
-  privacy_level?: 'public' | 'shielded' | 'confidential';
-  compute_units_consumed?: number;
-  error?: string;
-}
-
-// Account Types
-export interface TokenBalance {
-  mint: string;
-  owner: string;
-  amount: string;
-  decimals: number;
-  ui_amount: number;
-}
-
-export interface TokenAccount {
-  address: string;
-  mint: string;
-  mint_name?: string;
-  mint_symbol?: string;
-  balance: string;
-  decimals: number;
-  ui_balance: number;
-}
-
-export interface AccountDetail {
-  address: string;
-  lamports: string;
-  atlas_balance: string;
-  shrug_balance: string;
-  owner: string;
-  executable: boolean;
-  rent_epoch: number;
-  data_size: number;
-  token_accounts: TokenAccount[];
-  is_validator: boolean;
-  validator_identity?: string;
-  stake_accounts: StakeAccount[];
-}
-
-export interface StakeAccount {
-  address: string;
-  stake: string;
-  voter: string;
-  activation_epoch: number;
-  deactivation_epoch?: number;
-  status: 'active' | 'activating' | 'deactivating' | 'inactive';
-}
-
-export interface AccountTransaction {
-  signature: string;
-  slot: number;
-  timestamp: number;
-  status: TransactionStatus;
-  type: TransactionType;
-  fee: string;
-  direction: 'in' | 'out' | 'self';
-  amount?: string;
-  counterparty?: string;
-}
-
-// Validator Types
-export interface Validator {
-  identity: string;
-  vote_account: string;
-  name?: string;
-  website?: string;
-  icon_url?: string;
-  stake: string;
-  commission: number;
-  last_vote: number;
-  root_slot: number;
-  credits: number;
-  epoch_credits: number;
-  status: 'active' | 'delinquent' | 'inactive';
-  uptime_percentage: number;
-  skip_rate: number;
-}
-
-export interface ValidatorDetail extends Validator {
-  description?: string;
-  keybase_username?: string;
-  activated_stake: string;
-  stake_history: StakeHistoryEntry[];
-  recent_blocks: BlockSummary[];
-  epoch_vote_account: boolean;
-  version?: string;
-  feature_set?: number;
-}
-
-export interface StakeHistoryEntry {
-  epoch: number;
-  effective_stake: string;
-  activating_stake: string;
-  deactivating_stake: string;
-}
-
-// Token Types
-export interface TokenMint {
-  mint: string;
-  name?: string;
-  symbol?: string;
-  decimals: number;
-  supply: string;
-  ui_supply: number;
-  mint_authority?: string;
-  freeze_authority?: string;
-  is_initialized: boolean;
-  holder_count: number;
-  icon_url?: string;
-}
-
-export interface TokenSupply {
-  mint: string;
-  total_supply: string;
-  circulating_supply: string;
-  decimals: number;
-  ui_total_supply: number;
-  ui_circulating_supply: number;
-}
-
-export interface TokenHolder {
-  address: string;
-  balance: string;
-  ui_balance: number;
-  percentage: number;
-}
-
-// Search Types
-export type SearchResultType = 'block' | 'transaction' | 'account' | 'validator' | 'token';
-
-export interface SearchResult {
-  type: SearchResultType;
-  id: string;
-  label: string;
-  description?: string;
-  url: string;
-}
-
+// ---------------------------------------------------------------------------
 // Pagination
-export interface PaginatedResponse<T> {
-  data: T[];
-  total: number;
+// ---------------------------------------------------------------------------
+
+export interface PaginationMeta {
   page: number;
-  page_size: number;
+  limit: number;
+  total: number;
   total_pages: number;
   has_next: boolean;
   has_prev: boolean;
 }
 
-// WebSocket Types
-export type WebSocketChannel = 'blocks' | 'transactions' | 'account' | 'validator' | 'stats';
-
-export interface WebSocketMessage {
-  channel: WebSocketChannel;
-  action: 'subscribe' | 'unsubscribe' | 'update';
-  data?: unknown;
-  params?: Record<string, string>;
+export interface Paginated<T> {
+  data: T[];
+  pagination: PaginationMeta;
 }
 
-export interface WebSocketBlockUpdate {
-  slot: number;
-  blockhash: string;
-  timestamp: number;
-  transaction_count: number;
-  leader: string;
+// ---------------------------------------------------------------------------
+// Blocks
+// ---------------------------------------------------------------------------
+
+export interface BlockSummary {
+  hash: string;
+  height: number;
+  view: number;
+  parent: string;
+  proposer: string;
+  timestamp_ms: number;
+  tx_count: number;
+  justify_view: number;
 }
 
-export interface WebSocketTransactionUpdate {
-  signature: string;
-  slot: number;
-  status: TransactionStatus;
-  type: TransactionType;
-  signer: string;
+export interface BlockDetail extends BlockSummary {
+  tx_root: string;
+  state_root: string;
+  transactions: TransactionSummary[];
 }
 
-export interface WebSocketStatsUpdate {
-  block_height: number;
-  tps: number;
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
+
+export interface TransactionSummary {
+  hash: string;
+  height: number;
+  block_hash: string;
+  tx_index: number;
+  sender: string;
+  nonce: number;
+  fee: string;
+  kind: TransactionKind;
+  timestamp_ms: number;
+  to: string | null;
+  amount: string | null;
+  program: string | null;
+}
+
+export interface ReceiptEffect {
+  to: string;
+  amount: string;
+}
+
+export interface Receipt {
+  tx: string;
+  program: string;
+  tier: number;
+  outputs: number[];
+  effect: ReceiptEffect | null;
+  height: number;
+  index: number;
+}
+
+export interface TransactionDetail extends TransactionSummary {
+  chain_id: number;
+  base_pc: number | null;
+  words_len: number | null;
+  proof_len: number | null;
+  recipients: string[];
+  receipt: Receipt | null;
+}
+
+export interface AccountTransaction extends TransactionSummary {
+  role: AccountRole;
+}
+
+// ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+export interface AccountDetail {
+  address: string;
+  balance: string;
+  nonce: number;
+  tx_count: number;
+  first_seen_height: number;
+  last_seen_height: number;
+  is_validator: boolean;
+  stake: string | null;
+  programs_deployed: number;
+}
+
+// ---------------------------------------------------------------------------
+// Validators
+// ---------------------------------------------------------------------------
+
+export interface Validator {
+  address: string;
+  stake: string;
+  share_percent: number;
+  blocks_proposed: number;
+  last_proposed_height: number | null;
+  last_proposed_timestamp_ms: number | null;
+  sort_index: number;
+}
+
+export interface ValidatorDetail extends Validator {
+  recent_blocks: BlockSummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Programs
+// ---------------------------------------------------------------------------
+
+export interface ProgramSummary {
+  id: string;
+  deployer: string;
+  deploy_tx: string;
+  deployed_at_height: number;
+  base_pc: number;
+  words_len: number;
+  code_hash: string;
+  call_count: number;
+  last_called_height: number | null;
+}
+
+export interface ProgramDetail extends ProgramSummary {
+  recent_calls: TransactionSummary[];
+}
+
+// ---------------------------------------------------------------------------
+// Network / health
+// ---------------------------------------------------------------------------
+
+export interface NetworkStats {
+  chain_id: number;
+  symbol: string;
+  decimals: number;
+  height: number;
+  view: number;
   total_transactions: number;
+  total_accounts: number;
+  validator_count: number;
+  total_stake: string;
+  total_supply: string;
+  program_count: number;
+  avg_block_time_ms: number;
+  peer_count: number;
+  mempool_size: number;
+  node_syncing: boolean;
+  faucet: boolean;
+  confidential: boolean;
+  current_leader: string | null;
+  updated_at: string;
 }
 
-// API Error
-export interface ApiError {
+export interface IndexerHealth {
+  connected: boolean;
+  synced: boolean;
+  current_height: number;
+  node_height: number;
+  lag: number;
+}
+
+export interface Health {
+  status: HealthStatus;
+  version: string;
+  database: string;
+  indexer: IndexerHealth;
+}
+
+// ---------------------------------------------------------------------------
+// Nodes
+// ---------------------------------------------------------------------------
+
+export type NodeRole = 'validator' | 'observer' | 'peer';
+
+export interface GeoInfo {
+  lat: number;
+  lon: number;
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  country_code: string | null;
+  org: string | null;
+}
+
+export interface NodeInfo {
+  peer_id: string;
+  ip: string | null;
+  port: number | null;
+  connected_secs: number | null;
+  /** True for the node this explorer runs alongside. */
+  is_self: boolean;
+  role: NodeRole;
+  /** Null while a geo lookup is pending, or for private/unroutable addresses. */
+  geo: GeoInfo | null;
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export interface SearchResult {
+  type: SearchResultType;
+  id: string;
+  title: string;
+  subtitle?: string | null;
+  url: string;
+}
+
+// ---------------------------------------------------------------------------
+// Errors
+// ---------------------------------------------------------------------------
+
+export interface ApiErrorBody {
   error: string;
   message: string;
-  status: number;
+  code?: string | number | null;
 }
+
+// ---------------------------------------------------------------------------
+// WebSocket
+// ---------------------------------------------------------------------------
+
+export type WebSocketChannel = 'blocks' | 'transactions' | 'stats';
+
+export interface ClientSubscribeMessage {
+  type: 'subscribe' | 'unsubscribe';
+  channel: WebSocketChannel;
+}
+
+export interface ClientPingMessage {
+  type: 'ping';
+}
+
+export type ClientMessage = ClientSubscribeMessage | ClientPingMessage;
+
+export interface ServerSubscribedMessage {
+  type: 'subscribed';
+  channel: WebSocketChannel;
+  subscription_id: string;
+}
+
+export interface ServerUnsubscribedMessage {
+  type: 'unsubscribed';
+  channel: WebSocketChannel;
+  subscription_id?: string;
+}
+
+export interface ServerPongMessage {
+  type: 'pong';
+}
+
+export interface ServerErrorMessage {
+  type: 'error';
+  message?: string;
+  error?: string;
+}
+
+export interface ServerNewBlockMessage {
+  type: 'new_block';
+  block: BlockSummary;
+}
+
+export interface ServerNewTransactionMessage {
+  type: 'new_transaction';
+  transaction: TransactionSummary;
+}
+
+export interface ServerStatsUpdateMessage {
+  type: 'stats_update';
+  stats: NetworkStats;
+}
+
+export type ServerMessage =
+  | ServerSubscribedMessage
+  | ServerUnsubscribedMessage
+  | ServerPongMessage
+  | ServerErrorMessage
+  | ServerNewBlockMessage
+  | ServerNewTransactionMessage
+  | ServerStatsUpdateMessage;

@@ -1,261 +1,271 @@
-//! Database models (SQLx row types)
+//! Row types. NUMERIC columns are selected as `::text` and carried as `String`.
 
 use chrono::{DateTime, Utc};
+use randscan_core::{
+    BlockSummary, GeoInfo, NetworkStats, ProgramSummary, Receipt, ReceiptEffect,
+    TransactionSummary, TxKind, Validator,
+};
 use sqlx::FromRow;
 
-/// Block row from database
 #[derive(Debug, Clone, FromRow)]
 pub struct BlockRow {
-    pub block_id: String,
+    pub hash: String,
     pub height: i64,
-    pub view_number: i64,
-    pub epoch: i64,
-    pub parent_id: String,
-    pub proposer_id: String,
-    pub transactions_root: String,
+    pub view: i64,
+    pub parent: String,
+    pub proposer: String,
+    pub timestamp_ms: i64,
+    pub tx_root: String,
     pub state_root: String,
-    pub supply_commitment: String,
-    pub timestamp: i64,
-    pub transaction_count: i32,
-    pub finalized: bool,
-    pub created_at: DateTime<Utc>,
+    pub justify_view: i64,
+    pub tx_count: i32,
 }
 
-/// Quorum certificate row
-#[derive(Debug, Clone, FromRow)]
-pub struct QcRow {
-    pub block_id: String,
-    pub vote_type: String,
-    pub view_number: i64,
-    pub certified_block_id: String,
-    pub certified_block_height: i64,
-    pub signer_count: i32,
+impl From<BlockRow> for BlockSummary {
+    fn from(b: BlockRow) -> Self {
+        BlockSummary {
+            hash: b.hash,
+            height: b.height,
+            view: b.view,
+            parent: b.parent,
+            proposer: b.proposer,
+            timestamp_ms: b.timestamp_ms,
+            tx_count: b.tx_count,
+            justify_view: b.justify_view,
+        }
+    }
 }
 
-/// QC signer row
 #[derive(Debug, Clone, FromRow)]
-pub struct QcSignerRow {
-    pub id: i32,
-    pub block_id: String,
-    pub validator_id: String,
-    pub signature: String,
-}
-
-/// Transaction row from database
-#[derive(Debug, Clone, FromRow)]
-pub struct TransactionRow {
-    pub tx_id: String,
-    pub block_id: Option<String>,
-    pub block_height: Option<i64>,
+pub struct TxRow {
+    pub hash: String,
+    pub block_hash: String,
+    pub height: i64,
+    pub tx_index: i32,
     pub sender: String,
     pub nonce: i64,
-    pub compute_budget: i64,
-    pub fee: i64,
-    pub payload_type: String,
-    pub status: String,
-    pub timestamp: i64,
-    pub signature: String,
-    pub created_at: DateTime<Utc>,
+    pub fee: String,
+    pub kind: String,
+    pub chain_id: i64,
+    pub timestamp_ms: i64,
+    pub to_address: Option<String>,
+    pub amount: Option<String>,
+    pub program_id: Option<String>,
+    pub base_pc: Option<i64>,
+    pub words_len: Option<i64>,
+    pub proof_len: Option<i64>,
+    pub recipients: Vec<String>,
 }
 
-/// Account row
+impl From<TxRow> for TransactionSummary {
+    fn from(t: TxRow) -> Self {
+        TransactionSummary {
+            hash: t.hash,
+            height: t.height,
+            block_hash: t.block_hash,
+            tx_index: t.tx_index,
+            sender: t.sender,
+            nonce: t.nonce,
+            fee: t.fee,
+            kind: TxKind::parse(&t.kind).unwrap_or(TxKind::Transfer),
+            timestamp_ms: t.timestamp_ms,
+            to: t.to_address,
+            amount: t.amount,
+            program: t.program_id,
+        }
+    }
+}
+
+/// Transaction row joined with the account role.
+#[derive(Debug, Clone, FromRow)]
+pub struct AccountTxRow {
+    #[sqlx(flatten)]
+    pub tx: TxRow,
+    pub role: String,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct ReceiptRow {
+    pub tx_hash: String,
+    pub program: String,
+    pub tier: i32,
+    pub outputs: Vec<i64>,
+    pub effect_to: Option<String>,
+    pub effect_amount: Option<String>,
+    pub height: i64,
+    pub tx_index: i32,
+}
+
+impl From<ReceiptRow> for Receipt {
+    fn from(r: ReceiptRow) -> Self {
+        let effect = match (r.effect_to, r.effect_amount) {
+            (Some(to), Some(amount)) => Some(ReceiptEffect { to, amount }),
+            _ => None,
+        };
+        Receipt {
+            tx: r.tx_hash,
+            program: r.program,
+            tier: r.tier,
+            outputs: r.outputs,
+            effect,
+            height: r.height,
+            index: r.tx_index,
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow)]
 pub struct AccountRow {
     pub address: String,
-    pub atlas_balance: i64,
-    pub shrug_balance: i64,
+    pub balance: String,
     pub nonce: i64,
-    pub is_executable: bool,
-    pub owner: Option<String>,
-    pub data_len: i32,
-    pub tx_count: i32,
-    pub first_seen: i64,
-    pub last_seen: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub tx_count: i64,
+    pub first_seen_height: i64,
+    pub last_seen_height: i64,
 }
 
-/// Account transaction row
-#[derive(Debug, Clone, FromRow)]
-pub struct AccountTransactionRow {
-    pub id: i32,
-    pub account: String,
-    pub tx_id: String,
-    pub role: String,
-    pub block_height: i64,
-    pub timestamp: i64,
-}
-
-/// Validator row
 #[derive(Debug, Clone, FromRow)]
 pub struct ValidatorRow {
-    pub validator_id: String,
-    pub pubkey: String,
-    pub stake: i64,
-    pub commission_rate: i16,
-    pub is_active: bool,
-    pub blocks_produced: i64,
-    pub blocks_skipped: i64,
-    pub last_vote_height: Option<i64>,
-    pub uptime_percentage: f64,
-    pub first_seen: i64,
-    pub last_seen: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub address: String,
+    pub stake: String,
+    pub sort_index: i32,
+    pub blocks_proposed: i64,
+    pub last_proposed_height: Option<i64>,
+    pub last_proposed_timestamp_ms: Option<i64>,
 }
 
-/// Validator stake history row
-#[derive(Debug, Clone, FromRow)]
-pub struct StakeHistoryRow {
-    pub id: i32,
-    pub validator_id: String,
-    pub epoch: i64,
-    pub stake: i64,
-    pub delegators: i32,
-    pub rewards: i64,
-    pub timestamp: i64,
+impl ValidatorRow {
+    pub fn into_validator(self, total_stake: u128) -> Validator {
+        let stake: u128 = self.stake.parse().unwrap_or(0);
+        let share_percent = if total_stake == 0 {
+            0.0
+        } else {
+            (stake as f64 / total_stake as f64) * 100.0
+        };
+        Validator {
+            address: self.address,
+            stake: self.stake,
+            share_percent,
+            blocks_proposed: self.blocks_proposed,
+            last_proposed_height: self.last_proposed_height,
+            last_proposed_timestamp_ms: self.last_proposed_timestamp_ms,
+            sort_index: self.sort_index,
+        }
+    }
 }
 
-/// Epoch row
-#[derive(Debug, Clone, FromRow)]
-pub struct EpochRow {
-    pub epoch: i64,
-    pub start_height: i64,
-    pub end_height: Option<i64>,
-    pub start_timestamp: i64,
-    pub end_timestamp: Option<i64>,
-    pub block_count: i32,
-    pub tx_count: i32,
-    pub validator_count: i32,
-    pub total_stake: i64,
-    pub total_rewards: i64,
-    pub is_current: bool,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Token mint row
-#[derive(Debug, Clone, FromRow)]
-pub struct TokenMintRow {
-    pub mint_address: String,
-    pub symbol: String,
-    pub name: String,
-    pub decimals: i16,
-    pub total_supply: i64,
-    pub circulating_supply: i64,
-    pub burned: i64,
-    pub holder_count: i32,
-    pub tx_count: i32,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Token account row
-#[derive(Debug, Clone, FromRow)]
-pub struct TokenAccountRow {
-    pub id: i32,
-    pub account_address: String,
-    pub owner: String,
-    pub mint: String,
-    pub balance: i64,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
-}
-
-/// Nullifier row
-#[derive(Debug, Clone, FromRow)]
-pub struct NullifierRow {
-    pub nullifier: String,
-    pub tx_id: String,
-    pub created_at: DateTime<Utc>,
-}
-
-/// Commitment row
-#[derive(Debug, Clone, FromRow)]
-pub struct CommitmentRow {
-    pub commitment: String,
-    pub tx_id: String,
-    pub spent: bool,
-    pub spent_tx_id: Option<String>,
-    pub created_at: DateTime<Utc>,
-}
-
-/// Program row
 #[derive(Debug, Clone, FromRow)]
 pub struct ProgramRow {
-    pub program_id: String,
+    pub id: String,
     pub deployer: String,
-    pub deploy_tx_id: Option<String>,
-    pub code_size: i32,
-    pub invoke_count: i64,
-    pub last_invoked: Option<i64>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
+    pub deploy_tx: String,
+    pub deployed_at_height: i64,
+    pub base_pc: i64,
+    pub words_len: i64,
+    pub code_hash: String,
+    pub call_count: i64,
+    pub last_called_height: Option<i64>,
 }
 
-/// Network stats row
+impl From<ProgramRow> for ProgramSummary {
+    fn from(p: ProgramRow) -> Self {
+        ProgramSummary {
+            id: p.id,
+            deployer: p.deployer,
+            deploy_tx: p.deploy_tx,
+            deployed_at_height: p.deployed_at_height,
+            base_pc: p.base_pc,
+            words_len: p.words_len,
+            code_hash: p.code_hash,
+            call_count: p.call_count,
+            last_called_height: p.last_called_height,
+        }
+    }
+}
+
 #[derive(Debug, Clone, FromRow)]
 pub struct NetworkStatsRow {
-    pub id: i32,
-    pub block_height: i64,
+    pub chain_id: i64,
+    pub symbol: String,
+    pub decimals: i16,
+    pub height: i64,
+    pub view: i64,
     pub total_transactions: i64,
     pub total_accounts: i64,
-    pub total_validators: i64,
-    pub active_validators: i64,
-    pub atlas_total_supply: i64,
-    pub atlas_staked: i64,
-    pub shrug_total_supply: i64,
-    pub shrug_burned: i64,
-    pub avg_block_time: f64,
-    pub tps_current: f64,
-    pub tps_peak: f64,
-    pub current_epoch: i64,
+    pub validator_count: i64,
+    pub total_stake: String,
+    pub total_supply: String,
+    pub program_count: i64,
+    pub avg_block_time_ms: f64,
+    pub peer_count: i32,
+    pub mempool_size: i32,
+    pub node_syncing: bool,
+    pub faucet: bool,
+    pub confidential: bool,
+    pub current_leader: Option<String>,
     pub updated_at: DateTime<Utc>,
 }
 
-/// Stats hourly row
-#[derive(Debug, Clone, FromRow)]
-pub struct StatsHourlyRow {
-    pub hour: i64,
-    pub block_count: i32,
-    pub tx_count: i32,
-    pub unique_senders: i32,
-    pub total_fees: i64,
-    pub avg_block_time: f64,
-    pub tps_avg: f64,
-    pub tps_peak: f64,
-    pub tx_public: i32,
-    pub tx_private: i32,
-    pub tx_stealth: i32,
-    pub tx_stake: i32,
-    pub tx_unstake: i32,
-    pub tx_transfer: i32,
-    pub tx_deploy: i32,
-    pub tx_invoke: i32,
-    pub tx_private_transfer: i32,
-    pub created_at: DateTime<Utc>,
+impl From<NetworkStatsRow> for NetworkStats {
+    fn from(s: NetworkStatsRow) -> Self {
+        NetworkStats {
+            chain_id: s.chain_id,
+            symbol: s.symbol,
+            decimals: s.decimals,
+            height: s.height,
+            view: s.view,
+            total_transactions: s.total_transactions,
+            total_accounts: s.total_accounts,
+            validator_count: s.validator_count,
+            total_stake: s.total_stake,
+            total_supply: s.total_supply,
+            program_count: s.program_count,
+            avg_block_time_ms: s.avg_block_time_ms,
+            peer_count: s.peer_count,
+            mempool_size: s.mempool_size,
+            node_syncing: s.node_syncing,
+            faucet: s.faucet,
+            confidential: s.confidential,
+            current_leader: s.current_leader,
+            updated_at: s.updated_at.to_rfc3339(),
+        }
+    }
 }
 
-/// Indexer state row
 #[derive(Debug, Clone, FromRow)]
 pub struct IndexerStateRow {
-    pub id: i32,
-    pub last_indexed_height: i64,
-    pub last_indexed_block_id: Option<String>,
-    pub last_finalized_height: i64,
+    pub next_height: i64,
+    pub last_indexed_hash: Option<String>,
     pub is_syncing: bool,
-    pub sync_started_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct NodeGeoRow {
+    pub ip: String,
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub city: Option<String>,
+    pub region: Option<String>,
+    pub country: Option<String>,
+    pub country_code: Option<String>,
+    pub org: Option<String>,
+    pub ok: bool,
     pub updated_at: DateTime<Utc>,
 }
 
-/// Count result helper
-#[derive(Debug, Clone, FromRow)]
-pub struct CountRow {
-    pub count: Option<i64>,
-}
-
-impl CountRow {
-    pub fn value(&self) -> i64 {
-        self.count.unwrap_or(0)
+impl NodeGeoRow {
+    pub fn geo(&self) -> Option<GeoInfo> {
+        match (self.ok, self.lat, self.lon) {
+            (true, Some(lat), Some(lon)) => Some(GeoInfo {
+                lat,
+                lon,
+                city: self.city.clone(),
+                region: self.region.clone(),
+                country: self.country.clone(),
+                country_code: self.country_code.clone(),
+                org: self.org.clone(),
+            }),
+            _ => None,
+        }
     }
 }

@@ -2,123 +2,281 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ---------------------------------------------------------------------------
+   Palette — light is the default, dark is opt-in via data-theme on <html>.
+   --------------------------------------------------------------------------- */
+
 :root {
-  --foreground-rgb: 255, 255, 255;
-  --background-start-rgb: 15, 23, 42;
-  --background-end-rgb: 2, 6, 23;
+  --color-bg: #fafaf8;
+  --color-bg-soft: #f1f2ef;
+  --color-surface: #ffffff;
+  --color-surface-2: #f4f5f2;
+  --color-border: #d6d9d4;
+  --color-border-soft: #e6e8e3;
+  --color-text: #0f1b2d;
+  --color-text-soft: #3b4657;
+  --color-text-mute: #5c6675;
+  --color-text-strong: #0a1220;
+  --color-accent: #1b4b8f;
+  --color-accent-2: #4a6fa5;
+  --color-accent-3: #8c2f39;
+  --color-on-accent: #ffffff;
+  --color-live: #3a8f5c;
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
-  min-height: 100vh;
+[data-theme='dark'] {
+  --color-bg: #0e141c;
+  --color-bg-soft: #131a24;
+  --color-surface: #161e29;
+  --color-surface-2: #1c2531;
+  --color-border: #2a3442;
+  --color-border-soft: #212a36;
+  --color-text: #e4e7eb;
+  --color-text-soft: #aeb6c2;
+  --color-text-mute: #7d8794;
+  --color-text-strong: #ffffff;
+  --color-accent: #8fb3e6;
+  --color-accent-2: #a9bcd6;
+  --color-accent-3: #d98a93;
+  --color-on-accent: #0e141c;
+  --color-live: #4fa877;
 }
 
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: rgb(30, 41, 59);
-}
-
-::-webkit-scrollbar-thumb {
-  background: rgb(71, 85, 105);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: rgb(100, 116, 139);
-}
-
-/* Code and hash display */
-.font-mono {
-  font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
-}
-
-/* Table responsive */
-.table-responsive {
-  overflow-x: auto;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Animation utilities */
-@keyframes pulse-slow {
-  0%, 100% {
-    opacity: 1;
+@layer base {
+  html {
+    color-scheme: light;
   }
-  50% {
-    opacity: 0.5;
+
+  [data-theme='dark'] {
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--color-bg);
+    color: var(--color-text);
+    -webkit-font-smoothing: antialiased;
+    min-height: 100vh;
+  }
+
+  ::selection {
+    background: var(--color-accent);
+    color: var(--color-on-accent);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: var(--color-bg-soft);
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: var(--color-border);
+    border-radius: 0;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-mute);
   }
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
+@layer components {
+  /* -- surfaces --------------------------------------------------------- */
+
+  .card {
+    @apply rounded border border-border bg-surface;
+  }
+
+  .card-padded {
+    @apply rounded border border-border bg-surface p-6;
+  }
+
+  /* -- section label chip ("— Abstract" on the reference) --------------- */
+
+  .chip {
+    @apply inline-flex items-center gap-[0.6rem] text-[0.8125rem] font-medium text-accent;
+    letter-spacing: 0.01em;
+  }
+
+  .chip::before {
+    content: '';
+    display: inline-block;
+    width: 1.25rem;
+    height: 1px;
+    background: currentColor;
+  }
+
+  /* -- buttons ---------------------------------------------------------- */
+
+  .btn-primary {
+    @apply inline-flex items-center gap-2 rounded border border-accent bg-accent px-[1.1rem] py-[0.65rem] text-[0.9375rem] font-medium text-on-accent transition-colors;
+  }
+
+  .btn-primary:hover {
+    background: var(--color-accent-2);
+    border-color: var(--color-accent-2);
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 rounded border border-border bg-surface px-[1.1rem] py-[0.65rem] text-[0.9375rem] font-medium text-text transition-colors;
+  }
+
+  .btn-secondary:hover {
+    border-color: var(--color-text-mute);
+  }
+
+  .btn-icon {
+    @apply inline-flex h-8 w-8 items-center justify-center rounded border border-border bg-surface text-mute transition-colors;
+  }
+
+  .btn-icon:hover {
+    color: var(--color-text-strong);
+    border-color: var(--color-text-mute);
+  }
+
+  /* -- links ------------------------------------------------------------ */
+
+  .link {
+    @apply text-accent transition-colors;
+  }
+
+  .link:hover {
+    @apply underline underline-offset-4;
+  }
+
+  /* -- badges ----------------------------------------------------------- */
+
+  .badge {
+    @apply inline-flex items-center rounded border border-border bg-surface-2 px-2 py-0.5 text-[0.6875rem] font-medium text-soft;
+  }
+
+  .badge-transfer {
+    color: var(--color-accent);
+  }
+
+  .badge-mint {
+    color: var(--color-accent-2);
+  }
+
+  .badge-deploy {
+    color: var(--color-text-strong);
+  }
+
+  .badge-call {
+    color: var(--color-accent-3);
+  }
+
+  .badge-accent {
+    color: var(--color-accent);
+  }
+
+  .badge-neutral {
+    color: var(--color-text-mute);
+  }
+
+  /* -- stat row (hairline separated, not boxed) ------------------------- */
+
+  .stat-row {
+    @apply grid border-y border-border;
+  }
+
+  .stat {
+    @apply border-border px-5 py-5;
+  }
+
+  .stat + .stat {
+    @apply border-t border-border-soft sm:border-l sm:border-t-0 sm:border-border;
+  }
+
+  .stat-value {
+    @apply text-3xl font-medium tracking-tight text-strong;
+  }
+
+  .stat-label {
+    @apply mt-1.5 text-[0.8125rem] text-soft;
+  }
+
+  .stat-sub {
+    @apply mt-0.5 text-xs text-mute;
+  }
+
+  /* -- detail rows ------------------------------------------------------ */
+
+  .detail-row {
+    @apply flex flex-col gap-1 border-b border-border-soft py-3 last:border-0 sm:flex-row sm:items-start sm:gap-6;
+  }
+
+  .detail-label {
+    @apply w-full flex-shrink-0 text-[0.8125rem] text-mute sm:w-56;
+  }
+
+  .detail-value {
+    @apply min-w-0 flex-1 break-all text-sm text-text;
+  }
+
+  /* -- live indicator --------------------------------------------------- */
+
+  .status-dot {
+    @apply inline-block h-1.5 w-1.5 rounded-full;
+  }
+
+  .status-dot-live {
+    background: var(--color-live);
+  }
+
+  .status-dot-off {
+    background: var(--color-text-mute);
+    opacity: 0.6;
+  }
 }
 
-/* Status indicators */
-.status-dot {
-  @apply inline-block h-2 w-2 rounded-full;
+/* ---------------------------------------------------------------------------
+   Leaflet — themed to match the cards.
+   --------------------------------------------------------------------------- */
+
+.leaflet-container {
+  background: var(--color-bg-soft);
+  font-family: inherit;
+  border-radius: 3px;
 }
 
-.status-dot-success {
-  @apply bg-green-500;
+.leaflet-container a {
+  color: var(--color-accent);
 }
 
-.status-dot-error {
-  @apply bg-red-500;
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: none;
 }
 
-.status-dot-pending {
-  @apply bg-yellow-500;
+.leaflet-popup-content-wrapper {
+  border-radius: 3px;
 }
 
-.status-dot-inactive {
-  @apply bg-gray-500;
+.leaflet-popup-close-button {
+  color: var(--color-text-mute) !important;
 }
 
-/* Card hover effect */
-.card-hover {
-  @apply transition-all duration-200;
+.leaflet-control-attribution {
+  background: var(--color-surface) !important;
+  color: var(--color-text-mute);
+  border-top: 1px solid var(--color-border);
+  border-left: 1px solid var(--color-border);
+  font-size: 10px;
 }
 
-.card-hover:hover {
-  @apply border-dark-600 shadow-lg shadow-dark-900/50;
+.leaflet-bar a {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-bottom-color: var(--color-border);
 }
 
-/* Link styles */
-.link {
-  @apply text-primary-400 hover:text-primary-300 transition-colors;
-}
-
-/* Badge styles */
-.badge {
-  @apply inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium;
-}
-
-.badge-success {
-  @apply bg-green-500/10 text-green-400;
-}
-
-.badge-error {
-  @apply bg-red-500/10 text-red-400;
-}
-
-.badge-warning {
-  @apply bg-yellow-500/10 text-yellow-400;
-}
-
-.badge-info {
-  @apply bg-primary-500/10 text-primary-400;
-}
-
-.badge-neutral {
-  @apply bg-dark-700 text-dark-300;
+.leaflet-bar a:hover {
+  background: var(--color-bg-soft);
+  color: var(--color-text-strong);
 }

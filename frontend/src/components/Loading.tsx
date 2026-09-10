@@ -7,16 +7,16 @@ interface LoadingProps {
 
 export function Loading({ className, size = 'md' }: LoadingProps) {
   const sizeClasses = {
-    sm: 'h-4 w-4 border-2',
-    md: 'h-8 w-8 border-2',
-    lg: 'h-12 w-12 border-3',
+    sm: 'h-4 w-4',
+    md: 'h-6 w-6',
+    lg: 'h-8 w-8',
   };
 
   return (
     <div className={cn('flex items-center justify-center', className)}>
       <div
         className={cn(
-          'animate-spin rounded-full border-dark-600 border-t-primary-500',
+          'animate-spin rounded-full border-2 border-border border-t-accent',
           sizeClasses[size]
         )}
       />
@@ -26,7 +26,7 @@ export function Loading({ className, size = 'md' }: LoadingProps) {
 
 export function PageLoading() {
   return (
-    <div className="flex h-96 items-center justify-center">
+    <div className="flex h-64 items-center justify-center">
       <Loading size="lg" />
     </div>
   );
@@ -34,10 +34,10 @@ export function PageLoading() {
 
 export function CardSkeleton({ className }: { className?: string }) {
   return (
-    <div className={cn('animate-pulse rounded-xl border border-dark-700 bg-dark-800 p-6', className)}>
+    <div className={cn('card-padded animate-pulse', className)}>
       <div className="space-y-3">
-        <div className="h-4 w-3/4 rounded bg-dark-700" />
-        <div className="h-4 w-1/2 rounded bg-dark-700" />
+        <div className="h-3.5 w-3/4 rounded bg-bg-soft" />
+        <div className="h-3.5 w-1/2 rounded bg-bg-soft" />
       </div>
     </div>
   );
@@ -45,19 +45,16 @@ export function CardSkeleton({ className }: { className?: string }) {
 
 export function ListSkeleton({ count = 5 }: { count?: number }) {
   return (
-    <div className="space-y-3">
+    <div className="card divide-y divide-border-soft">
       {Array.from({ length: count }).map((_, i) => (
-        <div
-          key={i}
-          className="animate-pulse rounded-lg border border-dark-700 bg-dark-800 p-4"
-        >
+        <div key={i} className="animate-pulse p-4">
           <div className="flex items-center gap-4">
-            <div className="h-10 w-10 rounded-full bg-dark-700" />
+            <div className="h-8 w-8 rounded bg-bg-soft" />
             <div className="flex-1 space-y-2">
-              <div className="h-4 w-1/4 rounded bg-dark-700" />
-              <div className="h-3 w-1/2 rounded bg-dark-700" />
+              <div className="h-3.5 w-1/4 rounded bg-bg-soft" />
+              <div className="h-3 w-1/2 rounded bg-bg-soft" />
             </div>
-            <div className="h-4 w-16 rounded bg-dark-700" />
+            <div className="h-3.5 w-16 rounded bg-bg-soft" />
           </div>
         </div>
       ))}
@@ -67,33 +64,27 @@ export function ListSkeleton({ count = 5 }: { count?: number }) {
 
 export function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-8">
       <div className="animate-pulse">
-        <div className="h-8 w-48 rounded bg-dark-700" />
-        <div className="mt-2 h-4 w-96 rounded bg-dark-700" />
+        <div className="h-9 w-56 rounded bg-bg-soft" />
+        <div className="mt-3 h-3.5 w-96 max-w-full rounded bg-bg-soft" />
       </div>
 
-      {/* Info cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="stat-row grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div
-            key={i}
-            className="animate-pulse rounded-xl border border-dark-700 bg-dark-800 p-6"
-          >
-            <div className="h-4 w-20 rounded bg-dark-700" />
-            <div className="mt-3 h-6 w-32 rounded bg-dark-700" />
+          <div key={i} className="stat animate-pulse">
+            <div className="h-8 w-24 rounded bg-bg-soft" />
+            <div className="mt-2 h-3 w-16 rounded bg-bg-soft" />
           </div>
         ))}
       </div>
 
-      {/* Content */}
-      <div className="animate-pulse rounded-xl border border-dark-700 bg-dark-800 p-6">
+      <div className="card-padded animate-pulse">
         <div className="space-y-4">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="flex justify-between border-b border-dark-700 pb-4">
-              <div className="h-4 w-24 rounded bg-dark-700" />
-              <div className="h-4 w-48 rounded bg-dark-700" />
+            <div key={i} className="flex justify-between border-b border-border-soft pb-4 last:border-0">
+              <div className="h-3.5 w-24 rounded bg-bg-soft" />
+              <div className="h-3.5 w-48 rounded bg-bg-soft" />
             </div>
           ))}
         </div>

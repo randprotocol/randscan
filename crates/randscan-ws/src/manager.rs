@@ -1,24 +1,17 @@
-//! WebSocket connection manager
-
-use randscan_core::{
-    BroadcastEvent, Subscription, WsChannel, WsServerMessage, WsSubscribeParams,
-};
-use std::collections::HashMap;
+use randscan_core::{BroadcastEvent, WsChannel, WsServerMessage};
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc, RwLock};
 use tracing::{debug, info};
 use uuid::Uuid;
 
-/// Message sender type for a WebSocket connection
 pub type WsSender = mpsc::UnboundedSender<WsServerMessage>;
 
-/// Connection info
 struct Connection {
     sender: WsSender,
-    subscriptions: Vec<Subscription>,
+    channels: HashSet<WsChannel>,
 }
 
-/// WebSocket connection manager
 pub struct WsManager {
     connections: Arc<RwLock<HashMap<String, Connection>>>,
 }
@@ -30,158 +23,55 @@ impl WsManager {
         }
     }
 
-    /// Register a new connection
     pub async fn register(&self, sender: WsSender) -> String {
         let id = Uuid::new_v4().to_string();
-        let connection = Connection {
-            sender,
-            subscriptions: Vec::new(),
-        };
-
-        self.connections.write().await.insert(id.clone(), connection);
-        info!("WebSocket connection registered: {}", id);
+        self.connections.write().await.insert(
+            id.clone(),
+            Connection {
+                sender,
+                channels: HashSet::new(),
+            },
+        );
+        debug!("ws connection {} registered", id);
         id
     }
 
-    /// Unregister a connection
     pub async fn unregister(&self, id: &str) {
         self.connections.write().await.remove(id);
-        info!("WebSocket connection unregistered: {}", id);
+        debug!("ws connection {} unregistered", id);
     }
 
-    /// Subscribe to a channel
-    pub async fn subscribe(
-        &self,
-        connection_id: &str,
-        channel: WsChannel,
-        params: Option<WsSubscribeParams>,
-    ) -> Option<String> {
-        let mut connections = self.connections.write().await;
-
-        if let Some(conn) = connections.get_mut(connection_id) {
-            let subscription = Subscription::new(channel, params);
-            let sub_id = subscription.id.clone();
-            conn.subscriptions.push(subscription);
-
-            // Send confirmation
+    pub async fn subscribe(&self, connection_id: &str, channel: WsChannel) {
+        if let Some(conn) = self.connections.write().await.get_mut(connection_id) {
+            conn.channels.insert(channel);
             let _ = conn.sender.send(WsServerMessage::Subscribed {
                 channel,
-                subscription_id: sub_id.clone(),
+                subscription_id: Uuid::new_v4().to_string(),
             });
-
-            debug!(
-                "Connection {} subscribed to {:?}",
-                connection_id,
-                channel
-            );
-            Some(sub_id)
-        } else {
-            None
         }
     }
 
-    /// Unsubscribe from a channel
     pub async fn unsubscribe(&self, connection_id: &str, channel: WsChannel) {
-        let mut connections = self.connections.write().await;
-
-        if let Some(conn) = connections.get_mut(connection_id) {
-            conn.subscriptions.retain(|s| s.channel != channel);
-
+        if let Some(conn) = self.connections.write().await.get_mut(connection_id) {
+            conn.channels.remove(&channel);
             let _ = conn.sender.send(WsServerMessage::Unsubscribed { channel });
-
-            debug!(
-                "Connection {} unsubscribed from {:?}",
-                connection_id,
-                channel
-            );
         }
     }
 
-    /// Broadcast an event to matching subscribers
     pub async fn broadcast(&self, event: BroadcastEvent) {
-        let connections = self.connections.read().await;
-
-        for conn in connections.values() {
-            let message = match &event {
-                BroadcastEvent::NewBlock(block) => {
-                    let matches = conn
-                        .subscriptions
-                        .iter()
-                        .any(|s| s.matches_block(block));
-                    if matches {
-                        Some(WsServerMessage::NewBlock {
-                            block: block.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                BroadcastEvent::NewTransaction(tx) => {
-                    let matches = conn
-                        .subscriptions
-                        .iter()
-                        .any(|s| s.matches_transaction(tx));
-                    if matches {
-                        Some(WsServerMessage::NewTransaction {
-                            transaction: tx.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                BroadcastEvent::AccountUpdate(account) => {
-                    let matches = conn
-                        .subscriptions
-                        .iter()
-                        .any(|s| s.matches_account(account));
-                    if matches {
-                        Some(WsServerMessage::AccountUpdate {
-                            account: account.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                BroadcastEvent::ValidatorUpdate(validator) => {
-                    let matches = conn
-                        .subscriptions
-                        .iter()
-                        .any(|s| s.matches_validator(validator));
-                    if matches {
-                        Some(WsServerMessage::ValidatorUpdate {
-                            validator: validator.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-                BroadcastEvent::StatsUpdate(stats) => {
-                    let matches = conn
-                        .subscriptions
-                        .iter()
-                        .any(|s| s.channel == WsChannel::Stats);
-                    if matches {
-                        Some(WsServerMessage::StatsUpdate {
-                            stats: stats.clone(),
-                        })
-                    } else {
-                        None
-                    }
-                }
-            };
-
-            if let Some(msg) = message {
-                let _ = conn.sender.send(msg);
+        let channel = event.channel();
+        let message = event.to_message();
+        for conn in self.connections.read().await.values() {
+            if conn.channels.contains(&channel) {
+                let _ = conn.sender.send(message.clone());
             }
         }
     }
 
-    /// Get connection count
     pub async fn connection_count(&self) -> usize {
         self.connections.read().await.len()
     }
 
-    /// Start listening for broadcast events
     pub async fn start_broadcast_listener(
         self: Arc<Self>,
         mut receiver: broadcast::Receiver<BroadcastEvent>,
@@ -189,14 +79,12 @@ impl WsManager {
         tokio::spawn(async move {
             loop {
                 match receiver.recv().await {
-                    Ok(event) => {
-                        self.broadcast(event).await;
-                    }
+                    Ok(event) => self.broadcast(event).await,
                     Err(broadcast::error::RecvError::Lagged(n)) => {
-                        debug!("WebSocket broadcast lagged by {} messages", n);
+                        debug!("ws broadcast lagged by {}", n)
                     }
                     Err(broadcast::error::RecvError::Closed) => {
-                        info!("Broadcast channel closed");
+                        info!("broadcast channel closed");
                         break;
                     }
                 }

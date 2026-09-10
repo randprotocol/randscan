@@ -1,8 +1,6 @@
-//! API types for RandScan REST API
-
 use serde::{Deserialize, Serialize};
 
-/// Pagination parameters
+/// Pagination query parameters (`page`, `limit`).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Pagination {
     #[serde(default = "default_page")]
@@ -21,31 +19,30 @@ fn default_limit() -> u32 {
 
 impl Default for Pagination {
     fn default() -> Self {
-        Self {
-            page: 1,
-            limit: 20,
-        }
+        Self { page: 1, limit: 20 }
     }
 }
 
 impl Pagination {
-    pub fn offset(&self) -> i64 {
-        ((self.page.saturating_sub(1)) * self.limit) as i64
+    pub fn page(&self) -> u32 {
+        self.page.max(1)
     }
 
     pub fn limit(&self) -> i64 {
-        self.limit.min(100) as i64
+        self.limit.clamp(1, 100) as i64
+    }
+
+    pub fn offset(&self) -> i64 {
+        (self.page() as i64 - 1) * self.limit()
     }
 }
 
-/// Paginated response wrapper
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginatedResponse<T> {
     pub data: Vec<T>,
     pub pagination: PaginationInfo,
 }
 
-/// Pagination info in response
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PaginationInfo {
     pub page: u32,
@@ -57,8 +54,10 @@ pub struct PaginationInfo {
 }
 
 impl PaginationInfo {
-    pub fn new(page: u32, limit: u32, total: i64) -> Self {
-        let total_pages = ((total as f64) / (limit as f64)).ceil() as u32;
+    pub fn new(p: &Pagination, total: i64) -> Self {
+        let page = p.page();
+        let limit = p.limit() as u32;
+        let total_pages = ((total.max(0) as f64) / (limit as f64)).ceil() as u32;
         Self {
             page,
             limit,
@@ -70,7 +69,7 @@ impl PaginationInfo {
     }
 }
 
-/// API error response
+/// API error body.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ApiError {
     pub error: String,
@@ -80,48 +79,36 @@ pub struct ApiError {
 }
 
 impl ApiError {
-    pub fn new(error: &str, message: &str) -> Self {
-        Self {
-            error: error.to_string(),
-            message: message.to_string(),
-            code: None,
-        }
-    }
-
     pub fn not_found(resource: &str) -> Self {
         Self {
-            error: "not_found".to_string(),
+            error: "not_found".into(),
             message: format!("{} not found", resource),
-            code: Some("NOT_FOUND".to_string()),
+            code: Some("NOT_FOUND".into()),
         }
     }
 
     pub fn bad_request(message: &str) -> Self {
         Self {
-            error: "bad_request".to_string(),
-            message: message.to_string(),
-            code: Some("BAD_REQUEST".to_string()),
+            error: "bad_request".into(),
+            message: message.into(),
+            code: Some("BAD_REQUEST".into()),
         }
     }
 
     pub fn internal(message: &str) -> Self {
         Self {
-            error: "internal_error".to_string(),
-            message: message.to_string(),
-            code: Some("INTERNAL_ERROR".to_string()),
+            error: "internal_error".into(),
+            message: message.into(),
+            code: Some("INTERNAL_ERROR".into()),
         }
     }
 }
 
-/// Search query parameters
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchQuery {
     pub q: String,
-    #[serde(default)]
-    pub limit: Option<u32>,
 }
 
-/// Search result item
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SearchResult {
     #[serde(rename = "type")]
@@ -133,72 +120,73 @@ pub struct SearchResult {
     pub url: String,
 }
 
-/// Search result type
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchResultType {
     Block,
     Transaction,
     Account,
     Validator,
-    Token,
+    Program,
 }
 
-/// Block query parameters
+// Note: `#[serde(flatten)]` does not work with query strings (numbers arrive as strings),
+// so the paginated query structs repeat `page` and `limit`.
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BlockQuery {
-    #[serde(flatten)]
-    pub pagination: Pagination,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
     pub proposer: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub epoch: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub finalized: Option<bool>,
 }
 
-/// Transaction query parameters
+impl BlockQuery {
+    pub fn pagination(&self) -> Pagination {
+        Pagination {
+            page: self.page,
+            limit: self.limit,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionQuery {
-    #[serde(flatten)]
-    pub pagination: Pagination,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default = "default_page")]
+    pub page: u32,
+    #[serde(default = "default_limit")]
+    pub limit: u32,
+    pub kind: Option<String>,
     pub sender: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub block_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub payload_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub status: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub from_timestamp: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to_timestamp: Option<i64>,
+    pub height: Option<i64>,
 }
 
-/// Validator query parameters
+impl TransactionQuery {
+    pub fn pagination(&self) -> Pagination {
+        Pagination {
+            page: self.page,
+            limit: self.limit,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ValidatorQuery {
-    #[serde(flatten)]
-    pub pagination: Pagination,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub active: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub sort_by: Option<String>, // stake, blocks, uptime
+pub struct LimitQuery {
+    #[serde(default = "default_latest_limit")]
+    pub limit: u32,
 }
 
-/// Stats query parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct StatsQuery {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub from_timestamp: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub to_timestamp: Option<i64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub interval: Option<String>, // hourly, daily
+fn default_latest_limit() -> u32 {
+    10
 }
 
-/// Health check response
+impl LimitQuery {
+    pub fn limit(&self) -> i64 {
+        self.limit.clamp(1, 100) as i64
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HealthResponse {
     pub status: String,
@@ -207,7 +195,6 @@ pub struct HealthResponse {
     pub indexer: IndexerHealth,
 }
 
-/// Indexer health info
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct IndexerHealth {
     pub connected: bool,

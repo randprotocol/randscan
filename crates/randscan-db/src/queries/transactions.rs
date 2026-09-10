@@ -1,425 +1,216 @@
-//! Transaction queries
+use crate::{AccountTxRow, ReceiptRow, Result, TxRow};
+use sqlx::{PgConnection, PgPool};
 
-use crate::{CountRow, DbError, Result, TransactionRow};
-use sqlx::PgPool;
+pub const TX_COLS: &str = "hash, block_hash, height, tx_index, sender, nonce, fee::text AS fee, kind, chain_id, timestamp_ms, to_address, amount::text AS amount, program_id, base_pc, words_len, proof_len, recipients";
 
-/// Insert a transaction
-pub async fn insert_transaction(
-    pool: &PgPool,
-    tx_id: &str,
-    block_id: Option<&str>,
-    block_height: Option<i64>,
-    sender: &str,
-    nonce: i64,
-    compute_budget: i64,
-    fee: i64,
-    payload_type: &str,
-    status: &str,
-    timestamp: i64,
-    signature: &str,
-) -> Result<()> {
+pub struct NewTx<'a> {
+    pub hash: &'a str,
+    pub block_hash: &'a str,
+    pub height: i64,
+    pub tx_index: i32,
+    pub sender: &'a str,
+    pub nonce: i64,
+    pub fee: &'a str,
+    pub kind: &'a str,
+    pub chain_id: i64,
+    pub timestamp_ms: i64,
+    pub to_address: Option<&'a str>,
+    pub amount: Option<&'a str>,
+    pub program_id: Option<&'a str>,
+    pub base_pc: Option<i64>,
+    pub words_len: Option<i64>,
+    pub proof_len: Option<i64>,
+    pub recipients: &'a [String],
+}
+
+pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Result<()> {
     sqlx::query(
-        r#"
-        INSERT INTO transactions (
-            tx_id, block_id, block_height, sender, nonce, compute_budget,
-            fee, payload_type, status, timestamp, signature
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        ON CONFLICT (tx_id) DO UPDATE SET
-            block_id = COALESCE(EXCLUDED.block_id, transactions.block_id),
-            block_height = COALESCE(EXCLUDED.block_height, transactions.block_height),
-            status = EXCLUDED.status
-        "#,
+        "INSERT INTO transactions (hash, block_hash, height, tx_index, sender, nonce, fee, kind, chain_id, timestamp_ms,
+                                   to_address, amount, program_id, base_pc, words_len, proof_len, recipients)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9, $10, $11, $12::numeric, $13, $14, $15, $16, $17)",
     )
-    .bind(tx_id)
-    .bind(block_id)
-    .bind(block_height)
-    .bind(sender)
-    .bind(nonce)
-    .bind(compute_budget)
-    .bind(fee)
-    .bind(payload_type)
-    .bind(status)
-    .bind(timestamp)
-    .bind(signature)
-    .execute(pool)
+    .bind(t.hash)
+    .bind(t.block_hash)
+    .bind(t.height)
+    .bind(t.tx_index)
+    .bind(t.sender)
+    .bind(t.nonce)
+    .bind(t.fee)
+    .bind(t.kind)
+    .bind(t.chain_id)
+    .bind(t.timestamp_ms)
+    .bind(t.to_address)
+    .bind(t.amount)
+    .bind(t.program_id)
+    .bind(t.base_pc)
+    .bind(t.words_len)
+    .bind(t.proof_len)
+    .bind(t.recipients)
+    .execute(conn)
     .await?;
-
     Ok(())
 }
 
-/// Get transaction by ID
-pub async fn get_transaction_by_id(pool: &PgPool, tx_id: &str) -> Result<TransactionRow> {
-    sqlx::query_as::<_, TransactionRow>("SELECT * FROM transactions WHERE tx_id = $1")
-        .bind(tx_id)
-        .fetch_one(pool)
-        .await
-        .map_err(|e| match e {
-            sqlx::Error::RowNotFound => {
-                DbError::NotFound(format!("Transaction {} not found", tx_id))
-            }
-            _ => e.into(),
-        })
+pub async fn insert_account_transaction(
+    conn: &mut PgConnection,
+    account: &str,
+    tx_hash: &str,
+    role: &str,
+    height: i64,
+    tx_index: i32,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO account_transactions (account, tx_hash, role, height, tx_index)
+         VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING",
+    )
+    .bind(account)
+    .bind(tx_hash)
+    .bind(role)
+    .bind(height)
+    .bind(tx_index)
+    .execute(conn)
+    .await?;
+    Ok(())
 }
 
-/// Get transactions with pagination and filters
-pub async fn get_transactions(
+#[allow(clippy::too_many_arguments)]
+pub async fn insert_receipt(
+    conn: &mut PgConnection,
+    tx_hash: &str,
+    program: &str,
+    tier: i32,
+    outputs: &[i64],
+    effect_to: Option<&str>,
+    effect_amount: Option<&str>,
+    height: i64,
+    tx_index: i32,
+) -> Result<()> {
+    sqlx::query(
+        "INSERT INTO receipts (tx_hash, program, tier, outputs, effect_to, effect_amount, height, tx_index)
+         VALUES ($1, $2, $3, $4, $5, $6::numeric, $7, $8) ON CONFLICT (tx_hash) DO NOTHING",
+    )
+    .bind(tx_hash)
+    .bind(program)
+    .bind(tier)
+    .bind(outputs)
+    .bind(effect_to)
+    .bind(effect_amount)
+    .bind(height)
+    .bind(tx_index)
+    .execute(conn)
+    .await?;
+    Ok(())
+}
+
+pub async fn get_transaction(pool: &PgPool, hash: &str) -> Result<Option<TxRow>> {
+    let sql = format!("SELECT {TX_COLS} FROM transactions WHERE hash = $1");
+    Ok(sqlx::query_as::<_, TxRow>(&sql)
+        .bind(hash)
+        .fetch_optional(pool)
+        .await?)
+}
+
+pub async fn get_receipt(pool: &PgPool, tx_hash: &str) -> Result<Option<ReceiptRow>> {
+    Ok(sqlx::query_as::<_, ReceiptRow>(
+        "SELECT tx_hash, program, tier, outputs, effect_to, effect_amount::text AS effect_amount, height, tx_index FROM receipts WHERE tx_hash = $1",
+    )
+    .bind(tx_hash)
+    .fetch_optional(pool)
+    .await?)
+}
+
+pub async fn get_transactions_for_block(pool: &PgPool, block_hash: &str) -> Result<Vec<TxRow>> {
+    let sql =
+        format!("SELECT {TX_COLS} FROM transactions WHERE block_hash = $1 ORDER BY tx_index ASC");
+    Ok(sqlx::query_as::<_, TxRow>(&sql)
+        .bind(block_hash)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn get_latest_transactions(pool: &PgPool, limit: i64) -> Result<Vec<TxRow>> {
+    let sql =
+        format!("SELECT {TX_COLS} FROM transactions ORDER BY height DESC, tx_index DESC LIMIT $1");
+    Ok(sqlx::query_as::<_, TxRow>(&sql)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn list_transactions(
     pool: &PgPool,
     offset: i64,
     limit: i64,
+    kind: Option<&str>,
     sender: Option<&str>,
-    block_id: Option<&str>,
-    payload_type: Option<&str>,
-    status: Option<&str>,
-    from_timestamp: Option<i64>,
-    to_timestamp: Option<i64>,
-) -> Result<Vec<TransactionRow>> {
-    let mut query = String::from("SELECT * FROM transactions WHERE 1=1");
-    let mut params: Vec<String> = Vec::new();
-
-    if let Some(s) = sender {
-        params.push(s.to_string());
-        query.push_str(&format!(" AND sender = ${}", params.len()));
-    }
-    if let Some(b) = block_id {
-        params.push(b.to_string());
-        query.push_str(&format!(" AND block_id = ${}", params.len()));
-    }
-    if let Some(p) = payload_type {
-        params.push(p.to_string());
-        query.push_str(&format!(" AND payload_type = ${}", params.len()));
-    }
-    if let Some(st) = status {
-        params.push(st.to_string());
-        query.push_str(&format!(" AND status = ${}", params.len()));
-    }
-
-    query.push_str(" ORDER BY timestamp DESC");
-
-    // We need to use a dynamic approach since sqlx doesn't support dynamic params well
-    // For simplicity, we'll build the query based on what params are provided
-    let rows = if sender.is_some()
-        && block_id.is_none()
-        && payload_type.is_none()
-        && status.is_none()
-    {
-        sqlx::query_as::<_, TransactionRow>(
-            "SELECT * FROM transactions WHERE sender = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3",
-        )
-        .bind(sender.unwrap())
+    height: Option<i64>,
+) -> Result<Vec<TxRow>> {
+    let sql = format!(
+        "SELECT {TX_COLS} FROM transactions
+         WHERE ($1::text IS NULL OR kind = $1) AND ($2::text IS NULL OR sender = $2) AND ($3::bigint IS NULL OR height = $3)
+         ORDER BY height DESC, tx_index DESC LIMIT $4 OFFSET $5"
+    );
+    Ok(sqlx::query_as::<_, TxRow>(&sql)
+        .bind(kind)
+        .bind(sender)
+        .bind(height)
         .bind(limit)
         .bind(offset)
         .fetch_all(pool)
-        .await?
-    } else if block_id.is_some()
-        && sender.is_none()
-        && payload_type.is_none()
-        && status.is_none()
-    {
-        sqlx::query_as::<_, TransactionRow>(
-            "SELECT * FROM transactions WHERE block_id = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3",
-        )
-        .bind(block_id.unwrap())
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await?
-    } else if payload_type.is_some()
-        && sender.is_none()
-        && block_id.is_none()
-        && status.is_none()
-    {
-        sqlx::query_as::<_, TransactionRow>(
-            "SELECT * FROM transactions WHERE payload_type = $1 ORDER BY timestamp DESC LIMIT $2 OFFSET $3",
-        )
-        .bind(payload_type.unwrap())
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await?
-    } else {
-        // Default: no filters
-        sqlx::query_as::<_, TransactionRow>(
-            "SELECT * FROM transactions ORDER BY timestamp DESC LIMIT $1 OFFSET $2",
-        )
-        .bind(limit)
-        .bind(offset)
-        .fetch_all(pool)
-        .await?
-    };
-
-    Ok(rows)
+        .await?)
 }
 
-/// Count transactions with filters
 pub async fn count_transactions(
     pool: &PgPool,
+    kind: Option<&str>,
     sender: Option<&str>,
-    block_id: Option<&str>,
-    payload_type: Option<&str>,
-    status: Option<&str>,
+    height: Option<i64>,
 ) -> Result<i64> {
-    let row = if let Some(s) = sender {
-        sqlx::query_as::<_, CountRow>(
-            "SELECT COUNT(*) as count FROM transactions WHERE sender = $1",
-        )
-        .bind(s)
-        .fetch_one(pool)
-        .await?
-    } else if let Some(b) = block_id {
-        sqlx::query_as::<_, CountRow>(
-            "SELECT COUNT(*) as count FROM transactions WHERE block_id = $1",
-        )
-        .bind(b)
-        .fetch_one(pool)
-        .await?
-    } else if let Some(p) = payload_type {
-        sqlx::query_as::<_, CountRow>(
-            "SELECT COUNT(*) as count FROM transactions WHERE payload_type = $1",
-        )
-        .bind(p)
-        .fetch_one(pool)
-        .await?
-    } else {
-        sqlx::query_as::<_, CountRow>("SELECT COUNT(*) as count FROM transactions")
+    Ok(sqlx::query_scalar(
+        "SELECT COUNT(*) FROM transactions
+         WHERE ($1::text IS NULL OR kind = $1) AND ($2::text IS NULL OR sender = $2) AND ($3::bigint IS NULL OR height = $3)",
+    )
+    .bind(kind)
+    .bind(sender)
+    .bind(height)
+    .fetch_one(pool)
+    .await?)
+}
+
+pub async fn list_account_transactions(
+    pool: &PgPool,
+    account: &str,
+    offset: i64,
+    limit: i64,
+) -> Result<Vec<AccountTxRow>> {
+    let sql = "SELECT t.hash, t.block_hash, t.height, t.tx_index, t.sender, t.nonce, t.fee::text AS fee, t.kind, t.chain_id, t.timestamp_ms,
+                t.to_address, t.amount::text AS amount, t.program_id, t.base_pc, t.words_len, t.proof_len, t.recipients, a.role
+         FROM account_transactions a JOIN transactions t ON t.hash = a.tx_hash
+         WHERE a.account = $1 ORDER BY a.height DESC, a.tx_index DESC, a.role ASC LIMIT $2 OFFSET $3";
+    Ok(sqlx::query_as::<_, AccountTxRow>(sql)
+        .bind(account)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn count_account_transactions(pool: &PgPool, account: &str) -> Result<i64> {
+    Ok(
+        sqlx::query_scalar("SELECT COUNT(*) FROM account_transactions WHERE account = $1")
+            .bind(account)
             .fetch_one(pool)
-            .await?
-    };
-
-    Ok(row.value())
-}
-
-/// Get transactions for block
-pub async fn get_transactions_for_block(
-    pool: &PgPool,
-    block_id: &str,
-) -> Result<Vec<TransactionRow>> {
-    sqlx::query_as::<_, TransactionRow>(
-        "SELECT * FROM transactions WHERE block_id = $1 ORDER BY timestamp",
+            .await?,
     )
-    .bind(block_id)
-    .fetch_all(pool)
-    .await
-    .map_err(Into::into)
 }
 
-/// Update transaction status
-pub async fn update_transaction_status(pool: &PgPool, tx_id: &str, status: &str) -> Result<()> {
-    sqlx::query("UPDATE transactions SET status = $1 WHERE tx_id = $2")
-        .bind(status)
-        .bind(tx_id)
-        .execute(pool)
-        .await?;
-
-    Ok(())
-}
-
-/// Insert public transaction payload
-pub async fn insert_tx_public(
-    pool: &PgPool,
-    tx_id: &str,
-    instructions: &[u8],
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_public (tx_id, instructions, instructions_size)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(instructions)
-    .bind(instructions.len() as i32)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert private transaction payload
-pub async fn insert_tx_private(
-    pool: &PgPool,
-    tx_id: &str,
-    encrypted_payload: &[u8],
-    proof: &[u8],
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_private (tx_id, encrypted_payload, proof, encrypted_payload_size, proof_size)
-        VALUES ($1, $2, $3, $4, $5)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(encrypted_payload)
-    .bind(proof)
-    .bind(encrypted_payload.len() as i32)
-    .bind(proof.len() as i32)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert stealth transaction payload
-pub async fn insert_tx_stealth(
-    pool: &PgPool,
-    tx_id: &str,
-    ephemeral_pubkey: &str,
-    stealth_address: &str,
-    encrypted_amount: &str,
-    proof: &[u8],
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_stealth (tx_id, ephemeral_pubkey, stealth_address, encrypted_amount, proof, proof_size)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(ephemeral_pubkey)
-    .bind(stealth_address)
-    .bind(encrypted_amount)
-    .bind(proof)
-    .bind(proof.len() as i32)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert stake transaction payload
-pub async fn insert_tx_stake(pool: &PgPool, tx_id: &str, amount: i64) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_stake (tx_id, amount)
-        VALUES ($1, $2)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(amount)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert unstake transaction payload
-pub async fn insert_tx_unstake(pool: &PgPool, tx_id: &str, amount: i64) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_unstake (tx_id, amount)
-        VALUES ($1, $2)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(amount)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert transfer transaction payload
-pub async fn insert_tx_transfer(
-    pool: &PgPool,
-    tx_id: &str,
-    recipient: &str,
-    amount: i64,
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_transfer (tx_id, recipient, amount)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(recipient)
-    .bind(amount)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert deploy transaction payload
-pub async fn insert_tx_deploy(
-    pool: &PgPool,
-    tx_id: &str,
-    code: &[u8],
-    program_id: Option<&str>,
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_deploy (tx_id, code, code_size, program_id)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(code)
-    .bind(code.len() as i32)
-    .bind(program_id)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert invoke transaction payload
-pub async fn insert_tx_invoke(
-    pool: &PgPool,
-    tx_id: &str,
-    program_id: &str,
-    instruction: &[u8],
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_invoke (tx_id, program_id, instruction, instruction_size)
-        VALUES ($1, $2, $3, $4)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(program_id)
-    .bind(instruction)
-    .bind(instruction.len() as i32)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Insert private transfer transaction payload
-pub async fn insert_tx_private_transfer(pool: &PgPool, tx_id: &str, proof: &[u8]) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO tx_private_transfer (tx_id, proof, proof_size)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (tx_id) DO NOTHING
-        "#,
-    )
-    .bind(tx_id)
-    .bind(proof)
-    .bind(proof.len() as i32)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Search transactions by ID prefix
-pub async fn search_transactions(pool: &PgPool, query: &str, limit: i64) -> Result<Vec<TransactionRow>> {
-    let pattern = format!("{}%", query);
-    sqlx::query_as::<_, TransactionRow>(
-        "SELECT * FROM transactions WHERE tx_id LIKE $1 ORDER BY timestamp DESC LIMIT $2",
-    )
-    .bind(&pattern)
-    .bind(limit)
-    .fetch_all(pool)
-    .await
-    .map_err(Into::into)
+pub async fn list_program_calls(pool: &PgPool, program: &str, limit: i64) -> Result<Vec<TxRow>> {
+    let sql = format!(
+        "SELECT {TX_COLS} FROM transactions WHERE kind = 'call' AND program_id = $1 ORDER BY height DESC, tx_index DESC LIMIT $2"
+    );
+    Ok(sqlx::query_as::<_, TxRow>(&sql)
+        .bind(program)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?)
 }

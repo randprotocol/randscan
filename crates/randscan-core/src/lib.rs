@@ -1,29 +1,91 @@
-//! RandScan Core - Shared types for RandProtocol blockchain explorer
+//! RandScan Core - wire types shared by the indexer, API, WebSocket server and clients.
 //!
-//! This crate contains all the core types that mirror RandProtocol's blockchain
-//! structures, plus additional types for the scanner's internal use.
+//! The chain is the Rand Protocol SHRUGG chain served by `shrugg-node` (JSON-RPC `shrugg_*`).
 
-pub mod types;
 pub mod error;
+pub mod types;
 
-pub use types::*;
 pub use error::*;
+pub use types::*;
 
-/// Token decimals for ATLAS and SHRUG
+/// Native token symbol.
+pub const TOKEN_SYMBOL: &str = "SHRUGG";
+
+/// Native token decimals (1 SHRUGG = 10^9 units).
 pub const TOKEN_DECIMALS: u8 = 9;
 
-/// Lamports per token (10^9)
-pub const LAMPORTS_PER_TOKEN: u64 = 1_000_000_000;
+/// Units per SHRUGG.
+pub const UNITS_PER_TOKEN: u128 = 1_000_000_000;
 
-/// Minimum stake in lamports (10,000 ATLAS)
-pub const MINIMUM_STAKE: u64 = 10_000 * LAMPORTS_PER_TOKEN;
-
-/// Convert lamports to display units
-pub fn lamports_to_display(lamports: u64) -> f64 {
-    lamports as f64 / LAMPORTS_PER_TOKEN as f64
+/// Format an amount in units (decimal string) as a SHRUGG decimal string, trimming zeros.
+pub fn format_units(units: &str) -> String {
+    let value: u128 = units.parse().unwrap_or(0);
+    let whole = value / UNITS_PER_TOKEN;
+    let frac = value % UNITS_PER_TOKEN;
+    if frac == 0 {
+        return whole.to_string();
+    }
+    let frac = format!("{:09}", frac);
+    format!("{}.{}", whole, frac.trim_end_matches('0'))
 }
 
-/// Convert display units to lamports
-pub fn display_to_lamports(display: f64) -> u64 {
-    (display * LAMPORTS_PER_TOKEN as f64) as u64
+/// Classify a search query the same way the API does.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum QueryKind {
+    /// Decimal block height.
+    Height(i64),
+    /// 64 hex characters (block hash, transaction hash, program id), normalised to lowercase without 0x.
+    Hash(String),
+    /// Base58 address (32-44 chars).
+    Address(String),
+    Unknown,
+}
+
+pub fn classify_query(q: &str) -> QueryKind {
+    let q = q.trim();
+    if q.is_empty() {
+        return QueryKind::Unknown;
+    }
+    if q.chars().all(|c| c.is_ascii_digit()) {
+        if let Ok(h) = q.parse::<i64>() {
+            return QueryKind::Height(h);
+        }
+    }
+    let hex = q.strip_prefix("0x").unwrap_or(q);
+    if hex.len() == 64 && hex.chars().all(|c| c.is_ascii_hexdigit()) {
+        return QueryKind::Hash(hex.to_ascii_lowercase());
+    }
+    let is_b58 = |c: char| c.is_ascii_alphanumeric() && !matches!(c, '0' | 'O' | 'I' | 'l');
+    if (32..=44).contains(&q.len()) && q.chars().all(is_b58) {
+        return QueryKind::Address(q.to_string());
+    }
+    QueryKind::Unknown
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn formats_units() {
+        assert_eq!(format_units("0"), "0");
+        assert_eq!(format_units("1500000000"), "1.5");
+        assert_eq!(format_units("100000000225"), "100.000000225");
+        assert_eq!(format_units("25"), "0.000000025");
+    }
+
+    #[test]
+    fn classifies_queries() {
+        assert_eq!(classify_query("19"), QueryKind::Height(19));
+        let h = "d4c75efbe141567eae72d5f639a1d444eb074d8b58a6592d95e01cd39a2364e3";
+        assert_eq!(
+            classify_query(&format!("0x{}", h.to_uppercase())),
+            QueryKind::Hash(h.into())
+        );
+        assert_eq!(
+            classify_query("ByDkxsEfDCR5DrmDufKftvcRsgvufypnZ4SgDQzJAQ7Z"),
+            QueryKind::Address("ByDkxsEfDCR5DrmDufKftvcRsgvufypnZ4SgDQzJAQ7Z".into())
+        );
+        assert_eq!(classify_query("hello world"), QueryKind::Unknown);
+    }
 }

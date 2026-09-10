@@ -1,158 +1,90 @@
 # RandScan
 
-A blockchain explorer for the Rand Protocol built with a Rust backend and Next.js frontend.
+Block explorer for the Rand Protocol SHRUGG chain (the network served by
+[`shrugg-node`](../fullnode)). Live at https://randscan.org.
 
-## Architecture
+- **Backend**: Rust — axum REST API + WebSocket, SQLx/PostgreSQL, and an in-process indexer that
+  follows a `shrugg-node` JSON-RPC endpoint (`shrugg_*` methods).
+- **Frontend**: Next.js 14, TypeScript, Tailwind, SWR; Leaflet for the nodes map.
+- **Database**: PostgreSQL 16.
 
-- **Backend**: Rust (Axum web framework, SQLx for PostgreSQL)
-- **Frontend**: Next.js 14 with TypeScript and Tailwind CSS
-- **Database**: PostgreSQL 16
+## What it indexes
 
-## Prerequisites
+Committed blocks (hash, height, HotStuff view, proposer, roots, `justify_view`), the four transaction
+kinds (`transfer`, `mint`, `deploy`, `call`), confidential-call receipts (tier, outputs, effect),
+accounts (balance and nonce read back from the node), validators (stake, blocks proposed), deployed
+programs, network stats, and the node's libp2p peers with geolocated IPs.
 
-- Rust 1.75+
-- Node.js 20+
-- PostgreSQL 16
-- A running Solana/Rand RPC node
+## Run locally
 
-## Running Locally (Terminal)
-
-### 1. Database Setup
-
-Start PostgreSQL and create the database:
-
-```bash
-# Using Docker for PostgreSQL
-docker run -d \
-  --name randscan-postgres \
-  -e POSTGRES_USER=randscan \
-  -e POSTGRES_PASSWORD=randscan \
-  -e POSTGRES_DB=randscan \
-  -p 5432:5432 \
-  postgres:16-alpine
-```
-
-### 2. Backend (Rust API)
+Requirements: Rust 1.75+, Node 20+, PostgreSQL, and a reachable `shrugg-node` RPC
+(e.g. `ssh -N -L 8545:127.0.0.1:8545 root@<node>` to tunnel a remote node).
 
 ```bash
-# Copy environment file
-cp .env.example .env
+createdb randscan
+cp .env.example .env            # DATABASE_URL, RPC_URL, API_PORT ...
+cargo run --release --bin randscan-api          # API + indexer + WebSocket on :3000
 
-# Edit .env to configure your RPC_URL and other settings
-# Default DATABASE_URL: postgres://randscan:randscan@localhost:5432/randscan
-
-# Build and run the API server
-cargo run --release --bin randscan-api
-```
-
-The API server will start on `http://localhost:3000`.
-
-#### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | `postgres://randscan:randscan@localhost:5432/randscan` |
-| `RPC_URL` | Solana/Rand RPC endpoint | `http://localhost:8899` |
-| `API_HOST` | API bind address | `0.0.0.0` |
-| `API_PORT` | API port | `3000` |
-| `RUST_LOG` | Log level | `info` |
-
-### 3. Frontend (Next.js)
-
-```bash
 cd frontend
-
-# Install dependencies
-npm install
-
-# Copy environment file
-cp .env.local.example .env.local
-
-# Edit .env.local if needed (defaults work for local development)
-# NEXT_PUBLIC_API_URL=http://localhost:3000
-# NEXT_PUBLIC_WS_URL=ws://localhost:3000
-
-# Run development server
-npm run dev
+npm ci
+NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_WS_URL=ws://localhost:3000/ws npm run dev   # :3001
 ```
 
-The frontend will start on `http://localhost:3001`.
+The schema (`migrations/001_initial_schema.sql`) is created automatically on first start. The
+indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERVAL_MS`.
 
-#### Frontend Scripts
+### Environment
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server on port 3001 |
-| `npm run build` | Build for production |
-| `npm run start` | Start production server |
-| `npm run lint` | Run ESLint |
+| Variable | Default | Description |
+|---|---|---|
+| `DATABASE_URL` | `postgres://randscan:randscan@localhost:5432/randscan` | PostgreSQL connection |
+| `RPC_URL` | `http://127.0.0.1:8545` | `shrugg-node` JSON-RPC endpoint |
+| `API_HOST` / `API_PORT` | `0.0.0.0` / `3000` | API bind address |
+| `POLL_INTERVAL_MS` | `1000` | head polling interval when caught up |
+| `BATCH_SIZE` | `200` | blocks per pass while catching up |
+| `STATS_INTERVAL_SECS` | `5` | minimum interval between stats refreshes |
+| `NODES_INTERVAL_SECS` | `60` | peer list / geolocation refresh interval |
+| `NODE_PUBLIC_IP` | auto-detected | public IP of the node the explorer runs on |
+| `RUST_LOG` | `info` | log filter |
 
-## Running with Docker Compose
+## API
 
-The easiest way to run the entire stack:
+REST under `/api/v1` (`health`, `stats`, `blocks`, `blocks/latest`, `blocks/:id`, `transactions`,
+`transactions/latest`, `transactions/:hash`, `accounts/:address`, `accounts/:address/transactions`,
+`validators`, `validators/:address`, `programs`, `programs/:id`, `nodes`, `search?q=`) and a
+WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are strings of units
+(1 SHRUGG = 10^9 units); timestamps are `timestamp_ms`. Full shapes in
+`docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`.
+
+## Deploy on a node
+
+The explorer runs on the same machine as a synced `shrugg-node` (its RPC is bound to localhost):
 
 ```bash
-# Build and start all services
-docker compose up --build
-
-# Or run in detached mode
-docker compose up -d --build
-
-# View logs
-docker compose logs -f
-
-# Stop all services
-docker compose down
-
-# Stop and remove volumes (clears database)
-docker compose down -v
+deploy/push-to-vps.sh <ip> [domain]     # rsync, build, Postgres + Node 20 + Caddy, systemd units
 ```
 
-### Services
+`deploy/vps-setup.sh` installs `randscan-api` (:3000) and `randscan-frontend` (:3001) as systemd
+services and a Caddyfile that serves `<domain>` with automatic HTTPS (`/api/*` and `/ws` to the
+API, everything else to Next.js; `www.` and `randscan.com` redirect). Point the domain's A records
+at the server before running it so Caddy can obtain certificates.
 
-| Service | Port | Description |
-|---------|------|-------------|
-| `postgres` | 5432 | PostgreSQL database |
-| `api` | 3000 | Rust backend API |
-| `frontend` | 3001 | Next.js frontend |
+## Docker
 
-### Accessing the Application
+`docker compose up --build` runs Postgres, the API and the frontend (set `RPC_URL` to a reachable
+node).
 
-- **Frontend**: http://localhost:3001
-- **API**: http://localhost:3000
-
-### Docker Compose Environment
-
-The docker-compose.yml configures:
-- PostgreSQL with persistent volume storage
-- API server connected to PostgreSQL
-- Frontend with API/WebSocket URLs pointing to the backend
-
-To customize, you can override environment variables or modify `docker-compose.yml`.
-
-## Project Structure
+## Project structure
 
 ```
-randscan/
-├── crates/
-│   ├── randscan-api/       # REST API server
-│   ├── randscan-core/      # Core types and utilities
-│   ├── randscan-db/        # Database models and queries
-│   ├── randscan-indexer/   # Blockchain indexer
-│   ├── randscan-ws/        # WebSocket server
-│   └── randscan-frontend/  # (Deprecated) Leptos frontend
-├── frontend/               # Next.js frontend
-│   ├── src/
-│   │   ├── app/           # App Router pages
-│   │   ├── components/    # React components
-│   │   ├── hooks/         # Custom hooks
-│   │   ├── lib/           # Utilities
-│   │   └── types/         # TypeScript types
-│   └── ...
-├── migrations/             # SQL migrations
-├── docker-compose.yml
-├── Dockerfile             # Backend Dockerfile
-└── Cargo.toml             # Rust workspace
+crates/randscan-core      wire types, helpers (amount formatting, query classification)
+crates/randscan-db        schema, row models, queries
+crates/randscan-indexer   RPC client, block processor, sync service, peer tracker, broadcaster
+crates/randscan-api       axum routes/handlers, binary randscan-api
+crates/randscan-ws        WebSocket manager/handler
+frontend/                 Next.js app
+migrations/               SQL schema
+deploy/                   VPS install script, systemd units, Caddyfile
 ```
 
 ## License

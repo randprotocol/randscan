@@ -1,15 +1,34 @@
-//! RPC client for RandProtocol node
+//! JSON-RPC client for `shrugg-node` (see fullnode/docs/rpc.md).
 
 use anyhow::{anyhow, Result};
-use serde::{Deserialize, Serialize};
 use reqwest::Client;
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::time::Duration;
 
-/// RPC client for RandProtocol node
 #[derive(Clone)]
 pub struct RpcClient {
     client: Client,
     url: String,
+}
+
+#[derive(Serialize)]
+struct JsonRpcRequest<'a> {
+    jsonrpc: &'static str,
+    id: u64,
+    method: &'a str,
+    params: serde_json::Value,
+}
+
+#[derive(Deserialize)]
+struct JsonRpcResponse {
+    result: Option<serde_json::Value>,
+    error: Option<RpcError>,
+}
+
+#[derive(Deserialize, Debug)]
+pub struct RpcError {
+    pub code: i64,
+    pub message: String,
 }
 
 impl RpcClient {
@@ -17,429 +36,307 @@ impl RpcClient {
         let client = Client::builder()
             .timeout(Duration::from_secs(30))
             .build()
-            .expect("Failed to create HTTP client");
-
+            .expect("reqwest client");
         Self {
             client,
             url: url.to_string(),
         }
     }
 
-    /// Send a JSON-RPC request
-    async fn send<T: for<'de> Deserialize<'de>>(
+    pub fn url(&self) -> &str {
+        &self.url
+    }
+
+    /// Send a request; a JSON `null` result is returned as `None`.
+    async fn call<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<Option<T>> {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0",
+            id: 1,
+            method,
+            params,
+        };
+        let resp: JsonRpcResponse = self
+            .client
+            .post(&self.url)
+            .json(&req)
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        if let Some(e) = resp.error {
+            return Err(anyhow!("rpc {} failed: {} ({})", method, e.message, e.code));
+        }
+        match resp.result {
+            None | Some(serde_json::Value::Null) => Ok(None),
+            Some(v) => Ok(Some(serde_json::from_value(v)?)),
+        }
+    }
+
+    async fn call_required<T: DeserializeOwned>(
         &self,
         method: &str,
         params: serde_json::Value,
     ) -> Result<T> {
-        let request = JsonRpcRequest {
-            jsonrpc: "2.0".to_string(),
-            id: 1,
-            method: method.to_string(),
-            params,
-        };
-
-        let response = self
-            .client
-            .post(&self.url)
-            .json(&request)
-            .send()
-            .await?;
-
-        let rpc_response: JsonRpcResponse<T> = response.json().await?;
-
-        if let Some(error) = rpc_response.error {
-            return Err(anyhow!("RPC error: {} - {}", error.code, error.message));
-        }
-
-        rpc_response
-            .result
-            .ok_or_else(|| anyhow!("Empty RPC response"))
+        self.call(method, params)
+            .await?
+            .ok_or_else(|| anyhow!("rpc {} returned null", method))
     }
 
-    /// Get current block height
-    pub async fn get_block_height(&self) -> Result<u64> {
-        // RandProtocol returns {"height": u64}
-        let response: BlockHeightResponse = self.send("getBlockHeight", serde_json::json!([])).await?;
-        Ok(response.height)
-    }
-
-    /// Get block by height
-    pub async fn get_block(&self, height: u64) -> Result<BlockResponse> {
-        // RandProtocol expects positional params: [height] or ["block_id"]
-        let rpc_response: RpcBlockResponse = self.send("getBlock", serde_json::json!([height])).await?;
-        Ok(rpc_response.into())
-    }
-
-    /// Get block by ID
-    pub async fn get_block_by_id(&self, block_id: &str) -> Result<BlockResponse> {
-        let rpc_response: RpcBlockResponse = self.send("getBlock", serde_json::json!([block_id])).await?;
-        Ok(rpc_response.into())
-    }
-
-    /// Get blocks in range
-    pub async fn get_blocks(&self, start: u64, end: u64) -> Result<Vec<BlockResponse>> {
-        let rpc_response: GetBlocksResponse = self.send(
-            "getBlocks",
-            serde_json::json!({
-                "start_height": start,
-                "end_height": end,
-                "limit": (end - start + 1) as usize
-            }),
-        )
-        .await?;
-
-        Ok(rpc_response.blocks.into_iter().map(|b| b.into()).collect())
-    }
-
-    /// Get transaction by ID
-    pub async fn get_transaction(&self, tx_id: &str) -> Result<TransactionResponse> {
-        // RandProtocol expects positional params
-        self.send("getTransaction", serde_json::json!([tx_id]))
+    pub async fn chain_id(&self) -> Result<u64> {
+        self.call_required("shrugg_chainId", serde_json::json!([]))
             .await
     }
 
-    /// Get account info
-    pub async fn get_account_info(&self, address: &str) -> Result<AccountInfoResponse> {
-        // RandProtocol expects positional params
-        self.send("getAccountInfo", serde_json::json!([address]))
+    pub async fn token_info(&self) -> Result<TokenInfo> {
+        self.call_required("shrugg_tokenInfo", serde_json::json!([]))
             .await
     }
 
-    /// Get validators
-    pub async fn get_validators(&self) -> Result<Vec<ValidatorResponse>> {
-        let response: GetValidatorsResponse = self.send("getValidators", serde_json::json!([])).await?;
-        Ok(response.validators)
-    }
-
-    /// Get token supply
-    pub async fn get_token_supply(&self, token: &str) -> Result<TokenSupplyResponse> {
-        // RandProtocol expects positional params
-        self.send("getTokenSupply", serde_json::json!([token]))
+    pub async fn head(&self) -> Result<Head> {
+        self.call_required("shrugg_getHead", serde_json::json!([]))
             .await
     }
 
-    /// Get epoch info
-    pub async fn get_epoch_info(&self) -> Result<EpochInfoResponse> {
-        self.send("getEpochInfo", serde_json::json!([])).await
+    pub async fn status(&self) -> Result<NodeStatus> {
+        self.call_required("shrugg_status", serde_json::json!([]))
+            .await
     }
 
-    /// Get node health
-    pub async fn get_health(&self) -> Result<HealthResponse> {
-        self.send("getHealth", serde_json::json!([])).await
+    pub async fn block_by_height(&self, height: u64) -> Result<Option<RpcBlock>> {
+        self.call("shrugg_getBlockByHeight", serde_json::json!([height]))
+            .await
     }
 
-    /// Get latest blockhash
-    pub async fn get_latest_blockhash(&self) -> Result<String> {
-        let response: LatestBlockhashResponse = self.send("getLatestBlockhash", serde_json::json!([])).await?;
-        Ok(response.blockhash)
+    pub async fn block_by_hash(&self, hash: &str) -> Result<Option<RpcBlock>> {
+        self.call("shrugg_getBlockByHash", serde_json::json!([hash]))
+            .await
     }
 
-    /// Check if connected
+    pub async fn account(&self, address: &str) -> Result<RpcAccount> {
+        self.call_required("shrugg_getAccount", serde_json::json!([address]))
+            .await
+    }
+
+    pub async fn validators(&self) -> Result<Vec<RpcValidator>> {
+        self.call_required("shrugg_getValidators", serde_json::json!([]))
+            .await
+    }
+
+    pub async fn peers(&self) -> Result<Vec<RpcPeer>> {
+        self.call_required("shrugg_getPeers", serde_json::json!([]))
+            .await
+    }
+
+    pub async fn receipt(&self, tx_hash: &str) -> Result<Option<RpcReceipt>> {
+        self.call("shrugg_getReceipt", serde_json::json!([tx_hash]))
+            .await
+    }
+
+    pub async fn program(&self, id: &str) -> Result<Option<RpcProgram>> {
+        self.call("shrugg_getProgram", serde_json::json!([id]))
+            .await
+    }
+
     pub async fn is_connected(&self) -> bool {
-        self.get_health().await.is_ok()
+        self.head().await.is_ok()
     }
 }
 
-/// JSON-RPC request
-#[derive(Serialize)]
-struct JsonRpcRequest {
-    jsonrpc: String,
-    id: u64,
-    method: String,
-    params: serde_json::Value,
-}
-
-/// JSON-RPC response
-#[derive(Deserialize)]
-struct JsonRpcResponse<T> {
-    #[allow(dead_code)]
-    jsonrpc: String,
-    #[allow(dead_code)]
-    id: u64,
-    result: Option<T>,
-    error: Option<RpcError>,
-}
-
-/// RPC error
-#[derive(Deserialize)]
-struct RpcError {
-    code: i64,
-    message: String,
-}
-
-/// Block height response from RandProtocol
-#[derive(Debug, Deserialize)]
-struct BlockHeightResponse {
-    height: u64,
-}
-
-/// Latest blockhash response from RandProtocol
-#[derive(Debug, Deserialize)]
-struct LatestBlockhashResponse {
-    blockhash: String,
-    #[allow(dead_code)]
-    last_valid_block_height: u64,
-}
-
-/// Block response from RandProtocol RPC (internal format)
-#[derive(Debug, Deserialize)]
-struct RpcBlockResponse {
-    block_id: String,
-    height: u64,
-    view: u64,
-    epoch: u64,
-    parent_id: String,
-    proposer: String,
-    timestamp: u64,
-    state_root: String,
-    transactions_root: String,
-    transaction_count: usize,
-    transactions: Vec<String>, // Transaction IDs as strings
-    finalized: bool,
-}
-
-/// Block summary response (from getBlocks)
-#[derive(Debug, Deserialize)]
-struct RpcBlockSummary {
-    height: u64,
-    block_id: String,
-    timestamp: u64,
-    transaction_count: usize,
-}
-
-impl From<RpcBlockSummary> for BlockResponse {
-    fn from(summary: RpcBlockSummary) -> Self {
-        BlockResponse {
-            block_id: summary.block_id,
-            height: summary.height,
-            view: 0,
-            epoch: 0,
-            parent_id: String::new(),
-            proposer: String::new(),
-            timestamp: summary.timestamp,
-            state_root: String::new(),
-            transactions_root: String::new(),
-            supply_commitment: None,
-            transaction_count: summary.transaction_count,
-            transactions: Vec::new(),
-            finalized: true,
-            qc_vote_type: None,
-            qc_view: None,
-            qc_block_id: None,
-            qc_signers: None,
-        }
-    }
-}
-
-/// Get blocks response wrapper
-#[derive(Debug, Deserialize)]
-struct GetBlocksResponse {
-    blocks: Vec<RpcBlockSummary>,
-}
-
-/// Get validators response wrapper
-#[derive(Debug, Deserialize)]
-struct GetValidatorsResponse {
-    validators: Vec<ValidatorResponse>,
-}
-
-/// Block response (external format used by indexer)
 #[derive(Debug, Clone, Deserialize)]
-pub struct BlockResponse {
-    pub block_id: String,
-    pub height: u64,
-    pub view: u64,
-    pub epoch: u64,
-    pub parent_id: String,
-    pub proposer: String,
-    pub timestamp: u64,
-    pub state_root: String,
-    pub transactions_root: String,
-    pub supply_commitment: Option<String>,
-    pub transaction_count: usize,
-    pub transactions: Vec<TransactionResponse>,
-    pub finalized: bool,
-    // QC fields (optional, may not be provided by RandProtocol)
-    pub qc_vote_type: Option<String>,
-    pub qc_view: Option<u64>,
-    pub qc_block_id: Option<String>,
-    pub qc_signers: Option<Vec<String>>,
-}
-
-impl From<RpcBlockResponse> for BlockResponse {
-    fn from(rpc: RpcBlockResponse) -> Self {
-        let block_id = rpc.block_id;
-        let height = rpc.height;
-        let timestamp = rpc.timestamp;
-
-        BlockResponse {
-            block_id: block_id.clone(),
-            height,
-            view: rpc.view,
-            epoch: rpc.epoch,
-            parent_id: rpc.parent_id,
-            proposer: rpc.proposer,
-            timestamp,
-            state_root: rpc.state_root,
-            transactions_root: rpc.transactions_root,
-            supply_commitment: None,
-            transaction_count: rpc.transaction_count,
-            // Convert transaction IDs to empty TransactionResponse placeholders
-            // The processor will fetch full transaction details separately if needed
-            transactions: rpc.transactions.into_iter().map(|sig| TransactionResponse {
-                signature: sig,
-                sender: String::new(),
-                nonce: 0,
-                tx_type: String::new(),
-                fee: 0,
-                compute_budget: None,
-                timestamp,
-                block_height: Some(height),
-                block_id: Some(block_id.clone()),
-                status: "finalized".to_string(),
-                logs: None,
-                payload: None,
-            }).collect(),
-            finalized: rpc.finalized,
-            qc_vote_type: None,
-            qc_view: None,
-            qc_block_id: None,
-            qc_signers: None,
-        }
-    }
-}
-
-/// Transaction response from RPC
-#[derive(Debug, Clone, Deserialize)]
-pub struct TransactionResponse {
-    pub signature: String, // tx_id
-    #[serde(default)]
-    pub sender: String,
-    #[serde(default)]
-    pub nonce: u64,
-    #[serde(default, rename = "tx_type")]
-    pub tx_type: String,
-    #[serde(default)]
-    pub fee: u64,
-    pub compute_budget: Option<u64>,
-    #[serde(default)]
-    pub timestamp: u64,
-    pub block_height: Option<u64>,
-    pub block_id: Option<String>,
-    #[serde(default)]
-    pub status: String,
-    pub logs: Option<Vec<String>>,
-    // Type-specific fields
-    pub payload: Option<TransactionPayloadResponse>,
-}
-
-/// Transaction payload response
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum TransactionPayloadResponse {
-    Public {
-        instructions_size: usize,
-    },
-    Private {
-        encrypted_payload_size: usize,
-        proof_size: usize,
-        nullifiers: Vec<String>,
-        commitments: Vec<String>,
-    },
-    Stealth {
-        ephemeral_pubkey: String,
-        stealth_address: String,
-        proof_size: usize,
-    },
-    Stake {
-        amount: u64,
-    },
-    Unstake {
-        amount: u64,
-    },
-    Transfer {
-        to: String,
-        amount: u64,
-    },
-    Deploy {
-        code_size: usize,
-        program_id: Option<String>,
-    },
-    Invoke {
-        program_id: String,
-        instruction_size: usize,
-    },
-    PrivateTransfer {
-        proof_size: usize,
-        nullifiers: Vec<String>,
-        commitments: Vec<String>,
-    },
-    Mint {
-        to: String,
-        amount: u64,
-    },
-}
-
-/// Account info response
-#[derive(Debug, Clone, Deserialize)]
-pub struct AccountInfoResponse {
-    pub address: String,
-    pub atlas_balance: u64,
-    pub shrug_balance: u64,
-    pub nonce: u64,
-    pub executable: bool,
-    pub owner: Option<String>,
-    pub data: Option<String>,
-    pub data_len: usize,
-}
-
-/// Validator response
-#[derive(Debug, Clone, Deserialize)]
-pub struct ValidatorResponse {
-    pub validator_id: String,
-    pub pubkey: String,
-    pub stake: u64,
-    #[serde(alias = "commission")]
-    pub commission_rate: u16,
-    #[serde(alias = "active")]
-    pub is_active: bool,
-    pub blocks_produced: Option<u64>,
-    pub last_vote_height: Option<u64>,
-}
-
-/// Token supply response
-#[derive(Debug, Clone, Deserialize)]
-pub struct TokenSupplyResponse {
-    pub token: String,
-    pub total_supply: u64,
-    pub circulating_supply: u64,
-    pub burned: u64,
+pub struct TokenInfo {
+    pub symbol: String,
     pub decimals: u8,
 }
 
-/// Epoch info response
 #[derive(Debug, Clone, Deserialize)]
-pub struct EpochInfoResponse {
-    pub epoch: u64,
-    #[serde(default)]
-    pub slots_in_epoch: u64,
-    #[serde(default, alias = "slot_index")]
-    pub absolute_slot: u64,
-    #[serde(default)]
-    pub block_height: u64,
-    pub transaction_count: Option<u64>,
+pub struct Head {
+    pub height: u64,
+    pub hash: String,
+    pub view: u64,
 }
 
-/// Health response
-#[derive(Debug, Clone, Deserialize)]
-pub struct HealthResponse {
-    #[serde(alias = "healthy")]
-    pub status: String,
-    pub version: Option<String>,
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct NodeStatus {
     #[serde(default)]
     pub height: u64,
     #[serde(default)]
-    pub peer_count: usize,
+    pub head_hash: String,
     #[serde(default)]
-    pub is_syncing: bool,
+    pub view: u64,
+    #[serde(default)]
+    pub high_qc_view: u64,
+    #[serde(default)]
+    pub syncing: bool,
+    #[serde(default)]
+    pub sync_target: u64,
+    #[serde(default)]
+    pub peer_count: u32,
+    #[serde(default)]
+    pub mempool_size: u32,
+    #[serde(default)]
+    pub is_validator: bool,
+    #[serde(default)]
+    pub faucet: bool,
+    #[serde(default)]
+    pub confidential: bool,
+    #[serde(default)]
+    pub fri_profile: String,
+    #[serde(default)]
+    pub programs: u64,
+    #[serde(default)]
+    pub address: String,
+    #[serde(default)]
+    pub peer_id: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcBlock {
+    pub hash: String,
+    pub height: u64,
+    pub view: u64,
+    pub parent: String,
+    pub proposer: String,
+    pub timestamp_ms: u64,
+    pub tx_root: String,
+    pub state_root: String,
+    pub justify_view: u64,
+    #[serde(default)]
+    pub tx_count: u32,
+    #[serde(default)]
+    pub transactions: Vec<RpcTx>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcTx {
+    pub hash: String,
+    pub from: String,
+    pub nonce: u64,
+    pub fee: String,
+    pub chain_id: u64,
+    pub kind: RpcTxKind,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum RpcTxKind {
+    Transfer {
+        to: String,
+        amount: String,
+    },
+    Mint {
+        to: String,
+        amount: String,
+    },
+    Deploy {
+        base_pc: u32,
+        words_len: u32,
+        program: String,
+    },
+    Call {
+        program: String,
+        proof_len: u64,
+        #[serde(default)]
+        recipients: Vec<String>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcAccount {
+    pub address: String,
+    pub nonce: u64,
+    pub balance: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcValidator {
+    pub address: String,
+    pub stake: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcPeer {
+    pub peer_id: String,
+    #[serde(default)]
+    pub addrs: Vec<String>,
+    #[serde(default)]
+    pub connected_secs: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcReceipt {
+    pub tx: String,
+    pub program: String,
+    pub tier: u32,
+    #[serde(default)]
+    pub outputs: Vec<i64>,
+    pub effect: Option<RpcEffect>,
+    pub height: u64,
+    pub index: u32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcEffect {
+    pub to: String,
+    pub amount: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcProgram {
+    pub id: String,
+    pub base_pc: u32,
+    pub words_len: u32,
+    pub code_hash: String,
+    pub deployer: String,
+    pub deployed_at: u64,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_block_with_all_kinds() {
+        let json = r#"{"hash":"a9c8","height":10,"justify_view":31,"parent":"a070","proposer":"2nRd","state_root":"b364","timestamp_ms":1788977138048,
+          "transactions":[
+            {"chain_id":4,"fee":"4200000","from":"2nRd","hash":"dc97","kind":{"base_pc":0,"program":"675a","type":"deploy","words_len":42},"nonce":0},
+            {"chain_id":4,"fee":"1000000","from":"2nRd","hash":"d4c7","kind":{"program":"675a","proof_len":880866,"recipients":["ByDk"],"type":"call"},"nonce":1},
+            {"chain_id":4,"fee":"1000","from":"7th5","hash":"e7a7","kind":{"type":"transfer","to":"9W7d","amount":"3500000000"},"nonce":0},
+            {"chain_id":4,"fee":"0","from":"CxeG","hash":"ffff","kind":{"type":"mint","to":"ByDk","amount":"100000000000"},"nonce":3}
+          ],"tx_count":4,"tx_root":"dc97","view":32}"#;
+        let b: RpcBlock = serde_json::from_str(json).unwrap();
+        assert_eq!(b.height, 10);
+        assert_eq!(b.transactions.len(), 4);
+        assert!(matches!(
+            &b.transactions[0].kind,
+            RpcTxKind::Deploy { words_len: 42, .. }
+        ));
+        assert!(matches!(
+            &b.transactions[1].kind,
+            RpcTxKind::Call {
+                proof_len: 880866,
+                ..
+            }
+        ));
+        assert!(matches!(
+            &b.transactions[2].kind,
+            RpcTxKind::Transfer { .. }
+        ));
+        assert!(matches!(&b.transactions[3].kind, RpcTxKind::Mint { .. }));
+    }
+
+    #[test]
+    fn parses_receipt_and_status() {
+        let r: RpcReceipt = serde_json::from_str(r#"{"effect":{"amount":"25","to":"ByDk"},"height":19,"index":0,"outputs":[1,0,25,0,0,0,0,0],"program":"675a","tier":10,"tx":"d4c7"}"#).unwrap();
+        assert_eq!(r.effect.unwrap().amount, "25");
+        let r: RpcReceipt = serde_json::from_str(r#"{"effect":null,"height":78,"index":0,"outputs":[0,0,0,0,0,0,0,0],"program":"675a","tier":10,"tx":"dd1a"}"#).unwrap();
+        assert!(r.effect.is_none());
+        let s: NodeStatus = serde_json::from_str(r#"{"address":"CxeG","confidential":true,"faucet":true,"fri_profile":"production","head_hash":"02f0","height":324,"high_qc_view":664,"is_validator":false,"mempool_size":0,"peer_count":4,"peer_id":"12D3","programs":1,"sync_target":324,"syncing":false,"view":667}"#).unwrap();
+        assert_eq!(s.peer_count, 4);
+        assert!(s.confidential);
+    }
 }

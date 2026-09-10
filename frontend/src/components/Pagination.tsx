@@ -49,13 +49,13 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
         className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-lg text-sm transition-colors',
+          'flex h-8 w-8 items-center justify-center rounded border border-border text-sm transition-colors',
           currentPage === 1
-            ? 'cursor-not-allowed text-dark-500'
-            : 'text-dark-300 hover:bg-dark-700 hover:text-white'
+            ? 'cursor-not-allowed border-border-soft text-mute opacity-50'
+            : 'text-soft hover:border-mute hover:text-strong'
         )}
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
       </button>
@@ -63,7 +63,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
       {/* Page numbers */}
       {pages.map((page, index) =>
         page === 'ellipsis' ? (
-          <span key={`ellipsis-${index}`} className="px-2 text-dark-500">
+          <span key={`ellipsis-${index}`} className="px-1 text-mute">
             ...
           </span>
         ) : (
@@ -72,10 +72,10 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
             type="button"
             onClick={() => onPageChange(page)}
             className={cn(
-              'flex h-9 min-w-[2.25rem] items-center justify-center rounded-lg px-3 text-sm font-medium transition-colors',
+              'flex h-8 min-w-[2rem] items-center justify-center rounded border px-2.5 font-mono text-[0.8125rem] transition-colors',
               page === currentPage
-                ? 'bg-primary-600 text-white'
-                : 'text-dark-300 hover:bg-dark-700 hover:text-white'
+                ? 'border-accent bg-accent text-on-accent'
+                : 'border-border text-soft hover:border-mute hover:text-strong'
             )}
           >
             {page}
@@ -89,13 +89,13 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
         className={cn(
-          'flex h-9 w-9 items-center justify-center rounded-lg text-sm transition-colors',
+          'flex h-8 w-8 items-center justify-center rounded border border-border text-sm transition-colors',
           currentPage === totalPages
-            ? 'cursor-not-allowed text-dark-500'
-            : 'text-dark-300 hover:bg-dark-700 hover:text-white'
+            ? 'cursor-not-allowed border-border-soft text-mute opacity-50'
+            : 'text-soft hover:border-mute hover:text-strong'
         )}
       >
-        <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
       </button>

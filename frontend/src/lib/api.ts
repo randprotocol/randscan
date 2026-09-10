@@ -1,214 +1,219 @@
 import type {
-  NetworkStats,
-  BlockSummary,
-  BlockDetail,
-  TransactionSummary,
-  TransactionDetail,
   AccountDetail,
   AccountTransaction,
+  ApiErrorBody,
+  BlockDetail,
+  BlockSummary,
+  Health,
+  NetworkStats,
+  NodeInfo,
+  Paginated,
+  ProgramDetail,
+  ProgramSummary,
+  SearchResult,
+  TransactionDetail,
+  TransactionKind,
+  TransactionSummary,
   Validator,
   ValidatorDetail,
-  TokenMint,
-  TokenSupply,
-  TokenHolder,
-  SearchResult,
-  PaginatedResponse,
-  ApiError,
 } from '@/types';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-const API_VERSION = '/api/v1';
+/**
+ * Base URL for the REST API. An empty string (the default) means same-origin,
+ * so requests go to `/api/v1/...` and are served by the reverse proxy.
+ */
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? '';
 
-class ApiClient {
-  private baseUrl: string;
+const API_PREFIX = '/api/v1';
 
-  constructor(baseUrl: string = API_BASE) {
-    this.baseUrl = `${baseUrl}${API_VERSION}`;
+export class ApiError extends Error {
+  readonly status: number;
+  readonly error: string;
+  readonly code?: string | number | null;
+
+  constructor(status: number, body: Partial<ApiErrorBody> = {}) {
+    super(body.message || body.error || `Request failed with status ${status}`);
+    this.name = 'ApiError';
+    this.status = status;
+    this.error = body.error ?? 'error';
+    this.code = body.code ?? null;
   }
 
-  private async fetch<T>(endpoint: string, options?: RequestInit): Promise<T> {
-    const url = `${this.baseUrl}${endpoint}`;
-
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    });
-
-    if (!response.ok) {
-      const error: ApiError = {
-        error: 'API Error',
-        message: `Request failed with status ${response.status}`,
-        status: response.status,
-      };
-
-      try {
-        const body = await response.json();
-        error.message = body.message || body.error || error.message;
-      } catch {
-        // Use default message
-      }
-
-      throw error;
-    }
-
-    return response.json();
-  }
-
-  // Stats
-  async getStats(): Promise<NetworkStats> {
-    return this.fetch<NetworkStats>('/stats');
-  }
-
-  // Blocks
-  async getBlocks(page = 1, pageSize = 20): Promise<PaginatedResponse<BlockSummary>> {
-    return this.fetch<PaginatedResponse<BlockSummary>>(
-      `/blocks?page=${page}&page_size=${pageSize}`
-    );
-  }
-
-  async getBlock(slotOrHash: string | number): Promise<BlockDetail> {
-    return this.fetch<BlockDetail>(`/blocks/${slotOrHash}`);
-  }
-
-  async getLatestBlocks(limit = 5): Promise<BlockSummary[]> {
-    return this.fetch<BlockSummary[]>(`/blocks/latest?limit=${limit}`);
-  }
-
-  // Transactions
-  async getTransactions(
-    page = 1,
-    pageSize = 20,
-    filters?: {
-      type?: string;
-      status?: string;
-      from_slot?: number;
-      to_slot?: number;
-    }
-  ): Promise<PaginatedResponse<TransactionSummary>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      page_size: pageSize.toString(),
-    });
-
-    if (filters?.type) params.set('type', filters.type);
-    if (filters?.status) params.set('status', filters.status);
-    if (filters?.from_slot) params.set('from_slot', filters.from_slot.toString());
-    if (filters?.to_slot) params.set('to_slot', filters.to_slot.toString());
-
-    return this.fetch<PaginatedResponse<TransactionSummary>>(
-      `/transactions?${params.toString()}`
-    );
-  }
-
-  async getTransaction(signature: string): Promise<TransactionDetail> {
-    return this.fetch<TransactionDetail>(`/transactions/${signature}`);
-  }
-
-  async getLatestTransactions(limit = 5): Promise<TransactionSummary[]> {
-    return this.fetch<TransactionSummary[]>(`/transactions/latest?limit=${limit}`);
-  }
-
-  // Accounts
-  async getAccount(address: string): Promise<AccountDetail> {
-    return this.fetch<AccountDetail>(`/accounts/${address}`);
-  }
-
-  async getAccountTransactions(
-    address: string,
-    page = 1,
-    pageSize = 20
-  ): Promise<PaginatedResponse<AccountTransaction>> {
-    return this.fetch<PaginatedResponse<AccountTransaction>>(
-      `/accounts/${address}/transactions?page=${page}&page_size=${pageSize}`
-    );
-  }
-
-  async getAccountTokens(address: string): Promise<TokenMint[]> {
-    return this.fetch<TokenMint[]>(`/accounts/${address}/tokens`);
-  }
-
-  // Validators
-  async getValidators(
-    page = 1,
-    pageSize = 20,
-    status?: 'active' | 'delinquent' | 'inactive'
-  ): Promise<PaginatedResponse<Validator>> {
-    const params = new URLSearchParams({
-      page: page.toString(),
-      page_size: pageSize.toString(),
-    });
-
-    if (status) params.set('status', status);
-
-    return this.fetch<PaginatedResponse<Validator>>(
-      `/validators?${params.toString()}`
-    );
-  }
-
-  async getValidator(identity: string): Promise<ValidatorDetail> {
-    return this.fetch<ValidatorDetail>(`/validators/${identity}`);
-  }
-
-  // Tokens
-  async getTokens(page = 1, pageSize = 20): Promise<PaginatedResponse<TokenMint>> {
-    return this.fetch<PaginatedResponse<TokenMint>>(
-      `/tokens?page=${page}&page_size=${pageSize}`
-    );
-  }
-
-  async getToken(mint: string): Promise<TokenMint> {
-    return this.fetch<TokenMint>(`/tokens/${mint}`);
-  }
-
-  async getTokenSupply(mint: string): Promise<TokenSupply> {
-    return this.fetch<TokenSupply>(`/tokens/${mint}/supply`);
-  }
-
-  async getTokenHolders(
-    mint: string,
-    page = 1,
-    pageSize = 20
-  ): Promise<PaginatedResponse<TokenHolder>> {
-    return this.fetch<PaginatedResponse<TokenHolder>>(
-      `/tokens/${mint}/holders?page=${page}&page_size=${pageSize}`
-    );
-  }
-
-  // Search
-  async search(query: string): Promise<SearchResult[]> {
-    return this.fetch<SearchResult[]>(`/search?q=${encodeURIComponent(query)}`);
+  get isNotFound(): boolean {
+    return this.status === 404 || this.error === 'not_found';
   }
 }
 
-export const api = new ApiClient();
+export function isNotFoundError(err: unknown): boolean {
+  return err instanceof ApiError && err.isNotFound;
+}
 
-// Export individual functions for convenience
-export const getStats = () => api.getStats();
-export const getBlocks = (page?: number, pageSize?: number) => api.getBlocks(page, pageSize);
-export const getBlock = (id: string | number) => api.getBlock(id);
-export const getLatestBlocks = (limit?: number) => api.getLatestBlocks(limit);
-export const getTransactions = (
-  page?: number,
-  pageSize?: number,
-  filters?: Parameters<typeof api.getTransactions>[2]
-) => api.getTransactions(page, pageSize, filters);
-export const getTransaction = (sig: string) => api.getTransaction(sig);
-export const getLatestTransactions = (limit?: number) => api.getLatestTransactions(limit);
-export const getAccount = (address: string) => api.getAccount(address);
-export const getAccountTransactions = (address: string, page?: number, pageSize?: number) =>
-  api.getAccountTransactions(address, page, pageSize);
-export const getValidators = (
-  page?: number,
-  pageSize?: number,
-  status?: Parameters<typeof api.getValidators>[2]
-) => api.getValidators(page, pageSize, status);
-export const getValidator = (id: string) => api.getValidator(id);
-export const getTokens = (page?: number, pageSize?: number) => api.getTokens(page, pageSize);
-export const getToken = (mint: string) => api.getToken(mint);
-export const getTokenSupply = (mint: string) => api.getTokenSupply(mint);
-export const getTokenHolders = (mint: string, page?: number, pageSize?: number) =>
-  api.getTokenHolders(mint, page, pageSize);
-export const search = (query: string) => api.search(query);
+type QueryValue = string | number | boolean | null | undefined;
+
+function buildQuery(params: Record<string, QueryValue>): string {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === null || value === undefined || value === '') continue;
+    search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return qs ? `?${qs}` : '';
+}
+
+async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const url = `${API_BASE_URL}${API_PREFIX}${path}`;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      headers: { Accept: 'application/json', ...init?.headers },
+    });
+  } catch (cause) {
+    throw new ApiError(0, {
+      error: 'network_error',
+      message: cause instanceof Error ? cause.message : 'Network request failed',
+    });
+  }
+
+  if (!response.ok) {
+    let body: Partial<ApiErrorBody> = {};
+    try {
+      body = (await response.json()) as Partial<ApiErrorBody>;
+    } catch {
+      // Response had no JSON body; fall back to the status-derived message.
+    }
+    throw new ApiError(response.status, body);
+  }
+
+  return (await response.json()) as T;
+}
+
+// ---------------------------------------------------------------------------
+// Health & stats
+// ---------------------------------------------------------------------------
+
+export function getHealth(): Promise<Health> {
+  return request<Health>('/health');
+}
+
+export function getStats(): Promise<NetworkStats> {
+  return request<NetworkStats>('/stats');
+}
+
+// ---------------------------------------------------------------------------
+// Blocks
+// ---------------------------------------------------------------------------
+
+export function getBlocks(
+  page = 1,
+  limit = 25,
+  proposer?: string
+): Promise<Paginated<BlockSummary>> {
+  return request<Paginated<BlockSummary>>(
+    `/blocks${buildQuery({ page, limit, proposer })}`
+  );
+}
+
+export function getLatestBlocks(limit = 10): Promise<BlockSummary[]> {
+  return request<BlockSummary[]>(`/blocks/latest${buildQuery({ limit })}`);
+}
+
+/** `id` is a block height or a 64-hex block hash. */
+export function getBlock(id: string | number): Promise<BlockDetail> {
+  return request<BlockDetail>(`/blocks/${encodeURIComponent(String(id))}`);
+}
+
+// ---------------------------------------------------------------------------
+// Transactions
+// ---------------------------------------------------------------------------
+
+export interface TransactionListParams {
+  page?: number;
+  limit?: number;
+  kind?: TransactionKind | null;
+  sender?: string | null;
+  height?: number | null;
+}
+
+export function getTransactions(
+  params: TransactionListParams = {}
+): Promise<Paginated<TransactionSummary>> {
+  const { page = 1, limit = 25, kind, sender, height } = params;
+  return request<Paginated<TransactionSummary>>(
+    `/transactions${buildQuery({ page, limit, kind, sender, height })}`
+  );
+}
+
+export function getLatestTransactions(limit = 10): Promise<TransactionSummary[]> {
+  return request<TransactionSummary[]>(
+    `/transactions/latest${buildQuery({ limit })}`
+  );
+}
+
+export function getTransaction(hash: string): Promise<TransactionDetail> {
+  return request<TransactionDetail>(`/transactions/${encodeURIComponent(hash)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Accounts
+// ---------------------------------------------------------------------------
+
+export function getAccount(address: string): Promise<AccountDetail> {
+  return request<AccountDetail>(`/accounts/${encodeURIComponent(address)}`);
+}
+
+export function getAccountTransactions(
+  address: string,
+  page = 1,
+  limit = 25
+): Promise<Paginated<AccountTransaction>> {
+  return request<Paginated<AccountTransaction>>(
+    `/accounts/${encodeURIComponent(address)}/transactions${buildQuery({ page, limit })}`
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Validators
+// ---------------------------------------------------------------------------
+
+export function getValidators(): Promise<Validator[]> {
+  return request<Validator[]>('/validators');
+}
+
+export function getValidator(address: string): Promise<ValidatorDetail> {
+  return request<ValidatorDetail>(`/validators/${encodeURIComponent(address)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Programs
+// ---------------------------------------------------------------------------
+
+export function getPrograms(
+  page = 1,
+  limit = 25
+): Promise<Paginated<ProgramSummary>> {
+  return request<Paginated<ProgramSummary>>(
+    `/programs${buildQuery({ page, limit })}`
+  );
+}
+
+export function getProgram(id: string): Promise<ProgramDetail> {
+  return request<ProgramDetail>(`/programs/${encodeURIComponent(id)}`);
+}
+
+// ---------------------------------------------------------------------------
+// Nodes
+// ---------------------------------------------------------------------------
+
+export function getNodes(): Promise<NodeInfo[]> {
+  return request<NodeInfo[]>('/nodes');
+}
+
+// ---------------------------------------------------------------------------
+// Search
+// ---------------------------------------------------------------------------
+
+export function search(q: string): Promise<SearchResult[]> {
+  return request<SearchResult[]>(`/search${buildQuery({ q })}`);
+}

@@ -1,125 +1,147 @@
 'use client';
 
-import useSWR, { SWRConfiguration } from 'swr';
-import {
-  getStats,
-  getBlocks,
-  getBlock,
-  getLatestBlocks,
-  getTransactions,
-  getTransaction,
-  getLatestTransactions,
-  getAccount,
-  getAccountTransactions,
-  getValidators,
-  getValidator,
-  getTokens,
-  getToken,
-  search,
-} from '@/lib/api';
+import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
+import * as api from '@/lib/api';
 import type {
-  NetworkStats,
-  BlockSummary,
-  BlockDetail,
-  TransactionSummary,
-  TransactionDetail,
   AccountDetail,
   AccountTransaction,
+  BlockDetail,
+  BlockSummary,
+  Health,
+  NetworkStats,
+  NodeInfo,
+  Paginated,
+  ProgramDetail,
+  ProgramSummary,
+  SearchResult,
+  TransactionDetail,
+  TransactionKind,
+  TransactionSummary,
   Validator,
   ValidatorDetail,
-  TokenMint,
-  SearchResult,
-  PaginatedResponse,
 } from '@/types';
 
 const defaultConfig: SWRConfiguration = {
   revalidateOnFocus: false,
   revalidateOnReconnect: true,
-  dedupingInterval: 5000,
+  dedupingInterval: 2000,
+  shouldRetryOnError: (err: unknown) => !api.isNotFoundError(err),
 };
 
-// Network Stats
-export function useStats(config?: SWRConfiguration) {
-  return useSWR<NetworkStats>('stats', getStats, {
+/** Detail pages need a stable "this thing does not exist" signal. */
+export function isNotFound(error: unknown): boolean {
+  return api.isNotFoundError(error);
+}
+
+// ---------------------------------------------------------------------------
+// Health & stats
+// ---------------------------------------------------------------------------
+
+export function useHealth(config?: SWRConfiguration): SWRResponse<Health> {
+  return useSWR<Health>('health', api.getHealth, {
     ...defaultConfig,
-    refreshInterval: 5000, // Refresh every 5 seconds
+    refreshInterval: 30_000,
     ...config,
   });
 }
 
+export function useStats(config?: SWRConfiguration): SWRResponse<NetworkStats> {
+  return useSWR<NetworkStats>('stats', api.getStats, {
+    ...defaultConfig,
+    refreshInterval: 10_000,
+    ...config,
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Blocks
-export function useBlocks(page = 1, pageSize = 20, config?: SWRConfiguration) {
-  return useSWR<PaginatedResponse<BlockSummary>>(
-    ['blocks', page, pageSize],
-    () => getBlocks(page, pageSize),
-    { ...defaultConfig, ...config }
+// ---------------------------------------------------------------------------
+
+export function useBlocks(
+  page = 1,
+  limit = 25,
+  proposer?: string,
+  config?: SWRConfiguration
+): SWRResponse<Paginated<BlockSummary>> {
+  return useSWR<Paginated<BlockSummary>>(
+    ['blocks', page, limit, proposer ?? null],
+    () => api.getBlocks(page, limit, proposer),
+    { ...defaultConfig, keepPreviousData: true, ...config }
   );
 }
 
-export function useBlock(slotOrHash: string | number | null, config?: SWRConfiguration) {
-  return useSWR<BlockDetail>(
-    slotOrHash ? ['block', slotOrHash] : null,
-    () => getBlock(slotOrHash!),
-    { ...defaultConfig, ...config }
-  );
-}
-
-export function useLatestBlocks(limit = 5, config?: SWRConfiguration) {
+export function useLatestBlocks(
+  limit = 10,
+  config?: SWRConfiguration
+): SWRResponse<BlockSummary[]> {
   return useSWR<BlockSummary[]>(
-    ['latestBlocks', limit],
-    () => getLatestBlocks(limit),
-    {
-      ...defaultConfig,
-      refreshInterval: 3000, // Refresh frequently for latest blocks
-      ...config,
-    }
+    ['blocks/latest', limit],
+    () => api.getLatestBlocks(limit),
+    { ...defaultConfig, refreshInterval: 15_000, ...config }
   );
 }
 
+export function useBlock(
+  id: string | number | null,
+  config?: SWRConfiguration
+): SWRResponse<BlockDetail> {
+  return useSWR<BlockDetail>(
+    id === null || id === '' ? null : ['block', String(id)],
+    () => api.getBlock(id as string | number),
+    { ...defaultConfig, ...config }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Transactions
+// ---------------------------------------------------------------------------
+
 export function useTransactions(
   page = 1,
-  pageSize = 20,
-  filters?: {
-    type?: string;
-    status?: string;
-    from_slot?: number;
-    to_slot?: number;
-  },
+  limit = 25,
+  kind?: TransactionKind | null,
   config?: SWRConfiguration
-) {
-  return useSWR<PaginatedResponse<TransactionSummary>>(
-    ['transactions', page, pageSize, filters],
-    () => getTransactions(page, pageSize, filters),
-    { ...defaultConfig, ...config }
+): SWRResponse<Paginated<TransactionSummary>> {
+  return useSWR<Paginated<TransactionSummary>>(
+    ['transactions', page, limit, kind ?? null],
+    () => api.getTransactions({ page, limit, kind }),
+    { ...defaultConfig, keepPreviousData: true, ...config }
   );
 }
 
-export function useTransaction(signature: string | null, config?: SWRConfiguration) {
-  return useSWR<TransactionDetail>(
-    signature ? ['transaction', signature] : null,
-    () => getTransaction(signature!),
-    { ...defaultConfig, ...config }
-  );
-}
-
-export function useLatestTransactions(limit = 5, config?: SWRConfiguration) {
+export function useLatestTransactions(
+  limit = 10,
+  config?: SWRConfiguration
+): SWRResponse<TransactionSummary[]> {
   return useSWR<TransactionSummary[]>(
-    ['latestTransactions', limit],
-    () => getLatestTransactions(limit),
-    {
-      ...defaultConfig,
-      refreshInterval: 3000,
-      ...config,
-    }
+    ['transactions/latest', limit],
+    () => api.getLatestTransactions(limit),
+    { ...defaultConfig, refreshInterval: 15_000, ...config }
   );
 }
 
+export function useTransaction(
+  hash: string | null,
+  config?: SWRConfiguration
+): SWRResponse<TransactionDetail> {
+  return useSWR<TransactionDetail>(
+    hash ? ['transaction', hash] : null,
+    () => api.getTransaction(hash as string),
+    { ...defaultConfig, ...config }
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Accounts
-export function useAccount(address: string | null, config?: SWRConfiguration) {
+// ---------------------------------------------------------------------------
+
+export function useAccount(
+  address: string | null,
+  config?: SWRConfiguration
+): SWRResponse<AccountDetail> {
   return useSWR<AccountDetail>(
     address ? ['account', address] : null,
-    () => getAccount(address!),
+    () => api.getAccount(address as string),
     { ...defaultConfig, ...config }
   );
 }
@@ -127,64 +149,89 @@ export function useAccount(address: string | null, config?: SWRConfiguration) {
 export function useAccountTransactions(
   address: string | null,
   page = 1,
-  pageSize = 20,
+  limit = 25,
   config?: SWRConfiguration
-) {
-  return useSWR<PaginatedResponse<AccountTransaction>>(
-    address ? ['accountTransactions', address, page, pageSize] : null,
-    () => getAccountTransactions(address!, page, pageSize),
-    { ...defaultConfig, ...config }
+): SWRResponse<Paginated<AccountTransaction>> {
+  return useSWR<Paginated<AccountTransaction>>(
+    address ? ['account-transactions', address, page, limit] : null,
+    () => api.getAccountTransactions(address as string, page, limit),
+    { ...defaultConfig, keepPreviousData: true, ...config }
   );
 }
 
+// ---------------------------------------------------------------------------
 // Validators
-export function useValidators(
-  page = 1,
-  pageSize = 20,
-  status?: 'active' | 'delinquent' | 'inactive',
+// ---------------------------------------------------------------------------
+
+export function useValidators(config?: SWRConfiguration): SWRResponse<Validator[]> {
+  return useSWR<Validator[]>('validators', api.getValidators, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
+}
+
+export function useValidator(
+  address: string | null,
   config?: SWRConfiguration
-) {
-  return useSWR<PaginatedResponse<Validator>>(
-    ['validators', page, pageSize, status],
-    () => getValidators(page, pageSize, status),
-    { ...defaultConfig, ...config }
-  );
-}
-
-export function useValidator(identity: string | null, config?: SWRConfiguration) {
+): SWRResponse<ValidatorDetail> {
   return useSWR<ValidatorDetail>(
-    identity ? ['validator', identity] : null,
-    () => getValidator(identity!),
+    address ? ['validator', address] : null,
+    () => api.getValidator(address as string),
     { ...defaultConfig, ...config }
   );
 }
 
-// Tokens
-export function useTokens(page = 1, pageSize = 20, config?: SWRConfiguration) {
-  return useSWR<PaginatedResponse<TokenMint>>(
-    ['tokens', page, pageSize],
-    () => getTokens(page, pageSize),
+// ---------------------------------------------------------------------------
+// Programs
+// ---------------------------------------------------------------------------
+
+export function usePrograms(
+  page = 1,
+  limit = 25,
+  config?: SWRConfiguration
+): SWRResponse<Paginated<ProgramSummary>> {
+  return useSWR<Paginated<ProgramSummary>>(
+    ['programs', page, limit],
+    () => api.getPrograms(page, limit),
+    { ...defaultConfig, keepPreviousData: true, ...config }
+  );
+}
+
+export function useProgram(
+  id: string | null,
+  config?: SWRConfiguration
+): SWRResponse<ProgramDetail> {
+  return useSWR<ProgramDetail>(
+    id ? ['program', id] : null,
+    () => api.getProgram(id as string),
     { ...defaultConfig, ...config }
   );
 }
 
-export function useToken(mint: string | null, config?: SWRConfiguration) {
-  return useSWR<TokenMint>(
-    mint ? ['token', mint] : null,
-    () => getToken(mint!),
-    { ...defaultConfig, ...config }
-  );
+// ---------------------------------------------------------------------------
+// Nodes
+// ---------------------------------------------------------------------------
+
+export function useNodes(config?: SWRConfiguration): SWRResponse<NodeInfo[]> {
+  return useSWR<NodeInfo[]>('nodes', api.getNodes, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
 }
 
+// ---------------------------------------------------------------------------
 // Search
-export function useSearch(query: string | null, config?: SWRConfiguration) {
+// ---------------------------------------------------------------------------
+
+export function useSearch(
+  q: string | null,
+  config?: SWRConfiguration
+): SWRResponse<SearchResult[]> {
   return useSWR<SearchResult[]>(
-    query && query.length >= 2 ? ['search', query] : null,
-    () => search(query!),
-    {
-      ...defaultConfig,
-      dedupingInterval: 1000,
-      ...config,
-    }
+    q && q.trim() !== '' ? ['search', q.trim()] : null,
+    () => api.search((q as string).trim()),
+    { ...defaultConfig, ...config }
   );
 }

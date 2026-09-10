@@ -1,247 +1,200 @@
 'use client';
 
 import Link from 'next/link';
-import { useStats, useLatestBlocks, useLatestTransactions } from '@/hooks/useApi';
-import { useBlocksSubscription, useStatsSubscription } from '@/hooks/useWebSocket';
-import { StatsCard, StatsCardSkeleton } from '@/components/StatsCard';
-import { DataTable } from '@/components/DataTable';
+import { useCallback, useEffect, useState } from 'react';
+import { StatsCard, StatsCardSkeleton, StatsRow } from '@/components/StatsCard';
+import { BlocksTable, TransactionsTable } from '@/components/Tables';
+import { Hash } from '@/components/Hash';
+import { LiveIndicator, SectionHeading } from '@/components/States';
+import { useLatestBlocks, useLatestTransactions, useStats } from '@/hooks/useApi';
+import { useNewBlocks, useNewTransactions, useStatsUpdates } from '@/hooks/useWebSocket';
 import {
+  formatAmount,
+  formatDurationMs,
   formatNumber,
-  formatCompactNumber,
-  formatTimestamp,
-  formatLamports,
-  shortenHash,
-  formatPercentage,
-  getStatusColorClass,
-  getTransactionTypeLabel,
+  formatStake,
+  TOKEN_SYMBOL,
 } from '@/lib/utils';
-import type { BlockSummary, TransactionSummary, WebSocketBlockUpdate, WebSocketStatsUpdate } from '@/types';
-import { useCallback, useState } from 'react';
+import type { BlockSummary, NetworkStats, TransactionSummary } from '@/types';
+
+const LATEST_LIMIT = 10;
 
 export default function DashboardPage() {
-  const { data: stats, mutate: mutateStats } = useStats();
-  const { data: blocks, mutate: mutateBlocks } = useLatestBlocks(5);
-  const { data: transactions } = useLatestTransactions(5);
+  const { data: fetchedStats, isLoading: statsLoading } = useStats();
+  const { data: fetchedBlocks, isLoading: blocksLoading } = useLatestBlocks(LATEST_LIMIT);
+  const { data: fetchedTxs, isLoading: txsLoading } = useLatestTransactions(LATEST_LIMIT);
 
-  // State for real-time updates
-  const [realtimeBlocks, setRealtimeBlocks] = useState<BlockSummary[]>([]);
+  const [liveStats, setLiveStats] = useState<NetworkStats | null>(null);
+  const [liveBlocks, setLiveBlocks] = useState<BlockSummary[]>([]);
+  const [liveTxs, setLiveTxs] = useState<TransactionSummary[]>([]);
 
-  // Handle real-time block updates
-  const handleBlockUpdate = useCallback((block: WebSocketBlockUpdate) => {
-    const newBlock: BlockSummary = {
-      slot: block.slot,
-      blockhash: block.blockhash,
-      parent_slot: block.slot - 1,
-      timestamp: block.timestamp,
-      transaction_count: block.transaction_count,
-      leader: block.leader,
-      rewards: '0',
-    };
+  // Whenever a fresh REST payload lands, drop the locally accumulated deltas.
+  useEffect(() => {
+    if (fetchedBlocks) setLiveBlocks([]);
+  }, [fetchedBlocks]);
 
-    setRealtimeBlocks((prev) => [newBlock, ...prev.slice(0, 4)]);
-    mutateBlocks();
-  }, [mutateBlocks]);
+  useEffect(() => {
+    if (fetchedTxs) setLiveTxs([]);
+  }, [fetchedTxs]);
 
-  // Handle real-time stats updates
-  const handleStatsUpdate = useCallback((newStats: WebSocketStatsUpdate) => {
-    if (stats) {
-      mutateStats({
-        ...stats,
-        block_height: newStats.block_height,
-        tps: newStats.tps,
-        total_transactions: newStats.total_transactions,
-      }, false);
-    }
-  }, [stats, mutateStats]);
+  const onNewBlock = useCallback((block: BlockSummary) => {
+    setLiveBlocks((current) =>
+      current.some((b) => b.hash === block.hash) ? current : [block, ...current].slice(0, LATEST_LIMIT)
+    );
+  }, []);
 
-  // Subscribe to real-time updates
-  const { isConnected } = useBlocksSubscription(handleBlockUpdate);
-  useStatsSubscription(handleStatsUpdate);
+  const onNewTransaction = useCallback((tx: TransactionSummary) => {
+    setLiveTxs((current) =>
+      current.some((t) => t.hash === tx.hash) ? current : [tx, ...current].slice(0, LATEST_LIMIT)
+    );
+  }, []);
 
-  // Merge real-time blocks with fetched blocks
-  const displayBlocks = realtimeBlocks.length > 0 ? realtimeBlocks : blocks;
+  const { isConnected } = useNewBlocks(onNewBlock);
+  useNewTransactions(onNewTransaction);
+  useStatsUpdates(setLiveStats);
 
-  const blockColumns = [
-    {
-      key: 'slot',
-      header: 'Slot',
-      render: (block: BlockSummary) => (
-        <Link href={`/blocks/${block.slot}`} className="link font-mono">
-          {formatNumber(block.slot)}
-        </Link>
-      ),
-    },
-    {
-      key: 'timestamp',
-      header: 'Age',
-      render: (block: BlockSummary) => (
-        <span className="text-dark-300">{formatTimestamp(block.timestamp)}</span>
-      ),
-    },
-    {
-      key: 'transaction_count',
-      header: 'Txns',
-      render: (block: BlockSummary) => (
-        <span className="text-white">{block.transaction_count}</span>
-      ),
-    },
-    {
-      key: 'leader',
-      header: 'Leader',
-      render: (block: BlockSummary) => (
-        <Link href={`/validators/${block.leader}`} className="link font-mono">
-          {shortenHash(block.leader)}
-        </Link>
-      ),
-    },
-  ];
+  const stats = liveStats ?? fetchedStats;
 
-  const txColumns = [
-    {
-      key: 'signature',
-      header: 'Signature',
-      render: (tx: TransactionSummary) => (
-        <Link href={`/transactions/${tx.signature}`} className="link font-mono">
-          {shortenHash(tx.signature, 8, 8)}
-        </Link>
-      ),
-    },
-    {
-      key: 'type',
-      header: 'Type',
-      render: (tx: TransactionSummary) => (
-        <span className="badge badge-neutral">{getTransactionTypeLabel(tx.type)}</span>
-      ),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      render: (tx: TransactionSummary) => (
-        <span className={getStatusColorClass(tx.status)}>
-          {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
-        </span>
-      ),
-    },
-    {
-      key: 'fee',
-      header: 'Fee',
-      render: (tx: TransactionSummary) => (
-        <span className="text-dark-300">{formatLamports(tx.fee)} ATLAS</span>
-      ),
-    },
-  ];
+  const blocks = dedupe(
+    [...liveBlocks, ...(fetchedBlocks ?? [])],
+    (block) => block.hash
+  ).slice(0, LATEST_LIMIT);
+
+  const transactions = dedupe(
+    [...liveTxs, ...(fetchedTxs ?? [])],
+    (tx) => tx.hash
+  ).slice(0, LATEST_LIMIT);
 
   return (
     <div className="space-y-8">
-      {/* Page Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-white">Dashboard</h1>
-          <p className="mt-1 text-dark-400">
-            Overview of the Rand Protocol network
+          <h1 className="font-serif text-4xl font-medium tracking-tight text-strong">
+            Rand Protocol Explorer
+          </h1>
+          <p className="mt-2 text-sm text-soft">
+            {stats
+              ? `Chain ${stats.chain_id} · ${stats.symbol} · ${stats.decimals} decimals`
+              : 'Connecting to the network…'}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <span
-            className={`status-dot ${isConnected ? 'status-dot-success' : 'status-dot-error'}`}
-          />
-          <span className="text-sm text-dark-400">
-            {isConnected ? 'Live' : 'Connecting...'}
-          </span>
-        </div>
+        <LiveIndicator isConnected={isConnected} />
       </div>
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {stats ? (
+      {/* Primary stats */}
+      <StatsRow columns={4}>
+        {statsLoading && !stats ? (
+          Array.from({ length: 4 }).map((_, i) => <StatsCardSkeleton key={i} />)
+        ) : (
           <>
             <StatsCard
-              title="Block Height"
-              value={formatNumber(stats.block_height)}
-              subtitle={`Slot ${formatNumber(stats.slot)}`}
-              icon={
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                </svg>
-              }
-            />
-            <StatsCard
-              title="TPS"
-              value={stats.tps.toFixed(0)}
-              subtitle={`Avg: ${stats.average_tps.toFixed(1)}`}
-              icon={
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              }
+              title="Block height"
+              value={formatNumber(stats?.height ?? 0)}
+              subtitle={stats?.node_syncing ? 'Node syncing' : 'In sync'}
             />
             <StatsCard
               title="Validators"
-              value={formatNumber(stats.active_validators)}
-              subtitle={`Stake: ${formatCompactNumber(Number(stats.total_stake) / 1e9)} ATLAS`}
-              icon={
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-                </svg>
-              }
+              value={formatNumber(stats?.validator_count ?? 0)}
+              subtitle={stats ? formatStake(stats.total_stake) : undefined}
             />
             <StatsCard
-              title="Epoch"
-              value={formatNumber(stats.epoch)}
-              subtitle={`Progress: ${formatPercentage(stats.epoch_progress)}`}
-              icon={
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-              }
+              title="Transactions"
+              value={formatNumber(stats?.total_transactions ?? 0)}
+              subtitle={stats ? `${formatNumber(stats.total_accounts)} accounts` : undefined}
+            />
+            <StatsCard
+              title="Programs"
+              value={formatNumber(stats?.program_count ?? 0)}
+              subtitle={stats?.confidential ? 'Confidential calls enabled' : 'Confidential calls off'}
             />
           </>
-        ) : (
-          <>
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-            <StatsCardSkeleton />
-          </>
         )}
-      </div>
+      </StatsRow>
 
-      {/* Latest Blocks & Transactions */}
-      <div className="grid gap-8 lg:grid-cols-2">
-        {/* Latest Blocks */}
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Latest Blocks</h2>
-            <Link href="/blocks" className="link text-sm">
-              View all
-            </Link>
-          </div>
-          <DataTable
-            columns={blockColumns}
-            data={displayBlocks || []}
-            keyExtractor={(block) => block.slot.toString()}
-            onRowClick={(block) => window.location.href = `/blocks/${block.slot}`}
-            isLoading={!displayBlocks}
-          />
-        </div>
+      {/* Secondary stats */}
+      <StatsRow columns={5}>
+        <MiniStat label="Avg block time" value={stats ? formatDurationMs(stats.avg_block_time_ms) : '—'} />
+        <MiniStat label="Peers" value={stats ? formatNumber(stats.peer_count) : '—'} />
+        <MiniStat label="Mempool" value={stats ? formatNumber(stats.mempool_size) : '—'} />
+        <MiniStat
+          label="Chain / view"
+          value={stats ? `${stats.chain_id} / ${formatNumber(stats.view)}` : '—'}
+        />
+        <MiniStat
+          label="Current leader"
+          value={
+            stats?.current_leader ? (
+              <Hash
+                value={stats.current_leader}
+                href={`/validators/${stats.current_leader}`}
+                start={6}
+                end={4}
+              />
+            ) : (
+              '—'
+            )
+          }
+        />
+      </StatsRow>
 
-        {/* Latest Transactions */}
-        <div>
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-lg font-semibold text-white">Latest Transactions</h2>
-            <Link href="/transactions" className="link text-sm">
-              View all
-            </Link>
-          </div>
-          <DataTable
-            columns={txColumns}
-            data={transactions || []}
-            keyExtractor={(tx) => tx.signature}
-            onRowClick={(tx) => window.location.href = `/transactions/${tx.signature}`}
-            isLoading={!transactions}
+      {stats && (
+        <p className="text-xs text-mute">
+          Total supply {formatAmount(stats.total_supply)} · faucet{' '}
+          {stats.faucet ? 'enabled' : 'disabled'} · {TOKEN_SYMBOL} has {stats.decimals} decimals
+        </p>
+      )}
+
+      {/* Latest blocks + transactions */}
+      <div className="grid gap-6 xl:grid-cols-2">
+        <section className="space-y-4">
+          <SectionHeading
+            label="Latest blocks"
+            actions={
+              <Link href="/blocks" className="link text-sm">
+                View all →
+              </Link>
+            }
           />
-        </div>
+          <BlocksTable blocks={blocks} isLoading={blocksLoading && blocks.length === 0} />
+        </section>
+
+        <section className="space-y-4">
+          <SectionHeading
+            label="Latest transactions"
+            actions={
+              <Link href="/transactions" className="link text-sm">
+                View all →
+              </Link>
+            }
+          />
+          <TransactionsTable
+            transactions={transactions}
+            isLoading={txsLoading && transactions.length === 0}
+            hideColumns={['fee', 'to']}
+          />
+        </section>
       </div>
     </div>
   );
+}
+
+function MiniStat({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="stat">
+      <div className="truncate text-lg font-medium text-strong">{value}</div>
+      <p className="stat-label">{label}</p>
+    </div>
+  );
+}
+
+function dedupe<T>(items: T[], key: (item: T) => string): T[] {
+  const seen = new Set<string>();
+  const out: T[] = [];
+  for (const item of items) {
+    const k = key(item);
+    if (seen.has(k)) continue;
+    seen.add(k);
+    out.push(item);
+  }
+  return out;
 }

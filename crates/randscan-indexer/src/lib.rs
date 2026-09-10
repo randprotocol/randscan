@@ -1,69 +1,69 @@
-//! RandScan Indexer - Blockchain syncer for RandProtocol
-//!
-//! This crate implements the blockchain indexer that connects to a RandProtocol
-//! node, fetches blocks and transactions, and stores them in the database.
+//! RandScan Indexer - syncs the SHRUGG chain from a `shrugg-node` JSON-RPC endpoint into PostgreSQL.
 
-pub mod rpc;
-pub mod processor;
-pub mod service;
 pub mod broadcast;
+pub mod nodes;
+pub mod processor;
+pub mod rpc;
+pub mod service;
 
-pub use rpc::*;
-pub use processor::*;
-pub use service::*;
 pub use broadcast::*;
+pub use nodes::*;
+pub use processor::*;
+pub use rpc::*;
+pub use service::*;
 
 use std::time::Duration;
 
-/// Indexer configuration
 #[derive(Debug, Clone)]
 pub struct IndexerConfig {
-    /// RPC endpoint URL
+    /// JSON-RPC endpoint of the node.
     pub rpc_url: String,
-    /// Polling interval for new blocks
+    /// Polling interval when caught up.
     pub poll_interval: Duration,
-    /// Batch size for initial sync
+    /// Blocks per pass while catching up.
     pub batch_size: u64,
-    /// Enable real-time broadcasting
-    pub enable_broadcast: bool,
-    /// Finality depth (blocks behind tip considered final)
-    pub finality_depth: u64,
+    /// Minimum interval between stats refreshes.
+    pub stats_interval: Duration,
+    /// Interval between peer/geolocation refreshes.
+    pub nodes_interval: Duration,
 }
 
 impl Default for IndexerConfig {
     fn default() -> Self {
         Self {
-            rpc_url: "http://localhost:8899".to_string(),
-            poll_interval: Duration::from_millis(500),
-            batch_size: 100,
-            enable_broadcast: true,
-            finality_depth: 32,
+            rpc_url: "http://127.0.0.1:8545".to_string(),
+            poll_interval: Duration::from_millis(1000),
+            batch_size: 200,
+            stats_interval: Duration::from_secs(5),
+            nodes_interval: Duration::from_secs(60),
         }
     }
 }
 
 impl IndexerConfig {
     pub fn from_env() -> Self {
+        let d = Self::default();
+        let num = |k: &str, d: u64| {
+            std::env::var(k)
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(d)
+        };
         Self {
-            rpc_url: std::env::var("RPC_URL")
-                .unwrap_or_else(|_| "http://localhost:8899".to_string()),
-            poll_interval: Duration::from_millis(
-                std::env::var("POLL_INTERVAL_MS")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(500),
-            ),
-            batch_size: std::env::var("BATCH_SIZE")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(100),
-            enable_broadcast: std::env::var("ENABLE_BROADCAST")
-                .map(|s| s == "true" || s == "1")
-                .unwrap_or(true),
-            finality_depth: std::env::var("FINALITY_DEPTH")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(32),
+            rpc_url: std::env::var("RPC_URL").unwrap_or(d.rpc_url),
+            poll_interval: Duration::from_millis(num(
+                "POLL_INTERVAL_MS",
+                d.poll_interval.as_millis() as u64,
+            )),
+            batch_size: num("BATCH_SIZE", d.batch_size),
+            stats_interval: Duration::from_secs(num(
+                "STATS_INTERVAL_SECS",
+                d.stats_interval.as_secs(),
+            )),
+            nodes_interval: Duration::from_secs(num(
+                "NODES_INTERVAL_SECS",
+                d.nodes_interval.as_secs(),
+            )),
         }
     }
 }

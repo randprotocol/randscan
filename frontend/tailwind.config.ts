@@ -1,44 +1,54 @@
 import type { Config } from 'tailwindcss';
 
+/**
+ * Every colour resolves to a CSS variable defined in globals.css, so the light
+ * and dark themes swap by flipping `data-theme` on <html> with no `dark:`
+ * variants in the markup.
+ */
 const config: Config = {
   content: [
     './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
     './src/components/**/*.{js,ts,jsx,tsx,mdx}',
     './src/app/**/*.{js,ts,jsx,tsx,mdx}',
   ],
-  darkMode: 'class',
+  darkMode: ['selector', '[data-theme="dark"]'],
   theme: {
     extend: {
       colors: {
-        primary: {
-          50: '#f0f9ff',
-          100: '#e0f2fe',
-          200: '#bae6fd',
-          300: '#7dd3fc',
-          400: '#38bdf8',
-          500: '#0ea5e9',
-          600: '#0284c7',
-          700: '#0369a1',
-          800: '#075985',
-          900: '#0c4a6e',
-          950: '#082f49',
-        },
-        dark: {
-          50: '#f8fafc',
-          100: '#f1f5f9',
-          200: '#e2e8f0',
-          300: '#cbd5e1',
-          400: '#94a3b8',
-          500: '#64748b',
-          600: '#475569',
-          700: '#334155',
-          800: '#1e293b',
-          900: '#0f172a',
-          950: '#020617',
-        },
+        bg: 'var(--color-bg)',
+        'bg-soft': 'var(--color-bg-soft)',
+        surface: 'var(--color-surface)',
+        'surface-2': 'var(--color-surface-2)',
+        border: 'var(--color-border)',
+        'border-soft': 'var(--color-border-soft)',
+        text: 'var(--color-text)',
+        soft: 'var(--color-text-soft)',
+        mute: 'var(--color-text-mute)',
+        strong: 'var(--color-text-strong)',
+        accent: 'var(--color-accent)',
+        'accent-2': 'var(--color-accent-2)',
+        'accent-3': 'var(--color-accent-3)',
+        'on-accent': 'var(--color-on-accent)',
+        live: 'var(--color-live)',
+      },
+      borderRadius: {
+        none: '0',
+        DEFAULT: '3px',
+        sm: '3px',
+        md: '3px',
+        lg: '3px',
+        xl: '3px',
+        '2xl': '3px',
+        '3xl': '3px',
+        full: '9999px',
       },
       fontFamily: {
-        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+        sans: ['var(--font-sans)', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        serif: ['var(--font-serif)', 'Georgia', 'ui-serif', 'serif'],
+        mono: ['var(--font-mono)', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
+      fontSize: {
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
       },
     },
   },

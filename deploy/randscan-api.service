@@ -1,0 +1,14 @@
+[Unit]
+Description=RandScan API and indexer (SHRUGG chain explorer)
+After=network-online.target postgresql.service shrugg-node.service
+Wants=postgresql.service
+
+[Service]
+EnvironmentFile=/etc/randscan/api.env
+ExecStart=/usr/local/bin/randscan-api
+Restart=always
+RestartSec=3
+LimitNOFILE=65536
+
+[Install]
+WantedBy=multi-user.target

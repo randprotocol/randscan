@@ -1,22 +1,19 @@
-//! RandScan Database Layer
-//!
-//! PostgreSQL database access using SQLx with async support.
+//! RandScan database layer (PostgreSQL via SQLx).
 
-pub mod pool;
-pub mod models;
-pub mod queries;
 pub mod error;
+pub mod models;
+pub mod pool;
+pub mod queries;
 
-pub use pool::*;
-pub use models::*;
-pub use queries::*;
 pub use error::*;
+pub use models::*;
+pub use pool::*;
+pub use queries::*;
 
 use sqlx::postgres::PgPoolOptions;
-use sqlx::PgPool;
+pub use sqlx::PgPool;
 use std::time::Duration;
 
-/// Database configuration
 #[derive(Debug, Clone)]
 pub struct DatabaseConfig {
     pub url: String,
@@ -26,87 +23,68 @@ pub struct DatabaseConfig {
     pub idle_timeout: Duration,
 }
 
-impl Default for DatabaseConfig {
-    fn default() -> Self {
-        Self {
-            url: "postgres://localhost/randscan".to_string(),
-            max_connections: 10,
-            min_connections: 1,
-            connect_timeout: Duration::from_secs(10),
-            idle_timeout: Duration::from_secs(300),
-        }
-    }
-}
-
 impl DatabaseConfig {
     pub fn from_env() -> Self {
+        let num = |k: &str, d: u64| {
+            std::env::var(k)
+                .ok()
+                .and_then(|s| s.parse().ok())
+                .unwrap_or(d)
+        };
         Self {
-            url: std::env::var("DATABASE_URL")
-                .unwrap_or_else(|_| "postgres://localhost/randscan".to_string()),
-            max_connections: std::env::var("DB_MAX_CONNECTIONS")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(10),
-            min_connections: std::env::var("DB_MIN_CONNECTIONS")
-                .ok()
-                .and_then(|s| s.parse().ok())
-                .unwrap_or(1),
-            connect_timeout: Duration::from_secs(
-                std::env::var("DB_CONNECT_TIMEOUT")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(10),
-            ),
-            idle_timeout: Duration::from_secs(
-                std::env::var("DB_IDLE_TIMEOUT")
-                    .ok()
-                    .and_then(|s| s.parse().ok())
-                    .unwrap_or(300),
-            ),
+            url: std::env::var("DATABASE_URL").unwrap_or_else(|_| {
+                "postgres://randscan:randscan@localhost:5432/randscan".to_string()
+            }),
+            max_connections: num("DB_MAX_CONNECTIONS", 10) as u32,
+            min_connections: num("DB_MIN_CONNECTIONS", 1) as u32,
+            connect_timeout: Duration::from_secs(num("DB_CONNECT_TIMEOUT", 10)),
+            idle_timeout: Duration::from_secs(num("DB_IDLE_TIMEOUT", 300)),
         }
     }
 }
 
-/// Create a database connection pool
 pub async fn create_pool(config: &DatabaseConfig) -> Result<PgPool> {
-    let pool = PgPoolOptions::new()
+    PgPoolOptions::new()
         .max_connections(config.max_connections)
         .min_connections(config.min_connections)
         .acquire_timeout(config.connect_timeout)
         .idle_timeout(config.idle_timeout)
         .connect(&config.url)
         .await
-        .map_err(|e| DbError::Connection(e.to_string()))?;
-
-    Ok(pool)
+        .map_err(|e| DbError::Connection(e.to_string()))
 }
 
-/// Run database migrations
+/// Schema version string embedded in the `indexer_state` bootstrap; bump when the schema changes.
+const SCHEMA_SQL: &str = include_str!("../../../migrations/001_initial_schema.sql");
+
+/// Create the schema if the `blocks` table does not exist yet.
 pub async fn run_migrations(pool: &PgPool) -> Result<()> {
-    // Check if tables already exist
-    let table_exists: bool = sqlx::query_scalar(
-        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'blocks')"
+    let exists: bool = sqlx::query_scalar(
+        "SELECT EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'blocks')",
     )
     .fetch_one(pool)
-    .await
-    .map_err(|e| DbError::Query(e.to_string()))?;
+    .await?;
 
-    if table_exists {
-        tracing::info!("Database tables already exist, skipping migration");
+    if exists {
+        // Sanity check that this is the SHRUGG schema and not the legacy one.
+        let ok: bool = sqlx::query_scalar(
+            "SELECT EXISTS (SELECT FROM information_schema.columns WHERE table_name = 'blocks' AND column_name = 'justify_view')",
+        )
+        .fetch_one(pool)
+        .await?;
+        if !ok {
+            return Err(DbError::Migration(
+                "database has the legacy schema; drop and recreate the database".into(),
+            ));
+        }
+        tracing::info!("Database schema present");
         return Ok(());
     }
 
-    tracing::info!("Running initial database migration...");
-
-    // Embedded migration SQL
-    let migration_sql = include_str!("../../../migrations/001_initial_schema.sql");
-
-    // Execute migration
-    sqlx::raw_sql(migration_sql)
+    tracing::info!("Creating database schema");
+    sqlx::raw_sql(SCHEMA_SQL)
         .execute(pool)
         .await
-        .map_err(|e| DbError::Query(format!("Migration failed: {}", e)))?;
-
-    tracing::info!("Database migration completed successfully");
+        .map_err(|e| DbError::Migration(e.to_string()))?;
     Ok(())
 }

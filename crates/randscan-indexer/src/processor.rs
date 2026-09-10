@@ -1,354 +1,309 @@
-//! Block and transaction processor
+//! Turns an RPC block into database rows and refreshes the touched accounts.
 
-use crate::rpc::{BlockResponse, TransactionPayloadResponse, TransactionResponse};
-use crate::broadcast::Broadcaster;
-use randscan_core::{BlockSummary, TransactionSummary, PayloadType, Account, Validator};
-use randscan_db::{self as db, DbPool};
-use anyhow::Result;
-use tracing::{info, warn, debug};
+use crate::rpc::{RpcBlock, RpcClient, RpcTxKind};
+use anyhow::{Context, Result};
+use randscan_core::{BlockSummary, TransactionSummary, TxKind};
+use randscan_db::{self as db, DbPool, NewBlock, NewTx};
+use std::collections::BTreeSet;
+use tracing::{debug, warn};
 
-/// Block processor
 pub struct BlockProcessor {
     pool: DbPool,
-    broadcaster: Option<Broadcaster>,
+    rpc: RpcClient,
+}
+
+pub struct ProcessedBlock {
+    pub block: BlockSummary,
+    pub transactions: Vec<TransactionSummary>,
+}
+
+struct PreparedReceipt {
+    tx_hash: String,
+    program: String,
+    tier: i32,
+    outputs: Vec<i64>,
+    effect_to: Option<String>,
+    effect_amount: Option<String>,
+    height: i64,
+    index: i32,
 }
 
 impl BlockProcessor {
-    pub fn new(pool: DbPool, broadcaster: Option<Broadcaster>) -> Self {
-        Self { pool, broadcaster }
+    pub fn new(pool: DbPool, rpc: RpcClient) -> Self {
+        Self { pool, rpc }
     }
 
-    /// Process a block from RPC response
-    pub async fn process_block(&self, block: BlockResponse) -> Result<()> {
-        let db = self.pool.inner();
+    /// Store one block and everything derived from it, then advance `indexer_state.next_height`.
+    pub async fn process_block(&self, block: RpcBlock) -> Result<ProcessedBlock> {
+        let height = block.height as i64;
 
-        // Insert block
-        db::insert_block(
-            db,
-            &block.block_id,
-            block.height as i64,
-            block.view as i64,
-            block.epoch as i64,
-            &block.parent_id,
-            &block.proposer,
-            &block.transactions_root,
-            &block.state_root,
-            block.supply_commitment.as_deref().unwrap_or(""),
-            block.timestamp as i64,
-            block.transaction_count as i32,
-            block.finalized,
-        )
-        .await?;
-
-        // Insert QC if present
-        if let (Some(vote_type), Some(view), Some(qc_block_id)) =
-            (&block.qc_vote_type, block.qc_view, &block.qc_block_id)
-        {
-            db::insert_qc(
-                db,
-                &block.block_id,
-                vote_type,
-                view as i64,
-                qc_block_id,
-                block.height.saturating_sub(1) as i64,
-                block.qc_signers.as_ref().map(|s| s.len()).unwrap_or(0) as i32,
-            )
-            .await?;
-
-            // Insert QC signers
-            if let Some(signers) = &block.qc_signers {
-                for signer in signers {
-                    db::insert_qc_signer(db, &block.block_id, signer, "").await?;
+        // Receipts come from the node; fetch them before opening the DB transaction.
+        let mut receipts = Vec::new();
+        for tx in &block.transactions {
+            if let RpcTxKind::Call { .. } = tx.kind {
+                match self.rpc.receipt(&tx.hash).await {
+                    Ok(Some(r)) => receipts.push(PreparedReceipt {
+                        tx_hash: tx.hash.clone(),
+                        program: r.program,
+                        tier: r.tier as i32,
+                        outputs: r.outputs,
+                        effect_to: r.effect.as_ref().map(|e| e.to.clone()),
+                        effect_amount: r.effect.as_ref().map(|e| e.amount.clone()),
+                        height: r.height as i64,
+                        index: r.index as i32,
+                    }),
+                    Ok(None) => warn!("no receipt yet for call {} at height {}", tx.hash, height),
+                    Err(e) => warn!("receipt fetch failed for {}: {}", tx.hash, e),
                 }
             }
         }
 
-        // Update validator blocks produced
-        db::increment_blocks_produced(db, &block.proposer).await.ok();
+        let mut touched: BTreeSet<String> = BTreeSet::new();
+        let mut dbtx = self.pool.inner().begin().await?;
 
-        // Process transactions
-        for tx in &block.transactions {
-            self.process_transaction(tx, Some(&block.block_id), Some(block.height))
-                .await?;
-        }
-
-        // Update epoch counters
-        db::increment_epoch_counters(
-            db,
-            block.epoch as i64,
-            1,
-            block.transaction_count as i32,
+        db::insert_block(
+            &mut dbtx,
+            &NewBlock {
+                hash: &block.hash,
+                height,
+                view: block.view as i64,
+                parent: &block.parent,
+                proposer: &block.proposer,
+                timestamp_ms: block.timestamp_ms as i64,
+                tx_root: &block.tx_root,
+                state_root: &block.state_root,
+                justify_view: block.justify_view as i64,
+                tx_count: block.transactions.len() as i32,
+            },
         )
         .await
-        .ok();
+        .with_context(|| format!("insert block {}", height))?;
 
-        // Broadcast new block
-        if let Some(ref broadcaster) = self.broadcaster {
-            let summary = BlockSummary {
-                block_id: block.block_id.clone(),
-                height: block.height,
-                view: block.view,
-                epoch: block.epoch,
-                parent_id: block.parent_id.clone(),
-                proposer: block.proposer.clone(),
-                timestamp: block.timestamp,
-                transaction_count: block.transaction_count as i32,
-                finalized: block.finalized,
+        let mut summaries = Vec::with_capacity(block.transactions.len());
+
+        for (i, tx) in block.transactions.iter().enumerate() {
+            let tx_index = i as i32;
+            #[allow(clippy::type_complexity)]
+            let (kind, to, amount, program, base_pc, words_len, proof_len, recipients): (
+                TxKind,
+                Option<&str>,
+                Option<&str>,
+                Option<&str>,
+                Option<i64>,
+                Option<i64>,
+                Option<i64>,
+                Vec<String>,
+            ) = match &tx.kind {
+                RpcTxKind::Transfer { to, amount } => {
+                    (TxKind::Transfer, Some(to), Some(amount), None, None, None, None, vec![])
+                }
+                RpcTxKind::Mint { to, amount } => {
+                    (TxKind::Mint, Some(to), Some(amount), None, None, None, None, vec![])
+                }
+                RpcTxKind::Deploy { base_pc, words_len, program } => (
+                    TxKind::Deploy,
+                    None,
+                    None,
+                    Some(program),
+                    Some(*base_pc as i64),
+                    Some(*words_len as i64),
+                    None,
+                    vec![],
+                ),
+                RpcTxKind::Call { program, proof_len, recipients } => (
+                    TxKind::Call,
+                    None,
+                    None,
+                    Some(program),
+                    None,
+                    None,
+                    Some(*proof_len as i64),
+                    recipients.clone(),
+                ),
             };
-            broadcaster.broadcast_block(summary);
-        }
 
-        debug!("Processed block {} at height {}", block.block_id, block.height);
-        Ok(())
-    }
+            db::insert_transaction(
+                &mut dbtx,
+                &NewTx {
+                    hash: &tx.hash,
+                    block_hash: &block.hash,
+                    height,
+                    tx_index,
+                    sender: &tx.from,
+                    nonce: tx.nonce as i64,
+                    fee: &tx.fee,
+                    kind: kind.as_str(),
+                    chain_id: tx.chain_id as i64,
+                    timestamp_ms: block.timestamp_ms as i64,
+                    to_address: to,
+                    amount,
+                    program_id: program,
+                    base_pc,
+                    words_len,
+                    proof_len,
+                    recipients: &recipients,
+                },
+            )
+            .await
+            .with_context(|| format!("insert tx {}", tx.hash))?;
 
-    /// Process a transaction
-    pub async fn process_transaction(
-        &self,
-        tx: &TransactionResponse,
-        block_id: Option<&str>,
-        block_height: Option<u64>,
-    ) -> Result<()> {
-        let db = self.pool.inner();
-        let tx_type = &tx.tx_type;
-        let status = &tx.status;
-
-        // Insert main transaction record
-        db::insert_transaction(
-            db,
-            &tx.signature,
-            block_id,
-            block_height.map(|h| h as i64),
-            &tx.sender,
-            tx.nonce as i64,
-            tx.compute_budget.unwrap_or(0) as i64,
-            tx.fee as i64,
-            tx_type,
-            status,
-            tx.timestamp as i64,
-            "", // signature stored separately
-        )
-        .await?;
-
-        // Process type-specific payload
-        if let Some(payload) = &tx.payload {
-            self.process_payload(&tx.signature, payload).await?;
-        }
-
-        // Ensure sender account exists
-        db::upsert_account(
-            db,
-            &tx.sender,
-            0,
-            0,
-            tx.nonce as i64,
-            false,
-            None,
-            0,
-            tx.timestamp as i64,
-        )
-        .await?;
-
-        // Link transaction to sender account
-        if let Some(height) = block_height {
             db::insert_account_transaction(
-                db,
-                &tx.sender,
-                &tx.signature,
-                "sender",
-                height as i64,
-                tx.timestamp as i64,
+                &mut dbtx, &tx.from, &tx.hash, "sender", height, tx_index,
             )
             .await?;
-        }
-
-        // Increment sender tx count
-        db::increment_account_tx_count(db, &tx.sender).await.ok();
-
-        // Broadcast new transaction
-        if let Some(ref broadcaster) = self.broadcaster {
-            let payload_type = PayloadType::from_str(tx_type)
-                .unwrap_or(PayloadType::Public);
-
-            let summary = TransactionSummary {
-                tx_id: tx.signature.clone(),
-                block_id: block_id.map(|s| s.to_string()),
-                block_height: block_height.map(|h| h as i64),
-                sender: tx.sender.clone(),
-                nonce: tx.nonce as i64,
-                fee: tx.fee as i64,
-                payload_type: tx_type.clone(),
-                status: status.clone(),
-                timestamp: tx.timestamp as i64,
-                privacy_level: payload_type.privacy_level().as_str().to_string(),
-            };
-            broadcaster.broadcast_transaction(summary);
-        }
-
-        Ok(())
-    }
-
-    /// Process transaction payload details
-    async fn process_payload(
-        &self,
-        tx_id: &str,
-        payload: &TransactionPayloadResponse,
-    ) -> Result<()> {
-        let db = self.pool.inner();
-
-        match payload {
-            TransactionPayloadResponse::Public { .. } => {
-                db::insert_tx_public(db, tx_id, &[]).await?;
+            touched.insert(tx.from.clone());
+            if let Some(to) = to {
+                db::insert_account_transaction(
+                    &mut dbtx,
+                    to,
+                    &tx.hash,
+                    "recipient",
+                    height,
+                    tx_index,
+                )
+                .await?;
+                touched.insert(to.to_string());
             }
-            TransactionPayloadResponse::Private { nullifiers, commitments, .. } => {
-                db::insert_tx_private(db, tx_id, &[], &[]).await?;
 
-                // Track nullifiers and commitments
-                for n in nullifiers {
-                    db::insert_nullifier(db, n, tx_id).await?;
-                }
-                for c in commitments {
-                    db::insert_commitment(db, c, tx_id).await?;
-                }
-            }
-            TransactionPayloadResponse::Stealth { ephemeral_pubkey, stealth_address, .. } => {
-                db::insert_tx_stealth(
-                    db,
-                    tx_id,
-                    ephemeral_pubkey,
-                    stealth_address,
-                    "",
-                    &[],
+            if let RpcTxKind::Deploy {
+                base_pc,
+                words_len,
+                program,
+            } = &tx.kind
+            {
+                db::insert_program(
+                    &mut dbtx,
+                    program,
+                    &tx.from,
+                    &tx.hash,
+                    height,
+                    *base_pc as i64,
+                    *words_len as i64,
+                    program,
                 )
                 .await?;
             }
-            TransactionPayloadResponse::Stake { amount } => {
-                db::insert_tx_stake(db, tx_id, *amount as i64).await?;
-            }
-            TransactionPayloadResponse::Unstake { amount } => {
-                db::insert_tx_unstake(db, tx_id, *amount as i64).await?;
-            }
-            TransactionPayloadResponse::Transfer { to, amount } => {
-                db::insert_tx_transfer(db, tx_id, to, *amount as i64).await?;
 
-                // Ensure recipient account exists
-                db::upsert_account(db, to, 0, 0, 0, false, None, 0, 0).await.ok();
-            }
-            TransactionPayloadResponse::Deploy { program_id, .. } => {
-                db::insert_tx_deploy(db, tx_id, &[], program_id.as_deref()).await?;
-            }
-            TransactionPayloadResponse::Invoke { program_id, .. } => {
-                db::insert_tx_invoke(db, tx_id, program_id, &[]).await?;
-            }
-            TransactionPayloadResponse::PrivateTransfer { nullifiers, commitments, .. } => {
-                db::insert_tx_private_transfer(db, tx_id, &[]).await?;
+            summaries.push(TransactionSummary {
+                hash: tx.hash.clone(),
+                height,
+                block_hash: block.hash.clone(),
+                tx_index,
+                sender: tx.from.clone(),
+                nonce: tx.nonce as i64,
+                fee: tx.fee.clone(),
+                kind,
+                timestamp_ms: block.timestamp_ms as i64,
+                to: to.map(str::to_string),
+                amount: amount.map(str::to_string),
+                program: program.map(str::to_string),
+            });
+        }
 
-                for n in nullifiers {
-                    db::insert_nullifier(db, n, tx_id).await?;
+        for r in &receipts {
+            db::insert_receipt(
+                &mut dbtx,
+                &r.tx_hash,
+                &r.program,
+                r.tier,
+                &r.outputs,
+                r.effect_to.as_deref(),
+                r.effect_amount.as_deref(),
+                r.height,
+                r.index,
+            )
+            .await?;
+            if let Some(to) = &r.effect_to {
+                db::insert_account_transaction(
+                    &mut dbtx,
+                    to,
+                    &r.tx_hash,
+                    "recipient",
+                    r.height,
+                    r.index,
+                )
+                .await?;
+                touched.insert(to.clone());
+            }
+        }
+
+        // Fees go to the proposer, so its balance moved if the block had transactions.
+        if !block.transactions.is_empty() {
+            touched.insert(block.proposer.clone());
+        }
+
+        db::set_next_height(&mut dbtx, height + 1, Some(&block.hash)).await?;
+        dbtx.commit().await?;
+
+        // Balances and nonces are read back from the node rather than re-deriving ledger rules.
+        for address in &touched {
+            self.refresh_account(address, height).await;
+        }
+
+        debug!(
+            "indexed block {} ({} txs, {} accounts touched)",
+            height,
+            summaries.len(),
+            touched.len()
+        );
+
+        Ok(ProcessedBlock {
+            block: BlockSummary {
+                hash: block.hash,
+                height,
+                view: block.view as i64,
+                parent: block.parent,
+                proposer: block.proposer,
+                timestamp_ms: block.timestamp_ms as i64,
+                tx_count: summaries.len() as i32,
+                justify_view: block.justify_view as i64,
+            },
+            transactions: summaries,
+        })
+    }
+
+    /// Fetch an account from the node and upsert it. Failures are logged, not fatal.
+    pub async fn refresh_account(&self, address: &str, seen_height: i64) {
+        match self.rpc.account(address).await {
+            Ok(acc) => {
+                let mut conn = match self.pool.inner().acquire().await {
+                    Ok(c) => c,
+                    Err(e) => {
+                        warn!("db acquire failed: {}", e);
+                        return;
+                    }
+                };
+                if let Err(e) = db::upsert_account(
+                    &mut conn,
+                    address,
+                    &acc.balance,
+                    acc.nonce as i64,
+                    seen_height,
+                )
+                .await
+                {
+                    warn!("upsert account {} failed: {}", address, e);
                 }
-                for c in commitments {
-                    db::insert_commitment(db, c, tx_id).await?;
+                if let Err(e) = db::refresh_account_tx_count(&mut conn, address).await {
+                    warn!("refresh tx_count {} failed: {}", address, e);
                 }
             }
-            TransactionPayloadResponse::Mint { to, amount } => {
-                // Mint is similar to transfer - it credits tokens to an address
-                db::insert_tx_transfer(db, tx_id, to, *amount as i64).await?;
-
-                // Ensure recipient account exists
-                db::upsert_account(db, to, 0, 0, 0, false, None, 0, 0).await.ok();
-            }
+            Err(e) => warn!("account fetch {} failed: {}", address, e),
         }
-
-        Ok(())
     }
 
-    /// Update account from RPC response
-    pub async fn update_account(&self, address: &str, info: &crate::rpc::AccountInfoResponse) -> Result<()> {
-        let db = self.pool.inner();
-
-        db::upsert_account(
-            db,
-            address,
-            info.atlas_balance as i64,
-            info.shrug_balance as i64,
-            info.nonce as i64,
-            info.executable,
-            info.owner.as_deref(),
-            info.data_len as i32,
-            chrono::Utc::now().timestamp_millis(),
-        )
-        .await?;
-
-        // Broadcast account update
-        if let Some(ref broadcaster) = self.broadcaster {
-            let account = Account {
-                address: address.to_string(),
-                atlas_balance: info.atlas_balance as i64,
-                shrug_balance: info.shrug_balance as i64,
-                nonce: info.nonce as i64,
-                is_executable: info.executable,
-                owner: info.owner.clone(),
-                data_len: info.data_len as i32,
-                tx_count: 0,
-                first_seen: 0,
-                last_seen: chrono::Utc::now().timestamp_millis(),
-            };
-            broadcaster.broadcast_account_update(account);
-        }
-
+    /// Drop blocks at and above `height` so they are re-fetched.
+    pub async fn rewind_to(&self, height: i64) -> Result<()> {
+        let mut dbtx = self.pool.inner().begin().await?;
+        let n = db::delete_blocks_from(&mut dbtx, height).await?;
+        let last_hash = if height > 0 {
+            db::get_block_hash_at(self.pool.inner(), height - 1).await?
+        } else {
+            None
+        };
+        db::set_next_height(&mut dbtx, height, last_hash.as_deref()).await?;
+        dbtx.commit().await?;
+        warn!("rewound {} block(s); next height {}", n, height);
         Ok(())
-    }
-
-    /// Update validator from RPC response
-    pub async fn update_validator(&self, val: &crate::rpc::ValidatorResponse) -> Result<()> {
-        let db = self.pool.inner();
-        let now = chrono::Utc::now().timestamp_millis();
-
-        db::upsert_validator(
-            db,
-            &val.validator_id,
-            &val.pubkey,
-            val.stake as i64,
-            val.commission_rate as i16,
-            val.is_active,
-            now,
-        )
-        .await?;
-
-        if let Some(vote_height) = val.last_vote_height {
-            db::update_last_vote_height(db, &val.validator_id, vote_height as i64).await?;
-        }
-
-        // Broadcast validator update
-        if let Some(ref broadcaster) = self.broadcaster {
-            let validator = Validator {
-                validator_id: val.validator_id.clone(),
-                pubkey: val.pubkey.clone(),
-                stake: val.stake as i64,
-                commission_rate: val.commission_rate as i16,
-                is_active: val.is_active,
-                blocks_produced: val.blocks_produced.unwrap_or(0) as i64,
-                blocks_skipped: 0,
-                last_vote_height: val.last_vote_height.map(|h| h as i64),
-                uptime_percentage: 100.0,
-                first_seen: now,
-                last_seen: now,
-            };
-            broadcaster.broadcast_validator_update(validator);
-        }
-
-        Ok(())
-    }
-
-    /// Finalize blocks up to given height
-    pub async fn finalize_blocks(&self, height: u64) -> Result<i64> {
-        let db = self.pool.inner();
-        let count = db::finalize_blocks_up_to(db, height as i64).await?;
-
-        if count > 0 {
-            info!("Finalized {} blocks up to height {}", count, height);
-        }
-
-        Ok(count)
     }
 }

@@ -1,112 +1,95 @@
-//! Search handler
-
-use crate::{error::AppError, state::AppState, ApiResult};
+use crate::{state::AppState, ApiResult};
 use axum::{
     extract::{Query, State},
     Json,
 };
-use randscan_core::{SearchQuery, SearchResult, SearchResultType};
+use randscan_core::{
+    classify_query, format_units, QueryKind, SearchQuery, SearchResult, SearchResultType,
+};
 use randscan_db as db;
 
 /// GET /api/v1/search?q=
 pub async fn search(
     State(state): State<AppState>,
-    Query(query): Query<SearchQuery>,
+    Query(q): Query<SearchQuery>,
 ) -> ApiResult<Json<Vec<SearchResult>>> {
-    let q = query.q.trim();
-    let limit = query.limit.unwrap_or(10) as i64;
-
-    if q.is_empty() {
-        return Ok(Json(Vec::new()));
-    }
-
+    let pool = state.db.inner();
     let mut results = Vec::new();
 
-    // Check if it looks like a block height
-    if let Ok(height) = q.parse::<i64>() {
-        if let Ok(block) = db::get_block_by_height(state.db.inner(), height).await {
-            results.push(SearchResult {
-                result_type: SearchResultType::Block,
-                id: block.block_id.clone(),
-                title: format!("Block #{}", block.height),
-                subtitle: Some(format!("{} transactions", block.transaction_count)),
-                url: format!("/block/{}", block.height),
-            });
+    match classify_query(&q.q) {
+        QueryKind::Height(h) => {
+            if let Some(b) = db::get_block_by_height(pool, h).await? {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Block,
+                    id: b.height.to_string(),
+                    title: format!("Block #{}", b.height),
+                    subtitle: Some(format!("{} transactions", b.tx_count)),
+                    url: format!("/blocks/{}", b.height),
+                });
+            }
         }
-    }
-
-    // Search blocks by ID
-    if results.is_empty() || q.len() >= 8 {
-        if let Ok(block) = db::get_block_by_id(state.db.inner(), q).await {
-            results.push(SearchResult {
-                result_type: SearchResultType::Block,
-                id: block.block_id.clone(),
-                title: format!("Block #{}", block.height),
-                subtitle: Some(format!("{} transactions", block.transaction_count)),
-                url: format!("/block/{}", block.height),
-            });
+        QueryKind::Hash(h) => {
+            if let Some(b) = db::get_block_by_hash(pool, &h).await? {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Block,
+                    id: b.hash.clone(),
+                    title: format!("Block #{}", b.height),
+                    subtitle: Some(b.hash),
+                    url: format!("/blocks/{}", b.height),
+                });
+            }
+            if let Some(t) = db::get_transaction(pool, &h).await? {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Transaction,
+                    id: t.hash.clone(),
+                    title: format!("{} transaction", t.kind),
+                    subtitle: Some(format!("block #{}", t.height)),
+                    url: format!("/transactions/{}", t.hash),
+                });
+            }
+            if let Some(p) = db::get_program(pool, &h).await? {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Program,
+                    id: p.id.clone(),
+                    title: "Program".into(),
+                    subtitle: Some(format!(
+                        "deployed at #{} by {}",
+                        p.deployed_at_height, p.deployer
+                    )),
+                    url: format!("/programs/{}", p.id),
+                });
+            }
         }
+        QueryKind::Address(a) => {
+            let mut found = db::get_account(pool, &a).await?.map(|r| r.balance);
+            if found.is_none() {
+                if let Ok(acc) = state.indexer.rpc().account(&a).await {
+                    if acc.balance != "0" || acc.nonce != 0 {
+                        found = Some(acc.balance);
+                    }
+                }
+            }
+            if let Some(balance) = found {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Account,
+                    id: a.clone(),
+                    title: "Account".into(),
+                    subtitle: Some(format!("{} SHRUGG", format_units(&balance))),
+                    url: format!("/account/{}", a),
+                });
+            }
+            if let Some(v) = db::get_validator(pool, &a).await? {
+                results.push(SearchResult {
+                    result_type: SearchResultType::Validator,
+                    id: a.clone(),
+                    title: "Validator".into(),
+                    subtitle: Some(format!("stake {}", v.stake)),
+                    url: format!("/validators/{}", a),
+                });
+            }
+        }
+        QueryKind::Unknown => {}
     }
-
-    // Search transactions
-    let txs = db::search_transactions(state.db.inner(), q, limit).await?;
-    for tx in txs {
-        results.push(SearchResult {
-            result_type: SearchResultType::Transaction,
-            id: tx.tx_id.clone(),
-            title: format!("Transaction {}", &tx.tx_id[..16.min(tx.tx_id.len())]),
-            subtitle: Some(format!("{} - {}", tx.payload_type, tx.status)),
-            url: format!("/tx/{}", tx.tx_id),
-        });
-    }
-
-    // Search accounts
-    let accounts = db::search_accounts(state.db.inner(), q, limit).await?;
-    for account in accounts {
-        results.push(SearchResult {
-            result_type: SearchResultType::Account,
-            id: account.address.clone(),
-            title: format!(
-                "Account {}",
-                &account.address[..16.min(account.address.len())]
-            ),
-            subtitle: Some(format!("{} transactions", account.tx_count)),
-            url: format!("/account/{}", account.address),
-        });
-    }
-
-    // Search validators
-    let validators = db::search_validators(state.db.inner(), q, limit).await?;
-    for validator in validators {
-        results.push(SearchResult {
-            result_type: SearchResultType::Validator,
-            id: validator.validator_id.clone(),
-            title: format!(
-                "Validator {}",
-                &validator.validator_id[..16.min(validator.validator_id.len())]
-            ),
-            subtitle: Some(format!(
-                "{} ATLAS staked",
-                validator.stake / 1_000_000_000
-            )),
-            url: format!("/validator/{}", validator.validator_id),
-        });
-    }
-
-    // Search tokens
-    let tokens = db::search_tokens(state.db.inner(), q, limit).await?;
-    for token in tokens {
-        results.push(SearchResult {
-            result_type: SearchResultType::Token,
-            id: token.mint_address.clone(),
-            title: format!("{} ({})", token.name, token.symbol),
-            subtitle: Some(format!("{} holders", token.holder_count)),
-            url: format!("/token/{}", token.mint_address),
-        });
-    }
-
-    // Limit total results
-    results.truncate(limit as usize);
 
     Ok(Json(results))
 }

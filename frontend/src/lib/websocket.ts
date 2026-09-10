@@ -1,241 +1,278 @@
 import type {
+  BlockSummary,
+  ClientMessage,
+  NetworkStats,
+  ServerMessage,
+  TransactionSummary,
   WebSocketChannel,
-  WebSocketMessage,
-  WebSocketBlockUpdate,
-  WebSocketTransactionUpdate,
-  WebSocketStatsUpdate,
 } from '@/types';
 
-type MessageHandler = (data: unknown) => void;
-type ConnectionHandler = () => void;
-type ErrorHandler = (error: Event) => void;
+type BlockHandler = (block: BlockSummary) => void;
+type TransactionHandler = (tx: TransactionSummary) => void;
+type StatsHandler = (stats: NetworkStats) => void;
+type StatusHandler = (connected: boolean) => void;
 
-interface Subscription {
-  channel: WebSocketChannel;
-  params?: Record<string, string>;
-  handler: MessageHandler;
+/**
+ * Resolve the WebSocket endpoint. `NEXT_PUBLIC_WS_URL` wins when set; otherwise
+ * the URL is derived from the page origin (`ws://host/ws` / `wss://host/ws`).
+ */
+export function resolveWebSocketUrl(): string | null {
+  const configured = process.env.NEXT_PUBLIC_WS_URL;
+  if (configured && configured.trim() !== '') {
+    const base = configured.trim().replace(/\/+$/, '');
+    return base.endsWith('/ws') ? base : `${base}/ws`;
+  }
+
+  if (typeof window === 'undefined') return null;
+
+  const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+  return `${protocol}//${window.location.host}/ws`;
 }
 
-class WebSocketClient {
+const CHANNELS: WebSocketChannel[] = ['blocks', 'transactions', 'stats'];
+
+const INITIAL_RECONNECT_DELAY_MS = 1000;
+const MAX_RECONNECT_DELAY_MS = 30_000;
+const PING_INTERVAL_MS = 30_000;
+
+/**
+ * Single shared connection to `/ws`. Subscribers register per channel; the
+ * client subscribes on the wire when the first listener for a channel appears
+ * and unsubscribes when the last one goes away.
+ */
+class RandScanWebSocket {
   private ws: WebSocket | null = null;
-  private url: string;
-  private subscriptions: Map<string, Subscription> = new Map();
+  private connected = false;
+  private closedByUser = false;
   private reconnectAttempts = 0;
-  private maxReconnectAttempts = 5;
-  private reconnectDelay = 1000;
-  private isConnecting = false;
-  private onConnectHandlers: Set<ConnectionHandler> = new Set();
-  private onDisconnectHandlers: Set<ConnectionHandler> = new Set();
-  private onErrorHandlers: Set<ErrorHandler> = new Set();
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private pingTimer: ReturnType<typeof setInterval> | null = null;
 
-  constructor(url?: string) {
-    const wsUrl = url || process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:3000';
-    this.url = `${wsUrl}/ws`;
+  private blockHandlers = new Set<BlockHandler>();
+  private transactionHandlers = new Set<TransactionHandler>();
+  private statsHandlers = new Set<StatsHandler>();
+  private statusHandlers = new Set<StatusHandler>();
+
+  get isConnected(): boolean {
+    return this.connected;
   }
 
-  private getSubscriptionKey(channel: WebSocketChannel, params?: Record<string, string>): string {
-    if (!params || Object.keys(params).length === 0) {
-      return channel;
-    }
-    const sortedParams = Object.entries(params)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([k, v]) => `${k}=${v}`)
-      .join('&');
-    return `${channel}:${sortedParams}`;
-  }
+  // -- connection ----------------------------------------------------------
 
-  connect(): Promise<void> {
-    return new Promise((resolve, reject) => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
-        resolve();
-        return;
-      }
-
-      if (this.isConnecting) {
-        const checkConnection = setInterval(() => {
-          if (this.ws?.readyState === WebSocket.OPEN) {
-            clearInterval(checkConnection);
-            resolve();
-          }
-        }, 100);
-        return;
-      }
-
-      this.isConnecting = true;
-
-      try {
-        this.ws = new WebSocket(this.url);
-
-        this.ws.onopen = () => {
-          this.isConnecting = false;
-          this.reconnectAttempts = 0;
-          this.onConnectHandlers.forEach(handler => handler());
-
-          // Resubscribe to all channels
-          this.subscriptions.forEach(sub => {
-            this.sendSubscribe(sub.channel, sub.params);
-          });
-
-          resolve();
-        };
-
-        this.ws.onclose = () => {
-          this.isConnecting = false;
-          this.onDisconnectHandlers.forEach(handler => handler());
-          this.handleReconnect();
-        };
-
-        this.ws.onerror = (error) => {
-          this.isConnecting = false;
-          this.onErrorHandlers.forEach(handler => handler(error));
-          reject(error);
-        };
-
-        this.ws.onmessage = (event) => {
-          this.handleMessage(event.data);
-        };
-      } catch (error) {
-        this.isConnecting = false;
-        reject(error);
-      }
-    });
-  }
-
-  private handleMessage(data: string): void {
-    try {
-      const message: WebSocketMessage = JSON.parse(data);
-      const key = this.getSubscriptionKey(message.channel, message.params as Record<string, string>);
-      const subscription = this.subscriptions.get(key);
-
-      if (subscription && message.action === 'update') {
-        subscription.handler(message.data);
-      }
-    } catch (error) {
-      console.error('Failed to parse WebSocket message:', error);
-    }
-  }
-
-  private handleReconnect(): void {
-    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('Max reconnection attempts reached');
+  connect(): void {
+    if (typeof window === 'undefined') return;
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
       return;
     }
 
-    this.reconnectAttempts++;
-    const delay = this.reconnectDelay * Math.pow(2, this.reconnectAttempts - 1);
+    const url = resolveWebSocketUrl();
+    if (!url) return;
 
-    setTimeout(() => {
-      this.connect().catch(console.error);
-    }, delay);
-  }
+    this.closedByUser = false;
 
-  private sendSubscribe(channel: WebSocketChannel, params?: Record<string, string>): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const message: WebSocketMessage = {
-        channel,
-        action: 'subscribe',
-        params,
-      };
-      this.ws.send(JSON.stringify(message));
-    }
-  }
-
-  private sendUnsubscribe(channel: WebSocketChannel, params?: Record<string, string>): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      const message: WebSocketMessage = {
-        channel,
-        action: 'unsubscribe',
-        params,
-      };
-      this.ws.send(JSON.stringify(message));
-    }
-  }
-
-  subscribe(
-    channel: WebSocketChannel,
-    handler: MessageHandler,
-    params?: Record<string, string>
-  ): () => void {
-    const key = this.getSubscriptionKey(channel, params);
-
-    this.subscriptions.set(key, { channel, params, handler });
-
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      this.sendSubscribe(channel, params);
-    } else {
-      this.connect().catch(console.error);
+    let socket: WebSocket;
+    try {
+      socket = new WebSocket(url);
+    } catch {
+      this.scheduleReconnect();
+      return;
     }
 
-    // Return unsubscribe function
-    return () => {
-      this.subscriptions.delete(key);
-      this.sendUnsubscribe(channel, params);
+    this.ws = socket;
+
+    socket.onopen = () => {
+      this.connected = true;
+      this.reconnectAttempts = 0;
+      this.emitStatus(true);
+      for (const channel of CHANNELS) {
+        if (this.hasListeners(channel)) this.send({ type: 'subscribe', channel });
+      }
+      this.startPing();
+    };
+
+    socket.onmessage = (event: MessageEvent) => {
+      this.handleMessage(event.data);
+    };
+
+    socket.onerror = () => {
+      // `onclose` always follows; reconnect is handled there.
+    };
+
+    socket.onclose = () => {
+      this.connected = false;
+      this.stopPing();
+      this.emitStatus(false);
+      if (this.ws === socket) this.ws = null;
+      if (!this.closedByUser) this.scheduleReconnect();
     };
   }
 
-  // Convenience methods for typed subscriptions
-  subscribeToBlocks(handler: (block: WebSocketBlockUpdate) => void): () => void {
-    return this.subscribe('blocks', handler as MessageHandler);
-  }
-
-  subscribeToTransactions(handler: (tx: WebSocketTransactionUpdate) => void): () => void {
-    return this.subscribe('transactions', handler as MessageHandler);
-  }
-
-  subscribeToStats(handler: (stats: WebSocketStatsUpdate) => void): () => void {
-    return this.subscribe('stats', handler as MessageHandler);
-  }
-
-  subscribeToAccount(
-    address: string,
-    handler: MessageHandler
-  ): () => void {
-    return this.subscribe('account', handler, { address });
-  }
-
-  subscribeToValidator(
-    identity: string,
-    handler: MessageHandler
-  ): () => void {
-    return this.subscribe('validator', handler, { identity });
-  }
-
-  onConnect(handler: ConnectionHandler): () => void {
-    this.onConnectHandlers.add(handler);
-    return () => this.onConnectHandlers.delete(handler);
-  }
-
-  onDisconnect(handler: ConnectionHandler): () => void {
-    this.onDisconnectHandlers.add(handler);
-    return () => this.onDisconnectHandlers.delete(handler);
-  }
-
-  onError(handler: ErrorHandler): () => void {
-    this.onErrorHandlers.add(handler);
-    return () => this.onErrorHandlers.delete(handler);
-  }
-
   disconnect(): void {
+    this.closedByUser = true;
+    this.clearReconnect();
+    this.stopPing();
     if (this.ws) {
-      this.ws.close();
+      this.ws.onopen = null;
+      this.ws.onmessage = null;
+      this.ws.onerror = null;
+      this.ws.onclose = null;
+      try {
+        this.ws.close();
+      } catch {
+        // Already closing.
+      }
       this.ws = null;
     }
-    this.subscriptions.clear();
+    this.connected = false;
+    this.emitStatus(false);
   }
 
-  get isConnected(): boolean {
-    return this.ws?.readyState === WebSocket.OPEN;
+  private scheduleReconnect(): void {
+    if (this.closedByUser || this.reconnectTimer) return;
+
+    const delay = Math.min(
+      INITIAL_RECONNECT_DELAY_MS * 2 ** this.reconnectAttempts,
+      MAX_RECONNECT_DELAY_MS
+    );
+    this.reconnectAttempts += 1;
+
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectTimer = null;
+      this.connect();
+    }, delay);
+  }
+
+  private clearReconnect(): void {
+    if (this.reconnectTimer) {
+      clearTimeout(this.reconnectTimer);
+      this.reconnectTimer = null;
+    }
+    this.reconnectAttempts = 0;
+  }
+
+  private startPing(): void {
+    this.stopPing();
+    this.pingTimer = setInterval(() => {
+      this.send({ type: 'ping' });
+    }, PING_INTERVAL_MS);
+  }
+
+  private stopPing(): void {
+    if (this.pingTimer) {
+      clearInterval(this.pingTimer);
+      this.pingTimer = null;
+    }
+  }
+
+  private send(message: ClientMessage): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(message));
+    }
+  }
+
+  // -- messages ------------------------------------------------------------
+
+  private handleMessage(raw: unknown): void {
+    if (typeof raw !== 'string') return;
+
+    let message: ServerMessage;
+    try {
+      message = JSON.parse(raw) as ServerMessage;
+    } catch {
+      return;
+    }
+
+    switch (message.type) {
+      case 'new_block':
+        if (message.block) {
+          this.blockHandlers.forEach((handler) => handler(message.block));
+        }
+        break;
+      case 'new_transaction':
+        if (message.transaction) {
+          this.transactionHandlers.forEach((handler) => handler(message.transaction));
+        }
+        break;
+      case 'stats_update':
+        if (message.stats) {
+          this.statsHandlers.forEach((handler) => handler(message.stats));
+        }
+        break;
+      case 'subscribed':
+      case 'unsubscribed':
+      case 'pong':
+        break;
+      case 'error':
+        if (process.env.NODE_ENV !== 'production') {
+          console.warn('[ws] server error:', message.message ?? message.error);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+
+  // -- subscriptions -------------------------------------------------------
+
+  private hasListeners(channel: WebSocketChannel): boolean {
+    switch (channel) {
+      case 'blocks':
+        return this.blockHandlers.size > 0;
+      case 'transactions':
+        return this.transactionHandlers.size > 0;
+      case 'stats':
+        return this.statsHandlers.size > 0;
+      default:
+        return false;
+    }
+  }
+
+  private register<T>(
+    channel: WebSocketChannel,
+    set: Set<T>,
+    handler: T
+  ): () => void {
+    const wasEmpty = set.size === 0;
+    set.add(handler);
+
+    this.connect();
+    if (wasEmpty) this.send({ type: 'subscribe', channel });
+
+    return () => {
+      set.delete(handler);
+      if (set.size === 0) this.send({ type: 'unsubscribe', channel });
+    };
+  }
+
+  onBlock(handler: BlockHandler): () => void {
+    return this.register('blocks', this.blockHandlers, handler);
+  }
+
+  onTransaction(handler: TransactionHandler): () => void {
+    return this.register('transactions', this.transactionHandlers, handler);
+  }
+
+  onStats(handler: StatsHandler): () => void {
+    return this.register('stats', this.statsHandlers, handler);
+  }
+
+  onStatusChange(handler: StatusHandler): () => void {
+    this.statusHandlers.add(handler);
+    return () => {
+      this.statusHandlers.delete(handler);
+    };
+  }
+
+  private emitStatus(connected: boolean): void {
+    this.statusHandlers.forEach((handler) => handler(connected));
   }
 }
 
-// Singleton instance
-let wsClient: WebSocketClient | null = null;
+let client: RandScanWebSocket | null = null;
 
-export function getWebSocketClient(): WebSocketClient {
-  if (!wsClient) {
-    wsClient = new WebSocketClient();
-  }
-  return wsClient;
+export function getWebSocketClient(): RandScanWebSocket {
+  if (!client) client = new RandScanWebSocket();
+  return client;
 }
 
-export { WebSocketClient };
+export { RandScanWebSocket };

@@ -1,4 +1,4 @@
-//! RandScan API Server
+//! RandScan API server: runs the indexer and serves the REST + WebSocket API.
 
 use anyhow::Result;
 use randscan_api::{create_router, ApiConfig, AppState};
@@ -6,80 +6,55 @@ use randscan_db::{create_pool, run_migrations, DatabaseConfig, DbPool};
 use randscan_indexer::{Broadcaster, IndexerConfig, IndexerService};
 use randscan_ws::WsManager;
 use std::sync::Arc;
-use tracing::{info, Level};
-use tracing_subscriber::FmtSubscriber;
+use tracing::info;
+use tracing_subscriber::EnvFilter;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Initialize logging
-    let subscriber = FmtSubscriber::builder()
-        .with_max_level(Level::INFO)
-        .with_target(true)
-        .with_file(true)
-        .with_line_number(true)
-        .finish();
-    tracing::subscriber::set_global_default(subscriber)?;
-
-    info!("Starting RandScan API Server...");
-
-    // Load environment variables
     dotenvy::dotenv().ok();
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info")),
+        )
+        .with_target(false)
+        .init();
 
-    // Initialize database
+    info!("RandScan API {} starting", env!("CARGO_PKG_VERSION"));
+
     let db_config = DatabaseConfig::from_env();
-    info!("Connecting to database: {}", db_config.url);
-
     let pool = create_pool(&db_config).await?;
-    info!("Database connected");
-
-    // Run migrations
-    info!("Running database migrations...");
     run_migrations(&pool).await?;
-    info!("Migrations complete");
-
     let db_pool = DbPool::new(pool);
 
-    // Create broadcaster for real-time updates
     let broadcaster = Broadcaster::new();
-
-    // Create WebSocket manager
     let ws_manager = Arc::new(WsManager::new());
-
-    // Start broadcast listener
-    let ws_manager_clone = ws_manager.clone();
-    let broadcast_receiver = broadcaster.subscribe();
-    ws_manager_clone
-        .start_broadcast_listener(broadcast_receiver)
+    ws_manager
+        .clone()
+        .start_broadcast_listener(broadcaster.subscribe())
         .await;
 
-    // Create indexer service
-    let indexer_config = IndexerConfig::from_env();
     let indexer = Arc::new(IndexerService::new(
-        indexer_config,
+        IndexerConfig::from_env(),
         db_pool.clone(),
-        Some(broadcaster),
+        broadcaster,
     ));
-
-    // Start indexer in background
-    let indexer_clone = indexer.clone();
+    let indexer_task = indexer.clone();
     tokio::spawn(async move {
-        if let Err(e) = indexer_clone.run().await {
-            tracing::error!("Indexer error: {}", e);
+        if let Err(e) = indexer_task.run().await {
+            tracing::error!("indexer stopped: {:#}", e);
         }
     });
 
-    // Create application state
-    let state = AppState::new(db_pool, Some(indexer), ws_manager);
-
-    // Create router
+    let state = AppState {
+        db: db_pool,
+        indexer,
+        ws_manager,
+    };
     let app = create_router(state);
 
-    // Start server
     let api_config = ApiConfig::from_env();
-    info!("Starting API server on {}", api_config.listen_addr);
-
+    info!("listening on {}", api_config.listen_addr);
     let listener = tokio::net::TcpListener::bind(api_config.listen_addr).await?;
     axum::serve(listener, app).await?;
-
     Ok(())
 }

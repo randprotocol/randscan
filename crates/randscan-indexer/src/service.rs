@@ -1,42 +1,46 @@
-//! Indexer service - main sync loop
+//! Sync loop: follow the node head, index new blocks, refresh validators and stats.
 
-use crate::{BlockProcessor, Broadcaster, IndexerConfig, RpcClient};
-use randscan_core::NetworkStats;
-use randscan_db::{self as db, DbPool};
+use crate::{BlockProcessor, Broadcaster, IndexerConfig, NodeTracker, RpcClient};
 use anyhow::Result;
+use randscan_core::NetworkStats;
+use randscan_core::NodeInfo;
+use randscan_db::{self as db, DbPool, StatsUpdate};
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
-use tracing::{error, info, warn, debug};
+use tracing::{error, info, warn};
 
-/// Indexer state
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct IndexerState {
-    pub current_height: u64,
-    pub node_height: u64,
+    /// Highest indexed height (-1 if nothing indexed).
+    pub current_height: i64,
+    pub node_height: i64,
     pub is_syncing: bool,
     pub is_connected: bool,
 }
 
-/// Main indexer service
 pub struct IndexerService {
     config: IndexerConfig,
     rpc: RpcClient,
     processor: BlockProcessor,
     pool: DbPool,
-    broadcaster: Option<Broadcaster>,
+    broadcaster: Broadcaster,
     state: Arc<RwLock<IndexerState>>,
+    chain: RwLock<Option<(i64, String, i16)>>,
+    last_stats: RwLock<Option<Instant>>,
+    nodes: Arc<NodeTracker>,
 }
 
 impl IndexerService {
-    pub fn new(
-        config: IndexerConfig,
-        pool: DbPool,
-        broadcaster: Option<Broadcaster>,
-    ) -> Self {
+    pub fn new(config: IndexerConfig, pool: DbPool, broadcaster: Broadcaster) -> Self {
         let rpc = RpcClient::new(&config.rpc_url);
-        let processor = BlockProcessor::new(pool.clone(), broadcaster.clone());
-
+        let processor = BlockProcessor::new(pool.clone(), rpc.clone());
+        let nodes = Arc::new(NodeTracker::new(
+            rpc.clone(),
+            pool.clone(),
+            config.nodes_interval,
+        ));
         Self {
             config,
             rpc,
@@ -44,240 +48,237 @@ impl IndexerService {
             pool,
             broadcaster,
             state: Arc::new(RwLock::new(IndexerState {
-                current_height: 0,
-                node_height: 0,
-                is_syncing: false,
-                is_connected: false,
+                current_height: -1,
+                ..Default::default()
             })),
+            chain: RwLock::new(None),
+            last_stats: RwLock::new(None),
+            nodes,
         }
     }
 
-    /// Get current indexer state
+    pub fn rpc(&self) -> &RpcClient {
+        &self.rpc
+    }
+
+    /// Current view of this node and its peers (nodes map).
+    pub async fn nodes(&self) -> Vec<NodeInfo> {
+        self.nodes.nodes().await
+    }
+
     pub async fn get_state(&self) -> IndexerState {
         self.state.read().await.clone()
     }
 
-    /// Start the indexer service
     pub async fn run(&self) -> Result<()> {
-        info!("Starting indexer service...");
+        info!("indexer starting against {}", self.config.rpc_url);
+        let st = db::get_indexer_state(self.pool.inner()).await?;
+        self.state.write().await.current_height = st.next_height - 1;
+        info!("resuming from height {}", st.next_height);
 
-        // Initialize native tokens
-        db::initialize_native_tokens(self.pool.inner()).await?;
+        let tracker = self.nodes.clone();
+        tokio::spawn(async move { tracker.run().await });
 
-        // Get last indexed height from database
-        let last_height = db::get_last_indexed_height(self.pool.inner()).await?;
-
-        {
-            let mut state = self.state.write().await;
-            state.current_height = last_height as u64;
-        }
-
-        info!("Resuming from height {}", last_height);
-
-        // Main sync loop
         loop {
-            if let Err(e) = self.sync_loop().await {
-                error!("Sync loop error: {}", e);
-                sleep(Duration::from_secs(5)).await;
-            }
-        }
-    }
-
-    /// Main synchronization loop
-    async fn sync_loop(&self) -> Result<()> {
-        // Check connection
-        let connected = self.rpc.is_connected().await;
-        {
-            let mut state = self.state.write().await;
-            state.is_connected = connected;
-        }
-
-        if !connected {
-            warn!("Cannot connect to RPC node at {}", self.config.rpc_url);
-            sleep(Duration::from_secs(5)).await;
-            return Ok(());
-        }
-
-        // Get current node height
-        let node_height = self.rpc.get_block_height().await?;
-        let current_height = {
-            let state = self.state.read().await;
-            state.current_height
-        };
-
-        {
-            let mut state = self.state.write().await;
-            state.node_height = node_height;
-        }
-
-        // Check if we need to sync
-        if current_height >= node_height {
-            // Up to date, just poll for new blocks
-            sleep(self.config.poll_interval).await;
-            return Ok(());
-        }
-
-        // Calculate how many blocks to sync
-        let blocks_behind = node_height - current_height;
-        let is_initial_sync = blocks_behind > self.config.batch_size;
-
-        {
-            let mut state = self.state.write().await;
-            state.is_syncing = is_initial_sync;
-        }
-
-        if is_initial_sync {
-            info!(
-                "Initial sync: {} blocks behind (height {} -> {})",
-                blocks_behind, current_height, node_height
-            );
-            db::set_syncing(self.pool.inner(), true).await?;
-        }
-
-        // Sync blocks in batches
-        let batch_end = (current_height + self.config.batch_size).min(node_height);
-
-        for height in (current_height + 1)..=batch_end {
-            match self.rpc.get_block(height).await {
-                Ok(block) => {
-                    self.processor.process_block(block).await?;
-
-                    // Update checkpoint
-                    db::update_last_indexed(
-                        self.pool.inner(),
-                        height as i64,
-                        "",
-                    ).await?;
-
-                    {
-                        let mut state = self.state.write().await;
-                        state.current_height = height;
+            match self.sync_once().await {
+                Ok(idle) => {
+                    if idle {
+                        sleep(self.config.poll_interval).await;
                     }
                 }
                 Err(e) => {
-                    warn!("Failed to fetch block {}: {}", height, e);
-                    // Skip and continue
+                    error!("sync error: {:#}", e);
+                    self.state.write().await.is_connected = false;
+                    sleep(Duration::from_secs(3)).await;
+                }
+            }
+        }
+    }
+
+    /// One pass. Returns true when caught up (caller sleeps).
+    async fn sync_once(&self) -> Result<bool> {
+        let head = self.rpc.head().await?;
+        let node_height = head.height as i64;
+        {
+            let mut s = self.state.write().await;
+            s.is_connected = true;
+            s.node_height = node_height;
+        }
+
+        let next = db::get_indexer_state(self.pool.inner()).await?.next_height;
+        let behind = node_height - next + 1;
+        let catching_up = behind > 5;
+        {
+            let mut s = self.state.write().await;
+            if s.is_syncing != catching_up {
+                s.is_syncing = catching_up;
+                let _ = db::set_syncing(self.pool.inner(), catching_up).await;
+                if catching_up {
+                    info!(
+                        "catching up: {} blocks behind ({} -> {})",
+                        behind, next, node_height
+                    );
+                }
+            }
+        }
+        if next > node_height {
+            self.maybe_refresh_stats(false).await;
+            return Ok(true);
+        }
+
+        let end = (next + self.config.batch_size as i64 - 1).min(node_height);
+        let mut h = next;
+        while h <= end {
+            let block = match self.rpc.block_by_height(h as u64).await? {
+                Some(b) => b,
+                None => {
+                    warn!("block {} not served yet", h);
+                    return Ok(true);
+                }
+            };
+
+            if h > 0 {
+                let stored = db::get_block_hash_at(self.pool.inner(), h - 1).await?;
+                match stored {
+                    Some(ref parent) if parent == &block.parent => {}
+                    Some(parent) => {
+                        warn!(
+                            "parent mismatch at {}: stored {} vs node {}",
+                            h, parent, block.parent
+                        );
+                        self.processor.rewind_to(h - 1).await?;
+                        return Ok(false);
+                    }
+                    None => {
+                        warn!("missing block {} in database; rewinding", h - 1);
+                        self.processor.rewind_to(h - 1).await?;
+                        return Ok(false);
+                    }
                 }
             }
 
-            // Log progress during initial sync
-            if is_initial_sync && height % 100 == 0 {
-                info!("Synced to height {} / {}", height, node_height);
+            let processed = self.processor.process_block(block).await?;
+            self.state.write().await.current_height = h;
+            self.broadcaster.block(processed.block);
+            for tx in processed.transactions {
+                self.broadcaster.transaction(tx);
+            }
+            if catching_up && h % 500 == 0 {
+                info!("indexed height {} / {}", h, node_height);
+            }
+            h += 1;
+        }
+
+        if end >= node_height {
+            if catching_up {
+                info!("caught up at height {}", node_height);
+            }
+            self.maybe_refresh_stats(true).await;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    async fn maybe_refresh_stats(&self, force: bool) {
+        let due = {
+            let last = self.last_stats.read().await;
+            force
+                || last
+                    .map(|t| t.elapsed() >= self.config.stats_interval)
+                    .unwrap_or(true)
+        };
+        if !due {
+            return;
+        }
+        *self.last_stats.write().await = Some(Instant::now());
+        if let Err(e) = self.refresh_validators().await {
+            warn!("validator refresh failed: {:#}", e);
+        }
+        match self.refresh_stats().await {
+            Ok(stats) => self.broadcaster.stats(stats),
+            Err(e) => warn!("stats refresh failed: {:#}", e),
+        }
+    }
+
+    async fn refresh_validators(&self) -> Result<()> {
+        let set = self.rpc.validators().await?;
+        let pairs: Vec<(String, String)> = set
+            .iter()
+            .map(|v| (v.address.clone(), v.stake.clone()))
+            .collect();
+        let mut conn = self.pool.inner().acquire().await?;
+        db::replace_validators(&mut conn, &pairs).await?;
+        drop(conn);
+        // Genesis allocations are not transactions: make sure validator accounts exist.
+        for v in &set {
+            if db::get_account(self.pool.inner(), &v.address)
+                .await?
+                .is_none()
+            {
+                self.processor.refresh_account(&v.address, 0).await;
             }
         }
-
-        // Mark finalized blocks
-        if node_height > self.config.finality_depth {
-            let finalize_height = node_height - self.config.finality_depth;
-            self.processor.finalize_blocks(finalize_height).await?;
-            db::update_last_finalized(self.pool.inner(), finalize_height as i64).await?;
-        }
-
-        // Update network stats periodically
-        if !is_initial_sync {
-            self.update_stats().await?;
-        }
-
-        if is_initial_sync && batch_end >= node_height {
-            info!("Initial sync complete!");
-            db::set_syncing(self.pool.inner(), false).await?;
-        }
-
         Ok(())
     }
 
-    /// Update network statistics
-    async fn update_stats(&self) -> Result<()> {
-        let db = self.pool.inner();
+    async fn chain_info(&self) -> Result<(i64, String, i16)> {
+        if let Some(c) = self.chain.read().await.clone() {
+            return Ok(c);
+        }
+        let id = self.rpc.chain_id().await? as i64;
+        let token = self.rpc.token_info().await?;
+        let c = (id, token.symbol, token.decimals as i16);
+        *self.chain.write().await = Some(c.clone());
+        Ok(c)
+    }
 
-        // Get counts
-        let block_height = db::get_last_indexed_height(db).await?;
-        let total_transactions = db::count_transactions(db, None, None, None, None).await?;
-        let total_accounts = db::count_accounts(db).await?;
-        let total_validators = db::count_validators(db, None).await?;
-        let active_validators = db::count_validators(db, Some(true)).await?;
-        let total_staked = db::get_total_staked(db).await?;
-
-        // Get token supplies from RPC
-        let (atlas_supply, shrug_supply, shrug_burned) = match (
-            self.rpc.get_token_supply("ATLAS").await,
-            self.rpc.get_token_supply("SHRUG").await,
-        ) {
-            (Ok(atlas), Ok(shrug)) => (
-                atlas.total_supply as i64,
-                shrug.total_supply as i64,
-                shrug.burned as i64,
-            ),
-            _ => (0, 0, 0),
+    async fn refresh_stats(&self) -> Result<NetworkStats> {
+        let pool = self.pool.inner();
+        let status = self.rpc.status().await?;
+        let (chain_id, symbol, decimals) = self.chain_info().await?;
+        let height = db::max_block_height(pool).await?.unwrap_or(-1).max(0);
+        let total_transactions = db::count_transactions(pool, None, None, None).await?;
+        let total_accounts = db::count_accounts(pool).await?;
+        let validators = db::list_validators(pool).await?;
+        let validator_count = validators.len() as i64;
+        let total_stake = db::total_stake(pool).await?;
+        let total_supply = db::total_supply(pool).await?;
+        let program_count = db::count_programs(pool).await?;
+        let avg_block_time_ms = db::avg_block_time_ms(pool, 100).await?;
+        let current_leader = if validators.is_empty() {
+            None
+        } else {
+            validators
+                .get((status.view % validators.len() as u64) as usize)
+                .map(|v| v.address.clone())
         };
-
-        // Get epoch info
-        let current_epoch = match self.rpc.get_epoch_info().await {
-            Ok(info) => info.epoch as i64,
-            Err(_) => 0,
-        };
-
-        // Calculate TPS (simplified - last 10 blocks)
-        let tps_current = 0.0; // Would need to calculate from recent blocks
 
         db::update_network_stats(
-            db,
-            block_height,
-            total_transactions,
-            total_accounts,
-            total_validators,
-            active_validators,
-            atlas_supply,
-            total_staked,
-            shrug_supply,
-            shrug_burned,
-            0.0, // avg_block_time
-            tps_current,
-            tps_current,
-            current_epoch,
+            pool,
+            &StatsUpdate {
+                chain_id,
+                symbol: &symbol,
+                decimals,
+                height,
+                view: status.view as i64,
+                total_transactions,
+                total_accounts,
+                validator_count,
+                total_stake: &total_stake,
+                total_supply: &total_supply,
+                program_count,
+                avg_block_time_ms,
+                peer_count: status.peer_count as i32,
+                mempool_size: status.mempool_size as i32,
+                node_syncing: status.syncing,
+                faucet: status.faucet,
+                confidential: status.confidential,
+                current_leader: current_leader.as_deref(),
+            },
         )
         .await?;
 
-        // Broadcast stats update
-        if let Some(ref broadcaster) = self.broadcaster {
-            let stats = NetworkStats {
-                block_height,
-                total_transactions,
-                total_accounts,
-                total_validators,
-                active_validators,
-                atlas_total_supply: atlas_supply,
-                atlas_staked: total_staked,
-                shrug_total_supply: shrug_supply,
-                shrug_burned,
-                avg_block_time: 0.0,
-                tps_current,
-                tps_peak: 0.0,
-                current_epoch,
-                updated_at: chrono::Utc::now().timestamp_millis(),
-            };
-            broadcaster.broadcast_stats_update(stats);
-        }
-
-        debug!("Updated network stats");
-        Ok(())
-    }
-
-    /// Sync validators from node
-    pub async fn sync_validators(&self) -> Result<()> {
-        let validators = self.rpc.get_validators().await?;
-        let count = validators.len();
-
-        for val in validators {
-            self.processor.update_validator(&val).await?;
-        }
-
-        info!("Synced {} validators", count);
-        Ok(())
-    }
-
-    /// Get broadcaster reference
-    pub fn broadcaster(&self) -> Option<&Broadcaster> {
-        self.broadcaster.as_ref()
+        Ok(db::get_network_stats(pool).await?.into())
     }
 }

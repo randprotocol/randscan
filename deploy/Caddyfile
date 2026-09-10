@@ -1,0 +1,24 @@
+# RandScan: __DOMAIN__ is canonical; www and the .com mirror redirect to it.
+# API and WebSocket are served by randscan-api on :3000, pages by Next.js on :3001.
+
+__DOMAIN__ {
+	encode gzip zstd
+
+	@api path /api/* /ws
+	handle @api {
+		reverse_proxy 127.0.0.1:3000
+	}
+
+	handle {
+		reverse_proxy 127.0.0.1:3001
+	}
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+www.__DOMAIN__, randscan.com, www.randscan.com {
+	redir https://__DOMAIN__{uri} permanent
+}

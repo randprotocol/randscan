@@ -1,312 +1,125 @@
-//! Block queries
+use crate::{BlockRow, Result};
+use sqlx::{PgConnection, PgPool};
 
-use crate::{BlockRow, CountRow, DbError, QcRow, QcSignerRow, Result};
-use sqlx::PgPool;
+const COLS: &str = "hash, height, view, parent, proposer, timestamp_ms, tx_root, state_root, justify_view, tx_count";
 
-/// Insert a new block
-pub async fn insert_block(
-    pool: &PgPool,
-    block_id: &str,
-    height: i64,
-    view_number: i64,
-    epoch: i64,
-    parent_id: &str,
-    proposer_id: &str,
-    transactions_root: &str,
-    state_root: &str,
-    supply_commitment: &str,
-    timestamp: i64,
-    transaction_count: i32,
-    finalized: bool,
-) -> Result<()> {
+pub struct NewBlock<'a> {
+    pub hash: &'a str,
+    pub height: i64,
+    pub view: i64,
+    pub parent: &'a str,
+    pub proposer: &'a str,
+    pub timestamp_ms: i64,
+    pub tx_root: &'a str,
+    pub state_root: &'a str,
+    pub justify_view: i64,
+    pub tx_count: i32,
+}
+
+pub async fn insert_block(conn: &mut PgConnection, b: &NewBlock<'_>) -> Result<()> {
     sqlx::query(
-        r#"
-        INSERT INTO blocks (
-            block_id, height, view_number, epoch, parent_id, proposer_id,
-            transactions_root, state_root, supply_commitment, timestamp,
-            transaction_count, finalized
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        ON CONFLICT (block_id) DO UPDATE SET
-            finalized = EXCLUDED.finalized,
-            transaction_count = EXCLUDED.transaction_count
-        "#,
+        "INSERT INTO blocks (hash, height, view, parent, proposer, timestamp_ms, tx_root, state_root, justify_view, tx_count)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)",
     )
-    .bind(block_id)
-    .bind(height)
-    .bind(view_number)
-    .bind(epoch)
-    .bind(parent_id)
-    .bind(proposer_id)
-    .bind(transactions_root)
-    .bind(state_root)
-    .bind(supply_commitment)
-    .bind(timestamp)
-    .bind(transaction_count)
-    .bind(finalized)
-    .execute(pool)
+    .bind(b.hash)
+    .bind(b.height)
+    .bind(b.view)
+    .bind(b.parent)
+    .bind(b.proposer)
+    .bind(b.timestamp_ms)
+    .bind(b.tx_root)
+    .bind(b.state_root)
+    .bind(b.justify_view)
+    .bind(b.tx_count)
+    .execute(conn)
     .await?;
-
     Ok(())
 }
 
-/// Get block by ID
-pub async fn get_block_by_id(pool: &PgPool, block_id: &str) -> Result<BlockRow> {
-    sqlx::query_as::<_, BlockRow>(
-        "SELECT * FROM blocks WHERE block_id = $1",
-    )
-    .bind(block_id)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::NotFound(format!("Block {} not found", block_id)),
-        _ => e.into(),
-    })
+pub async fn get_block_by_height(pool: &PgPool, height: i64) -> Result<Option<BlockRow>> {
+    let sql = format!("SELECT {COLS} FROM blocks WHERE height = $1");
+    Ok(sqlx::query_as::<_, BlockRow>(&sql)
+        .bind(height)
+        .fetch_optional(pool)
+        .await?)
 }
 
-/// Get block by height
-pub async fn get_block_by_height(pool: &PgPool, height: i64) -> Result<BlockRow> {
-    sqlx::query_as::<_, BlockRow>(
-        "SELECT * FROM blocks WHERE height = $1",
-    )
-    .bind(height)
-    .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::NotFound(format!("Block at height {} not found", height)),
-        _ => e.into(),
-    })
+pub async fn get_block_by_hash(pool: &PgPool, hash: &str) -> Result<Option<BlockRow>> {
+    let sql = format!("SELECT {COLS} FROM blocks WHERE hash = $1");
+    Ok(sqlx::query_as::<_, BlockRow>(&sql)
+        .bind(hash)
+        .fetch_optional(pool)
+        .await?)
 }
 
-/// Get latest block
-pub async fn get_latest_block(pool: &PgPool) -> Result<BlockRow> {
-    sqlx::query_as::<_, BlockRow>(
-        "SELECT * FROM blocks ORDER BY height DESC LIMIT 1",
+pub async fn get_block_hash_at(pool: &PgPool, height: i64) -> Result<Option<String>> {
+    Ok(
+        sqlx::query_scalar("SELECT hash FROM blocks WHERE height = $1")
+            .bind(height)
+            .fetch_optional(pool)
+            .await?,
     )
-    .fetch_one(pool)
-    .await
-    .map_err(|e| match e {
-        sqlx::Error::RowNotFound => DbError::NotFound("No blocks found".to_string()),
-        _ => e.into(),
-    })
 }
 
-/// Get blocks with pagination
-pub async fn get_blocks(
+pub async fn get_latest_blocks(pool: &PgPool, limit: i64) -> Result<Vec<BlockRow>> {
+    let sql = format!("SELECT {COLS} FROM blocks ORDER BY height DESC LIMIT $1");
+    Ok(sqlx::query_as::<_, BlockRow>(&sql)
+        .bind(limit)
+        .fetch_all(pool)
+        .await?)
+}
+
+pub async fn list_blocks(
     pool: &PgPool,
     offset: i64,
     limit: i64,
     proposer: Option<&str>,
-    epoch: Option<i64>,
-    finalized: Option<bool>,
 ) -> Result<Vec<BlockRow>> {
-    let mut query = String::from("SELECT * FROM blocks WHERE 1=1");
-    let mut param_count = 0;
-
-    if proposer.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND proposer_id = ${}", param_count));
-    }
-    if epoch.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND epoch = ${}", param_count));
-    }
-    if finalized.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND finalized = ${}", param_count));
-    }
-
-    query.push_str(&format!(" ORDER BY height DESC LIMIT ${} OFFSET ${}", param_count + 1, param_count + 2));
-
-    let mut q = sqlx::query_as::<_, BlockRow>(&query);
-
-    if let Some(p) = proposer {
-        q = q.bind(p);
-    }
-    if let Some(e) = epoch {
-        q = q.bind(e);
-    }
-    if let Some(f) = finalized {
-        q = q.bind(f);
-    }
-
-    q = q.bind(limit).bind(offset);
-
-    q.fetch_all(pool).await.map_err(Into::into)
+    let sql = format!(
+        "SELECT {COLS} FROM blocks WHERE ($1::text IS NULL OR proposer = $1) ORDER BY height DESC LIMIT $2 OFFSET $3"
+    );
+    Ok(sqlx::query_as::<_, BlockRow>(&sql)
+        .bind(proposer)
+        .bind(limit)
+        .bind(offset)
+        .fetch_all(pool)
+        .await?)
 }
 
-/// Count blocks
-pub async fn count_blocks(
-    pool: &PgPool,
-    proposer: Option<&str>,
-    epoch: Option<i64>,
-    finalized: Option<bool>,
-) -> Result<i64> {
-    let mut query = String::from("SELECT COUNT(*) as count FROM blocks WHERE 1=1");
-    let mut param_count = 0;
-
-    if proposer.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND proposer_id = ${}", param_count));
-    }
-    if epoch.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND epoch = ${}", param_count));
-    }
-    if finalized.is_some() {
-        param_count += 1;
-        query.push_str(&format!(" AND finalized = ${}", param_count));
-    }
-
-    let mut q = sqlx::query_as::<_, CountRow>(&query);
-
-    if let Some(p) = proposer {
-        q = q.bind(p);
-    }
-    if let Some(e) = epoch {
-        q = q.bind(e);
-    }
-    if let Some(f) = finalized {
-        q = q.bind(f);
-    }
-
-    let row = q.fetch_one(pool).await?;
-    Ok(row.value())
-}
-
-/// Update block finalized status
-pub async fn update_block_finalized(pool: &PgPool, block_id: &str, finalized: bool) -> Result<()> {
-    sqlx::query("UPDATE blocks SET finalized = $1 WHERE block_id = $2")
-        .bind(finalized)
-        .bind(block_id)
-        .execute(pool)
-        .await?;
-
-    Ok(())
-}
-
-/// Finalize blocks up to height
-pub async fn finalize_blocks_up_to(pool: &PgPool, height: i64) -> Result<i64> {
-    let result = sqlx::query(
-        "UPDATE blocks SET finalized = TRUE WHERE height <= $1 AND finalized = FALSE",
+pub async fn count_blocks(pool: &PgPool, proposer: Option<&str>) -> Result<i64> {
+    Ok(
+        sqlx::query_scalar("SELECT COUNT(*) FROM blocks WHERE ($1::text IS NULL OR proposer = $1)")
+            .bind(proposer)
+            .fetch_one(pool)
+            .await?,
     )
-    .bind(height)
-    .execute(pool)
+}
+
+pub async fn max_block_height(pool: &PgPool) -> Result<Option<i64>> {
+    Ok(sqlx::query_scalar("SELECT MAX(height) FROM blocks")
+        .fetch_one(pool)
+        .await?)
+}
+
+/// Average block interval over the last `n` blocks, in milliseconds.
+pub async fn avg_block_time_ms(pool: &PgPool, n: i64) -> Result<f64> {
+    let row: Option<(i64, i64, i64)> = sqlx::query_as(
+        "SELECT MIN(timestamp_ms), MAX(timestamp_ms), COUNT(*) FROM (SELECT timestamp_ms FROM blocks ORDER BY height DESC LIMIT $1) t",
+    )
+    .bind(n)
+    .fetch_optional(pool)
     .await?;
-
-    Ok(result.rows_affected() as i64)
+    Ok(match row {
+        Some((min, max, count)) if count > 1 => (max - min) as f64 / (count - 1) as f64,
+        _ => 0.0,
+    })
 }
 
-/// Insert quorum certificate
-pub async fn insert_qc(
-    pool: &PgPool,
-    block_id: &str,
-    vote_type: &str,
-    view_number: i64,
-    certified_block_id: &str,
-    certified_block_height: i64,
-    signer_count: i32,
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO quorum_certificates (
-            block_id, vote_type, view_number, certified_block_id,
-            certified_block_height, signer_count
-        ) VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT (block_id) DO UPDATE SET
-            signer_count = EXCLUDED.signer_count
-        "#,
-    )
-    .bind(block_id)
-    .bind(vote_type)
-    .bind(view_number)
-    .bind(certified_block_id)
-    .bind(certified_block_height)
-    .bind(signer_count)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Get QC for block
-pub async fn get_qc_for_block(pool: &PgPool, block_id: &str) -> Result<QcRow> {
-    sqlx::query_as::<_, QcRow>(
-        "SELECT * FROM quorum_certificates WHERE block_id = $1",
-    )
-    .bind(block_id)
-    .fetch_one(pool)
-    .await
-    .map_err(Into::into)
-}
-
-/// Insert QC signer
-pub async fn insert_qc_signer(
-    pool: &PgPool,
-    block_id: &str,
-    validator_id: &str,
-    signature: &str,
-) -> Result<()> {
-    sqlx::query(
-        r#"
-        INSERT INTO qc_signers (block_id, validator_id, signature)
-        VALUES ($1, $2, $3)
-        ON CONFLICT (block_id, validator_id) DO NOTHING
-        "#,
-    )
-    .bind(block_id)
-    .bind(validator_id)
-    .bind(signature)
-    .execute(pool)
-    .await?;
-
-    Ok(())
-}
-
-/// Get QC signers for block
-pub async fn get_qc_signers(pool: &PgPool, block_id: &str) -> Result<Vec<QcSignerRow>> {
-    sqlx::query_as::<_, QcSignerRow>(
-        "SELECT * FROM qc_signers WHERE block_id = $1",
-    )
-    .bind(block_id)
-    .fetch_all(pool)
-    .await
-    .map_err(Into::into)
-}
-
-/// Get blocks by proposer
-pub async fn get_blocks_by_proposer(
-    pool: &PgPool,
-    proposer_id: &str,
-    limit: i64,
-) -> Result<Vec<BlockRow>> {
-    sqlx::query_as::<_, BlockRow>(
-        "SELECT * FROM blocks WHERE proposer_id = $1 ORDER BY height DESC LIMIT $2",
-    )
-    .bind(proposer_id)
-    .bind(limit)
-    .fetch_all(pool)
-    .await
-    .map_err(Into::into)
-}
-
-/// Check if block exists
-pub async fn block_exists(pool: &PgPool, block_id: &str) -> Result<bool> {
-    let row = sqlx::query_as::<_, CountRow>(
-        "SELECT COUNT(*) as count FROM blocks WHERE block_id = $1",
-    )
-    .bind(block_id)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(row.value() > 0)
-}
-
-/// Delete blocks above height (for reorg handling)
-pub async fn delete_blocks_above_height(pool: &PgPool, height: i64) -> Result<i64> {
-    let result = sqlx::query("DELETE FROM blocks WHERE height > $1")
+/// Delete every block at or above `height` (transactions, receipts, programs cascade).
+pub async fn delete_blocks_from(conn: &mut PgConnection, height: i64) -> Result<u64> {
+    let r = sqlx::query("DELETE FROM blocks WHERE height >= $1")
         .bind(height)
-        .execute(pool)
+        .execute(conn)
         .await?;
-
-    Ok(result.rows_affected() as i64)
+    Ok(r.rows_affected())
 }

@@ -12,67 +12,50 @@ interface StatsCardProps {
   className?: string;
 }
 
-export function StatsCard({ title, value, subtitle, icon, trend, className }: StatsCardProps) {
+/**
+ * A single cell of a hairline-separated stat row: big number, small label,
+ * smaller muted sub-label. Wrap a group in <StatsRow> to get the rules.
+ */
+export function StatsCard({ title, value, subtitle, trend, className }: StatsCardProps) {
   return (
-    <div
-      className={cn(
-        'rounded-xl border border-dark-700 bg-dark-800 p-6',
-        className
+    <div className={cn('stat', className)}>
+      <p className="stat-value">{value}</p>
+      <p className="stat-label">{title}</p>
+      {subtitle && <p className="stat-sub">{subtitle}</p>}
+      {trend && (
+        <p className={cn('stat-sub', trend.isPositive ? 'text-accent' : 'text-accent-3')}>
+          {trend.isPositive ? '+' : '−'}
+          {Math.abs(trend.value)}%
+        </p>
       )}
-    >
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-sm font-medium text-dark-400">{title}</p>
-          <p className="mt-2 text-2xl font-bold text-white">{value}</p>
-          {subtitle && (
-            <p className="mt-1 text-sm text-dark-400">{subtitle}</p>
-          )}
-          {trend && (
-            <div
-              className={cn(
-                'mt-2 inline-flex items-center gap-1 text-sm font-medium',
-                trend.isPositive ? 'text-green-500' : 'text-red-500'
-              )}
-            >
-              <svg
-                className={cn('h-4 w-4', !trend.isPositive && 'rotate-180')}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M5 10l7-7m0 0l7 7m-7-7v18"
-                />
-              </svg>
-              {Math.abs(trend.value)}%
-            </div>
-          )}
-        </div>
-        {icon && (
-          <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-dark-700 text-primary-400">
-            {icon}
-          </div>
-        )}
-      </div>
     </div>
   );
 }
 
-// Skeleton version for loading states
+interface StatsRowProps {
+  children: React.ReactNode;
+  /** Number of columns on large screens; cells stack below `sm`. */
+  columns?: 3 | 4 | 5;
+  className?: string;
+}
+
+const columnClasses: Record<number, string> = {
+  3: 'sm:grid-cols-3',
+  4: 'sm:grid-cols-2 lg:grid-cols-4',
+  5: 'sm:grid-cols-2 lg:grid-cols-5',
+};
+
+export function StatsRow({ children, columns = 4, className }: StatsRowProps) {
+  return (
+    <div className={cn('stat-row grid-cols-1', columnClasses[columns], className)}>{children}</div>
+  );
+}
+
 export function StatsCardSkeleton() {
   return (
-    <div className="rounded-xl border border-dark-700 bg-dark-800 p-6">
-      <div className="flex items-start justify-between">
-        <div className="flex-1">
-          <div className="h-4 w-24 animate-pulse rounded bg-dark-700" />
-          <div className="mt-3 h-8 w-32 animate-pulse rounded bg-dark-700" />
-          <div className="mt-2 h-4 w-20 animate-pulse rounded bg-dark-700" />
-        </div>
-        <div className="h-12 w-12 animate-pulse rounded-lg bg-dark-700" />
-      </div>
+    <div className="stat">
+      <div className="h-8 w-28 animate-pulse rounded bg-bg-soft" />
+      <div className="mt-2 h-3 w-20 animate-pulse rounded bg-bg-soft" />
     </div>
   );
 }
