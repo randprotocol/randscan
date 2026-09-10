@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { SearchBar } from './SearchBar';
 import { ThemeToggle } from './ThemeToggle';
 import { cn } from '@/lib/utils';
+import { useMe } from '@/hooks/useApi';
 
 const navLinks = [
   { href: '/', label: 'Dashboard' },
@@ -16,9 +17,26 @@ const navLinks = [
   { href: '/nodes', label: 'Nodes' },
 ];
 
+function AccountLink({
+  signedIn,
+  className,
+  onClick,
+}: {
+  signedIn: boolean;
+  className?: string;
+  onClick?: () => void;
+}) {
+  return (
+    <Link href={signedIn ? '/dashboard' : '/login'} className={className} onClick={onClick}>
+      {signedIn ? 'API keys' : 'Sign in'}
+    </Link>
+  );
+}
+
 export function Header() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { data: me } = useMe();
 
   const isActive = (href: string) =>
     href === '/' ? pathname === '/' : pathname.startsWith(href);
@@ -66,6 +84,7 @@ export function Header() {
             <div className="w-56">
               <SearchBar />
             </div>
+            <AccountLink signedIn={!!me} className="text-sm text-soft transition-colors hover:text-strong" />
             <a
               href="https://github.com/randprotocol"
               target="_blank"
@@ -115,6 +134,11 @@ export function Header() {
                 {link.label}
               </Link>
             ))}
+            <AccountLink
+              signedIn={!!me}
+              className="px-1 py-2 text-sm text-soft transition-colors hover:text-strong"
+              onClick={() => setMobileOpen(false)}
+            />
           </nav>
         )}
 
