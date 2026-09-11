@@ -65,7 +65,8 @@ REST under `/api/v1` (`health`, `stats`, `blocks`, `blocks/latest`, `blocks/:id`
 WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are strings of units
 (1 SHRUGG = 10^9 units); timestamps are `timestamp_ms`. Full shapes in
 `docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`; a guide for integrators with
-examples in [docs/api.md](docs/api.md).
+examples in [docs/api.md](docs/api.md). How the fullnode review fixes (M1–M4) shape confidential
+calls and what the explorer shows for them: [docs/confidential-transactions-after-review-fixes.md](docs/confidential-transactions-after-review-fixes.md).
 
 Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed requests use
 `Authorization: Bearer rsk_...`. Details and quotas in [docs/api.md](docs/api.md).
