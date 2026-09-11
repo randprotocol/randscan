@@ -29,7 +29,7 @@ async fn migrations_are_versioned_and_idempotent() {
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(versions, vec![1, 2, 3]);
+    assert_eq!(versions, vec![1, 2, 3, 4]);
 
     for table in ["users", "sessions", "api_keys"] {
         let exists: bool = sqlx::query_scalar(
@@ -271,7 +271,7 @@ async fn concurrent_migrations_do_not_race() {
             .fetch_all(&pool)
             .await
             .unwrap();
-    assert_eq!(versions, vec![1, 2, 3]);
+    assert_eq!(versions, vec![1, 2, 3, 4]);
 
     pool.close().await;
     sqlx::query(&format!("DROP DATABASE IF EXISTS {scratch_db}"))

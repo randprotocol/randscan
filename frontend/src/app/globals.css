@@ -189,6 +189,11 @@
     color: var(--color-accent-3);
   }
 
+  .badge-bridge {
+    color: var(--color-accent-2);
+    border-style: dashed;
+  }
+
   .badge-accent {
     color: var(--color-accent);
   }

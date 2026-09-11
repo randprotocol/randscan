@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod mock_node;
+
 use axum::{
     body::Body,
     http::{HeaderMap, Request, StatusCode},
@@ -15,6 +17,7 @@ use randscan_ws::WsManager;
 use serde_json::Value;
 use sqlx::{postgres::PgPoolOptions, PgPool};
 use std::sync::Arc;
+use std::time::Duration;
 use tower::ServiceExt;
 
 /// Limits off, proxy trusted so tests can pick their own client IP, insecure cookies.
@@ -61,12 +64,16 @@ pub async fn test_app_with_mailer(
     Some((create_router(state), pool))
 }
 
+/// Unique per call, also across tests running in parallel within one binary (the clock alone
+/// collides at microsecond resolution and turned into sporadic 409 `email_taken` on signup).
 pub fn unique_email() -> String {
+    static COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
     let nanos = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .unwrap()
         .as_nanos();
-    format!("t{nanos}@example.com")
+    let n = COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    format!("t{nanos}-{}-{n}@example.com", std::process::id())
 }
 
 pub fn json_req(
@@ -114,4 +121,73 @@ pub fn session_cookie_from(headers: &HeaderMap) -> String {
         .and_then(|v| v.split(';').next())
         .expect("session cookie")
         .to_string()
+}
+
+/// The API wired to a live indexer that follows the node at `rpc_url` (a mock or a real
+/// `shrugg-node`). `run()` is not started; call `start()` when the test is ready.
+pub struct LiveApp {
+    pub app: Router,
+    pub pool: PgPool,
+    pub indexer: Arc<IndexerService>,
+    pub broadcaster: Broadcaster,
+}
+
+impl LiveApp {
+    pub fn start(&self) {
+        let indexer = self.indexer.clone();
+        tokio::spawn(async move {
+            if let Err(e) = indexer.run().await {
+                eprintln!("indexer stopped: {e:#}");
+            }
+        });
+    }
+
+    /// Poll `GET path` until `pred(body)` holds; panics with the last body after `timeout`.
+    pub async fn wait_for(&self, path: &str, timeout: Duration, pred: impl Fn(&Value) -> bool) -> Value {
+        let start = std::time::Instant::now();
+        let mut last = Value::Null;
+        while start.elapsed() < timeout {
+            let (_, _, body) = call(&self.app, json_req("GET", path, None, None)).await;
+            if pred(&body) {
+                return body;
+            }
+            last = body;
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+        panic!("timed out waiting on {path}; last body: {last}");
+    }
+}
+
+pub async fn live_app(cfg: ApiConfig, rpc_url: &str) -> Option<LiveApp> {
+    let url = std::env::var("DATABASE_URL").ok()?;
+    // Keep the peer tracker off the network (it would geolocate the host otherwise).
+    std::env::set_var("NODE_PUBLIC_IP", "127.0.0.1");
+    let pool = PgPoolOptions::new()
+        .max_connections(6)
+        .connect(&url)
+        .await
+        .expect("connect to DATABASE_URL");
+    run_migrations(&pool).await.expect("migrations");
+    let db = DbPool::new(pool.clone());
+    let broadcaster = Broadcaster::new();
+    let indexer = Arc::new(IndexerService::new(
+        IndexerConfig {
+            rpc_url: rpc_url.to_string(),
+            poll_interval: Duration::from_millis(100),
+            batch_size: 50,
+            stats_interval: Duration::from_millis(200),
+            nodes_interval: Duration::from_secs(3600),
+        },
+        db.clone(),
+        broadcaster.clone(),
+    ));
+    let state = AppState {
+        db,
+        indexer: indexer.clone(),
+        ws_manager: Arc::new(WsManager::new()),
+        config: Arc::new(cfg),
+        limiter: Arc::new(RateLimiter::new()),
+        mailer: None,
+    };
+    Some(LiveApp { app: create_router(state), pool, indexer, broadcaster })
 }

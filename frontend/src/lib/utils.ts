@@ -227,11 +227,14 @@ export function getSearchQueryType(query: string): SearchQueryType {
 // Transaction kinds
 // ---------------------------------------------------------------------------
 
+/** Kinds the API accepts as a `?kind=` filter (`other` is display-only). */
 export const TRANSACTION_KINDS: TransactionKind[] = [
   'transfer',
   'mint',
   'deploy',
   'call',
+  'bridge_attest',
+  'bridge_burn',
 ];
 
 const KIND_LABELS: Record<TransactionKind, string> = {
@@ -239,6 +242,9 @@ const KIND_LABELS: Record<TransactionKind, string> = {
   mint: 'Mint (faucet)',
   deploy: 'Deploy',
   call: 'Call (confidential)',
+  bridge_attest: 'Bridge in (attestation)',
+  bridge_burn: 'Bridge out (burn)',
+  other: 'Other',
 };
 
 const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
@@ -246,6 +252,9 @@ const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
   mint: 'Mint',
   deploy: 'Deploy',
   call: 'Call',
+  bridge_attest: 'Bridge in',
+  bridge_burn: 'Bridge out',
+  other: 'Other',
 };
 
 const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
@@ -253,7 +262,50 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   mint: 'badge badge-mint',
   deploy: 'badge badge-deploy',
   call: 'badge badge-call',
+  bridge_attest: 'badge badge-bridge',
+  bridge_burn: 'badge badge-bridge',
+  other: 'badge badge-neutral',
 };
+
+// ---------------------------------------------------------------------------
+// Bridge
+// ---------------------------------------------------------------------------
+
+/** Bridged assets carry 8 decimals, not SHRUGG's 9 (see fullnode/docs/cli.md). */
+export const BRIDGED_DECIMALS = 8;
+
+const BRIDGE_CHAIN_NAMES: Record<number, string> = {
+  1: 'Rand',
+  2: 'Ethereum',
+  3: 'BSC',
+  4: 'Tron',
+  5: 'Solana',
+};
+
+/** "Ethereum (2)" for a known bridge chain id, "chain 9" otherwise. */
+export function formatBridgeChain(id: number | null | undefined): string {
+  if (id === null || id === undefined) return '—';
+  const name = BRIDGE_CHAIN_NAMES[id];
+  return name ? `${name} (${id})` : `chain ${id}`;
+}
+
+/** Bridged units as a decimal number of tokens (8 decimals) with the raw units alongside. */
+export function formatBridgedAmount(units: string | null | undefined): string {
+  if (units === null || units === undefined) return '—';
+  return `${formatUnits(units, BRIDGED_DECIMALS)} tokens (${formatUnits(units, 0)} units)`;
+}
+
+/**
+ * Bridge destinations are 32-byte hex; a 20-byte EVM/Tron address arrives left-padded with
+ * 24 zero hex digits. Strip that padding for display and keep the full value for copying.
+ */
+export function formatBridgeAddress(hex: string): string {
+  const clean = hex.toLowerCase().replace(/^0x/, '');
+  if (clean.length === 64 && clean.startsWith('0'.repeat(24))) {
+    return `0x${clean.slice(24)}`;
+  }
+  return clean;
+}
 
 export function getKindLabel(kind: string): string {
   return KIND_LABELS[kind as TransactionKind] ?? kind;

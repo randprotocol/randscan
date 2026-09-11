@@ -71,6 +71,11 @@ pub async fn get_transaction(
     } else {
         None
     };
+    let attestation = if row.kind == "bridge_attest" {
+        db::get_attestation(pool, &hash).await?
+    } else {
+        None
+    };
     Ok(Json(TransactionDetail {
         chain_id: row.chain_id,
         base_pc: row.base_pc,
@@ -78,6 +83,12 @@ pub async fn get_transaction(
         proof_len: row.proof_len,
         recipients: row.recipients.clone(),
         receipt,
+        asset: row.asset.clone(),
+        bridge_amount: row.bridge_amount.clone(),
+        to_chain: row.to_chain,
+        bridge_to: row.bridge_to.clone(),
+        bridge_fee: row.bridge_fee.clone(),
+        attestation,
         summary: row.into(),
     }))
 }

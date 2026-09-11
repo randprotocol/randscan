@@ -163,8 +163,8 @@ need `height`.
 | `GET /transactions/latest?limit=10` | array of the newest `TransactionSummary` |
 | `GET /transactions/:hash` | `TransactionDetail` |
 
-Filters: `kind` is one of `transfer`, `mint`, `deploy`, `call`; `sender` is an address; `height`
-restricts to one block.
+Filters: `kind` is one of `transfer`, `mint`, `deploy`, `call`, `bridge_attest`, `bridge_burn`;
+`sender` is an address; `height` restricts to one block.
 
 `TransactionSummary`:
 
@@ -182,7 +182,7 @@ restricts to one block.
 }
 ```
 
-The four kinds and which fields they fill:
+The kinds and which fields they fill:
 
 | kind | `to` / `amount` | `program` | detail-only fields |
 |---|---|---|---|
@@ -190,10 +190,20 @@ The four kinds and which fields they fill:
 | `mint` | recipient and amount (testnet faucet) | null | |
 | `deploy` | null | the new program id | `base_pc`, `words_len` |
 | `call` | null | the called program id | `proof_len`, `recipients`, `receipt` |
+| `bridge_attest` | null | null | `attestation` (hex of the guardian-signed inbound message) |
+| `bridge_burn` | null | null | `asset`, `bridge_amount`, `to_chain`, `bridge_to`, `bridge_fee` |
+| `other` | null | null | none: a kind newer than this explorer build, indexed by hash, sender, fee and block only |
+
+`to` and `amount` are always a SHRUGG address and SHRUGG units. A bridge burn's destination is an
+address on another chain, so it is served separately as `bridge_to` (32 bytes of hex; 20-byte EVM
+and Tron addresses are left-padded with zeros) together with `to_chain` (2 Ethereum, 3 BSC, 4 Tron,
+5 Solana). `bridge_amount` and `bridge_fee` are strings of **bridged units, which have 8 decimals**,
+not SHRUGG's 9; `asset` is the 64-hex bridged asset id (`shrugg_bridgeAssetId` in the node docs).
+The `fee` of every kind is the SHRUGG transaction fee.
 
 `TransactionDetail` adds `chain_id`, `base_pc`, `words_len`, `proof_len`, `recipients` (the
-public list of addresses a confidential call may pay, at most 8), and `receipt`. The receipt of a
-confidential call is:
+public list of addresses a confidential call may pay, at most 8), `receipt`, and the bridge fields
+above (null for other kinds). The receipt of a confidential call is:
 
 ```json
 {

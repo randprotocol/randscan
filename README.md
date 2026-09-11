@@ -91,6 +91,19 @@ psql "$DATABASE_URL" -c "UPDATE users SET password_hash = '<paste>' WHERE email 
 avoids appending a trailing newline — together this keeps the password out of shell history and
 process listings.
 
+### Chain switch (testnet hard fork)
+
+The indexer records the chain id of the data it holds (`indexer_state.chain_id`). When the node it
+follows serves a different chain id, or a different genesis block under the same id, the indexer
+logs a warning, truncates only the chain-derived tables (blocks, transactions, receipts, accounts,
+programs, validators) and re-indexes from height 0. Users, sessions, API keys, password resets and
+the peer geolocation cache are kept. Nothing to do by hand: restart (or re-point) the node and, if
+you want it picked up immediately rather than within ten seconds, `systemctl restart randscan-api`.
+Do **not** drop the database; that would delete user accounts and API keys.
+
+Transaction kinds the node serves that this build does not decode are indexed as kind `other`
+(hash, sender, fee and block only) so a newer node never stalls the explorer.
+
 ## Deploy on a node
 
 The explorer runs on the same machine as a synced `shrugg-node` (its RPC is bound to localhost):

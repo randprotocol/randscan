@@ -55,6 +55,11 @@ pub struct TxRow {
     pub words_len: Option<i64>,
     pub proof_len: Option<i64>,
     pub recipients: Vec<String>,
+    pub asset: Option<String>,
+    pub bridge_amount: Option<String>,
+    pub to_chain: Option<i32>,
+    pub bridge_to: Option<String>,
+    pub bridge_fee: Option<String>,
 }
 
 impl From<TxRow> for TransactionSummary {
@@ -67,7 +72,7 @@ impl From<TxRow> for TransactionSummary {
             sender: t.sender,
             nonce: t.nonce,
             fee: t.fee,
-            kind: TxKind::parse(&t.kind).unwrap_or(TxKind::Transfer),
+            kind: TxKind::parse_lossy(&t.kind),
             timestamp_ms: t.timestamp_ms,
             to: t.to_address,
             amount: t.amount,
@@ -237,6 +242,8 @@ pub struct IndexerStateRow {
     pub next_height: i64,
     pub last_indexed_hash: Option<String>,
     pub is_syncing: bool,
+    /// Chain id of the indexed data; `None` before the indexer first reached a node.
+    pub chain_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, FromRow)]

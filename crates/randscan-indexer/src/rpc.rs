@@ -221,9 +221,52 @@ pub struct RpcTx {
     pub kind: RpcTxKind,
 }
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
+/// Transaction kinds as the node serializes them (`fullnode/docs/rpc.md`, `shrugg_getTransaction`).
+///
+/// Kinds this client does not know become [`RpcTxKind::Unknown`] rather than a parse error, so a
+/// node that is newer than the explorer never stalls indexing on an unfamiliar block.
+#[derive(Debug, Clone)]
 pub enum RpcTxKind {
+    Transfer {
+        to: String,
+        amount: String,
+    },
+    Mint {
+        to: String,
+        amount: String,
+    },
+    Deploy {
+        base_pc: u32,
+        words_len: u32,
+        program: String,
+    },
+    Call {
+        program: String,
+        proof_len: u64,
+        recipients: Vec<String>,
+    },
+    /// Guardian-signed inbound bridge message (`attestation` is hex).
+    BridgeAttest {
+        attestation: String,
+    },
+    /// Outbound bridge transfer: burn `amount` of `asset` (bridged units, 8 decimals) for
+    /// `to` (32-byte hex) on `to_chain`; `fee` is the relayer fee in the same units.
+    BridgeBurn {
+        asset: String,
+        amount: String,
+        to_chain: u16,
+        to: String,
+        fee: String,
+    },
+    /// A kind this build does not decode; `kind` is the node's `type` tag.
+    Unknown {
+        kind: String,
+    },
+}
+
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum KnownTxKind {
     Transfer {
         to: String,
         amount: String,
@@ -243,7 +286,54 @@ pub enum RpcTxKind {
         #[serde(default)]
         recipients: Vec<String>,
     },
+    BridgeAttest {
+        attestation: String,
+    },
+    BridgeBurn {
+        asset: String,
+        amount: String,
+        to_chain: u16,
+        to: String,
+        fee: String,
+    },
 }
+
+impl<'de> Deserialize<'de> for RpcTxKind {
+    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        let value = serde_json::Value::deserialize(d)?;
+        let tag = value
+            .get("type")
+            .and_then(|t| t.as_str())
+            .ok_or_else(|| serde::de::Error::missing_field("type"))?
+            .to_string();
+        match serde_json::from_value::<KnownTxKind>(value) {
+            Ok(k) => Ok(match k {
+                KnownTxKind::Transfer { to, amount } => RpcTxKind::Transfer { to, amount },
+                KnownTxKind::Mint { to, amount } => RpcTxKind::Mint { to, amount },
+                KnownTxKind::Deploy { base_pc, words_len, program } => {
+                    RpcTxKind::Deploy { base_pc, words_len, program }
+                }
+                KnownTxKind::Call { program, proof_len, recipients } => {
+                    RpcTxKind::Call { program, proof_len, recipients }
+                }
+                KnownTxKind::BridgeAttest { attestation } => RpcTxKind::BridgeAttest { attestation },
+                KnownTxKind::BridgeBurn { asset, amount, to_chain, to, fee } => {
+                    RpcTxKind::BridgeBurn { asset, amount, to_chain, to, fee }
+                }
+            }),
+            // A known tag with a malformed body is a real error; an unknown tag is tolerated.
+            Err(e) => {
+                if KNOWN_TAGS.contains(&tag.as_str()) {
+                    Err(serde::de::Error::custom(e))
+                } else {
+                    Ok(RpcTxKind::Unknown { kind: tag })
+                }
+            }
+        }
+    }
+}
+
+const KNOWN_TAGS: &[&str] = &["transfer", "mint", "deploy", "call", "bridge_attest", "bridge_burn"];
 
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcAccount {
@@ -327,6 +417,45 @@ mod tests {
             RpcTxKind::Transfer { .. }
         ));
         assert!(matches!(&b.transactions[3].kind, RpcTxKind::Mint { .. }));
+    }
+
+    #[test]
+    fn parses_bridge_kinds() {
+        let json = r#"{"kind":{"type":"bridge_attest","attestation":"01000000"}}"#;
+        let v: serde_json::Value = serde_json::from_str(json).unwrap();
+        let k: RpcTxKind = serde_json::from_value(v["kind"].clone()).unwrap();
+        assert!(matches!(k, RpcTxKind::BridgeAttest { ref attestation } if attestation == "01000000"));
+
+        let json = r#"{"type":"bridge_burn","asset":"8f1c","amount":"99999000","to_chain":2,"to":"000000000000000000000000f10befe1e0794722d3baf8bfd5bdac47b2a33148","fee":"1000"}"#;
+        let k: RpcTxKind = serde_json::from_str(json).unwrap();
+        match k {
+            RpcTxKind::BridgeBurn { asset, amount, to_chain, to, fee } => {
+                assert_eq!(asset, "8f1c");
+                assert_eq!(amount, "99999000");
+                assert_eq!(to_chain, 2);
+                assert_eq!(to.len(), 64);
+                assert_eq!(fee, "1000");
+            }
+            other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn unknown_kind_does_not_fail_the_block() {
+        let json = r#"{"hash":"a9c8","height":10,"justify_view":31,"parent":"a070","proposer":"2nRd","state_root":"b364","timestamp_ms":1,
+          "transactions":[{"chain_id":5,"fee":"1","from":"2nRd","hash":"dc97","kind":{"type":"shielded_transfer","note":"..."},"nonce":0}],
+          "tx_count":1,"tx_root":"dc97","view":32}"#;
+        let b: RpcBlock = serde_json::from_str(json).unwrap();
+        assert!(matches!(&b.transactions[0].kind, RpcTxKind::Unknown { kind } if kind == "shielded_transfer"));
+    }
+
+    #[test]
+    fn malformed_known_kind_is_an_error() {
+        // A known tag with the wrong body must not be silently accepted as Unknown.
+        let json = r#"{"type":"transfer","to":"9W7d"}"#;
+        assert!(serde_json::from_str::<RpcTxKind>(json).is_err());
+        let json = r#"{"amount":"1"}"#;
+        assert!(serde_json::from_str::<RpcTxKind>(json).is_err());
     }
 
     #[test]

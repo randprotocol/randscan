@@ -1,7 +1,18 @@
 use crate::{AccountTxRow, ReceiptRow, Result, TxRow};
 use sqlx::{PgConnection, PgPool};
 
-pub const TX_COLS: &str = "hash, block_hash, height, tx_index, sender, nonce, fee::text AS fee, kind, chain_id, timestamp_ms, to_address, amount::text AS amount, program_id, base_pc, words_len, proof_len, recipients";
+/// Columns of a transaction row. `attestation` (up to 32 KiB of hex) is deliberately left out of
+/// list queries; `get_attestation` fetches it for the detail view.
+pub const TX_COLS: &str = "hash, block_hash, height, tx_index, sender, nonce, fee::text AS fee, kind, chain_id, timestamp_ms, to_address, amount::text AS amount, program_id, base_pc, words_len, proof_len, recipients, asset, bridge_amount::text AS bridge_amount, to_chain, bridge_to, bridge_fee::text AS bridge_fee";
+
+/// `TX_COLS` with every column prefixed by a table alias (for joins).
+pub fn tx_cols_qualified(alias: &str) -> String {
+    TX_COLS
+        .split(", ")
+        .map(|c| format!("{alias}.{c}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
 
 pub struct NewTx<'a> {
     pub hash: &'a str,
@@ -21,13 +32,21 @@ pub struct NewTx<'a> {
     pub words_len: Option<i64>,
     pub proof_len: Option<i64>,
     pub recipients: &'a [String],
+    pub asset: Option<&'a str>,
+    pub bridge_amount: Option<&'a str>,
+    pub to_chain: Option<i32>,
+    pub bridge_to: Option<&'a str>,
+    pub bridge_fee: Option<&'a str>,
+    pub attestation: Option<&'a str>,
 }
 
 pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Result<()> {
     sqlx::query(
         "INSERT INTO transactions (hash, block_hash, height, tx_index, sender, nonce, fee, kind, chain_id, timestamp_ms,
-                                   to_address, amount, program_id, base_pc, words_len, proof_len, recipients)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9, $10, $11, $12::numeric, $13, $14, $15, $16, $17)",
+                                   to_address, amount, program_id, base_pc, words_len, proof_len, recipients,
+                                   asset, bridge_amount, to_chain, bridge_to, bridge_fee, attestation)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::numeric, $8, $9, $10, $11, $12::numeric, $13, $14, $15, $16, $17,
+                 $18, $19::numeric, $20, $21, $22::numeric, $23)",
     )
     .bind(t.hash)
     .bind(t.block_hash)
@@ -46,9 +65,26 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(t.words_len)
     .bind(t.proof_len)
     .bind(t.recipients)
+    .bind(t.asset)
+    .bind(t.bridge_amount)
+    .bind(t.to_chain)
+    .bind(t.bridge_to)
+    .bind(t.bridge_fee)
+    .bind(t.attestation)
     .execute(conn)
     .await?;
     Ok(())
+}
+
+/// The hex attestation of a `bridge_attest` transaction (`None` for other kinds).
+pub async fn get_attestation(pool: &PgPool, tx_hash: &str) -> Result<Option<String>> {
+    Ok(sqlx::query_scalar::<_, Option<String>>(
+        "SELECT attestation FROM transactions WHERE hash = $1",
+    )
+    .bind(tx_hash)
+    .fetch_optional(pool)
+    .await?
+    .flatten())
 }
 
 pub async fn insert_account_transaction(
@@ -183,11 +219,14 @@ pub async fn list_account_transactions(
     offset: i64,
     limit: i64,
 ) -> Result<Vec<AccountTxRow>> {
-    let sql = "SELECT t.hash, t.block_hash, t.height, t.tx_index, t.sender, t.nonce, t.fee::text AS fee, t.kind, t.chain_id, t.timestamp_ms,
-                t.to_address, t.amount::text AS amount, t.program_id, t.base_pc, t.words_len, t.proof_len, t.recipients, a.role
+    // Same columns as TX_COLS, qualified with the join alias, plus the account's role.
+    let sql = format!(
+        "SELECT {}, a.role
          FROM account_transactions a JOIN transactions t ON t.hash = a.tx_hash
-         WHERE a.account = $1 ORDER BY a.height DESC, a.tx_index DESC, a.role ASC LIMIT $2 OFFSET $3";
-    Ok(sqlx::query_as::<_, AccountTxRow>(sql)
+         WHERE a.account = $1 ORDER BY a.height DESC, a.tx_index DESC, a.role ASC LIMIT $2 OFFSET $3",
+        tx_cols_qualified("t")
+    );
+    Ok(sqlx::query_as::<_, AccountTxRow>(&sql)
         .bind(account)
         .bind(limit)
         .bind(offset)

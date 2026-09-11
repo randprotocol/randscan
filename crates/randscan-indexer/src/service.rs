@@ -5,11 +5,15 @@ use anyhow::Result;
 use randscan_core::NetworkStats;
 use randscan_core::NodeInfo;
 use randscan_db::{self as db, DbPool, StatsUpdate};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::RwLock;
 use tokio::time::{sleep, Duration};
 use tracing::{error, info, warn};
+
+/// Minimum interval between forced chain re-checks (each costs two RPC calls).
+const CHAIN_RECHECK_SECS: u64 = 10;
 
 #[derive(Debug, Clone, Default)]
 pub struct IndexerState {
@@ -28,6 +32,10 @@ pub struct IndexerService {
     broadcaster: Broadcaster,
     state: Arc<RwLock<IndexerState>>,
     chain: RwLock<Option<(i64, String, i16)>>,
+    /// Set once the indexed data has been checked against the node's chain id.
+    chain_checked: AtomicBool,
+    /// Last forced re-check (the node's head fell below the indexed height, or a fork).
+    last_chain_check: RwLock<Option<Instant>>,
     last_stats: RwLock<Option<Instant>>,
     nodes: Arc<NodeTracker>,
 }
@@ -52,6 +60,8 @@ impl IndexerService {
                 ..Default::default()
             })),
             chain: RwLock::new(None),
+            chain_checked: AtomicBool::new(false),
+            last_chain_check: RwLock::new(None),
             last_stats: RwLock::new(None),
             nodes,
         }
@@ -95,6 +105,76 @@ impl IndexerService {
         }
     }
 
+    /// Make sure the indexed data belongs to the chain the node serves. Returns true when the
+    /// chain data was reset (the caller should start a fresh pass).
+    ///
+    /// A different chain id (testnet hard fork, or the node was re-pointed) or a different
+    /// genesis block throws away the chain-derived tables and starts over at height 0; user
+    /// accounts and API keys are kept. A database indexed before the chain id was recorded is
+    /// stamped with the node's id. The check runs once at startup and again, at most every
+    /// `CHAIN_RECHECK_SECS`, whenever the node looks like a different chain (`force`).
+    async fn ensure_chain(&self, force: bool) -> Result<bool> {
+        if self.chain_checked.load(Ordering::Relaxed) {
+            if !force {
+                return Ok(false);
+            }
+            let recently = self
+                .last_chain_check
+                .read()
+                .await
+                .map(|t| t.elapsed() < Duration::from_secs(CHAIN_RECHECK_SECS))
+                .unwrap_or(false);
+            if recently {
+                return Ok(false);
+            }
+        }
+        *self.last_chain_check.write().await = Some(Instant::now());
+
+        // Ask the node, not the cache: the node may have been restarted on another chain.
+        let node_chain = self.rpc.chain_id().await? as i64;
+        let st = db::get_indexer_state(self.pool.inner()).await?;
+        let mut reason = None;
+        match st.chain_id {
+            Some(stored) if stored == node_chain => {}
+            Some(stored) => {
+                reason = Some(format!(
+                    "node serves chain {} but the database holds chain {} ({} blocks)",
+                    node_chain, stored, st.next_height
+                ));
+            }
+            None => {
+                let mut conn = self.pool.inner().acquire().await?;
+                db::set_chain_id(&mut conn, node_chain).await?;
+                info!("indexing chain {}", node_chain);
+            }
+        }
+        if reason.is_none() && self.genesis_changed().await? {
+            reason = Some("the node's genesis block differs from the indexed one".to_string());
+        }
+
+        self.chain_checked.store(true, Ordering::Relaxed);
+        let Some(reason) = reason else {
+            return Ok(false);
+        };
+        warn!("{}; resetting chain data and re-indexing from height 0", reason);
+        self.processor.reset_chain(node_chain).await?;
+        *self.chain.write().await = None; // symbol/decimals may differ too
+        self.state.write().await.current_height = -1;
+        Ok(true)
+    }
+
+    /// True when the node's genesis block differs from the one indexed, i.e. the chain was
+    /// re-created (possibly under the same id) and rewinding block by block would never converge.
+    async fn genesis_changed(&self) -> Result<bool> {
+        let Some(stored) = db::get_block_hash_at(self.pool.inner(), 0).await? else {
+            return Ok(false);
+        };
+        let Some(node) = self.rpc.block_by_height(0).await? else {
+            return Ok(false);
+        };
+        Ok(!stored.eq_ignore_ascii_case(&node.hash))
+    }
+
     /// One pass. Returns true when caught up (caller sleeps).
     async fn sync_once(&self) -> Result<bool> {
         let head = self.rpc.head().await?;
@@ -104,8 +184,15 @@ impl IndexerService {
             s.is_connected = true;
             s.node_height = node_height;
         }
+        if self.ensure_chain(false).await? {
+            return Ok(false);
+        }
 
         let next = db::get_indexer_state(self.pool.inner()).await?.next_height;
+        // A head below what we indexed means the node lost blocks or is another chain.
+        if next > node_height + 1 && self.ensure_chain(true).await? {
+            return Ok(false);
+        }
         let behind = node_height - next + 1;
         let catching_up = behind > 5;
         {
@@ -146,7 +233,9 @@ impl IndexerService {
                             "parent mismatch at {}: stored {} vs node {}",
                             h, parent, block.parent
                         );
-                        self.processor.rewind_to(h - 1).await?;
+                        if !self.ensure_chain(true).await? {
+                            self.processor.rewind_to(h - 1).await?;
+                        }
                         return Ok(false);
                     }
                     None => {

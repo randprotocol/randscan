@@ -2,7 +2,15 @@
 // All amounts are decimal strings of smallest units (SHRUGG has 9 decimals).
 // All timestamps are `timestamp_ms`: milliseconds since the Unix epoch.
 
-export type TransactionKind = 'transfer' | 'mint' | 'deploy' | 'call';
+/** `other` is any kind the node serves that this explorer build does not decode. */
+export type TransactionKind =
+  | 'transfer'
+  | 'mint'
+  | 'deploy'
+  | 'call'
+  | 'bridge_attest'
+  | 'bridge_burn'
+  | 'other';
 
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
@@ -95,6 +103,18 @@ export interface TransactionDetail extends TransactionSummary {
   proof_len: number | null;
   recipients: string[];
   receipt: Receipt | null;
+  /** bridge_burn: bridged asset id (hex) */
+  asset: string | null;
+  /** bridge_burn: amount in bridged units (8 decimals, not SHRUGG's 9) */
+  bridge_amount: string | null;
+  /** bridge_burn: destination chain id (2 Ethereum, 3 BSC, 4 Tron, 5 Solana) */
+  to_chain: number | null;
+  /** bridge_burn: destination address, 32 bytes hex */
+  bridge_to: string | null;
+  /** bridge_burn: relayer fee in bridged units */
+  bridge_fee: string | null;
+  /** bridge_attest: guardian-signed message, hex */
+  attestation: string | null;
 }
 
 export interface AccountTransaction extends TransactionSummary {

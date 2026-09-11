@@ -9,6 +9,9 @@ import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/compo
 import { isNotFound, useTransaction } from '@/hooks/useApi';
 import {
   formatAmount,
+  formatBridgeAddress,
+  formatBridgeChain,
+  formatBridgedAmount,
   formatBytes,
   formatDateTime,
   formatNumber,
@@ -131,6 +134,78 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
             {tx.words_len === null ? '—' : `${formatNumber(tx.words_len)} words`}
           </span>
         </DetailRow>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'bridge_burn') {
+    return (
+      <Panel title={title}>
+        <DetailRow label="Asset">
+          {tx.asset ? <Hash value={tx.asset} full /> : <span className="text-mute">—</span>}
+        </DetailRow>
+        <DetailRow label="Amount burned">
+          <span className="text-base font-semibold text-strong">
+            {formatBridgedAmount(tx.bridge_amount)}
+          </span>
+        </DetailRow>
+        <DetailRow label="Destination chain">
+          <span>{formatBridgeChain(tx.to_chain)}</span>
+        </DetailRow>
+        <DetailRow label="Destination address">
+          {tx.bridge_to ? (
+            <span className="font-mono break-all" title={tx.bridge_to}>
+              {formatBridgeAddress(tx.bridge_to)}
+            </span>
+          ) : (
+            <span className="text-mute">—</span>
+          )}
+        </DetailRow>
+        <DetailRow label="Relayer fee">
+          <span>{formatBridgedAmount(tx.bridge_fee)}</span>
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          Bridged assets use 8 decimals. The transaction fee above is paid in SHRUGG; the relayer
+          fee is carried inside the outbound message for whoever delivers it.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'bridge_attest') {
+    const hex = tx.attestation ?? '';
+    return (
+      <Panel title={title}>
+        <DetailRow label="Attestation size">
+          <span className="font-mono">{formatBytes(hex.length / 2)}</span>
+        </DetailRow>
+        <DetailRow label="Attestation (hex)">
+          {hex ? (
+            <details className="max-w-full">
+              <summary className="cursor-pointer text-sm text-soft">Show {hex.length} hex characters</summary>
+              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded border border-border bg-surface-2 p-3 font-mono text-xs text-text">
+                {hex}
+              </pre>
+            </details>
+          ) : (
+            <span className="text-mute">—</span>
+          )}
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          A guardian-signed message that mints bridged tokens on this chain. The recipient and
+          amount are inside the message; the sender collects its relayer fee.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'other') {
+    return (
+      <Panel title={title}>
+        <p className="px-4 py-3 text-sm text-mute">
+          This transaction kind is newer than this explorer build. It was indexed with its hash,
+          sender, fee and block; decoded fields will appear after the explorer is updated.
+        </p>
       </Panel>
     );
   }
