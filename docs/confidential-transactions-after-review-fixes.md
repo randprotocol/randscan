@@ -104,3 +104,25 @@ and the explorer's own integration test against a real node should exercise a do
 Viewing keys, note envelopes and nullifiers are not exposed by the node yet, so shielded content
 cannot be opened in the explorer; see the "Later" section of
 `docs/superpowers/specs/2026-09-10-accounts-and-api-keys-design.md`.
+
+## zkVM constraint set 4 (fullnode `dbea18c`, 2026-09-11)
+
+The fullnode re-synced its vendored zkVM to research milestone 4.1 (`f06446a`, merged as
+`dbea18c`): `read_input` is now bound to a salted input commitment `H_IN`, published as eight
+more public values, and `Proof` gained an `input_log_height` field. This changes proof bytes and
+the verifier key, not the RPC surface: no RPC file changed, and `shrugg_getBlockByHeight`,
+`shrugg_getReceipt` and `shrugg_getProgram` return the same shapes as before. `H_IN` is not
+exposed by the node, so the explorer has nothing new to show.
+
+What matters to RandScan is the hard fork: proofs made under constraint set 3 do not verify
+under set 4, so a node built from this commit truncates any chain holding an older call and the
+operator starts a new chain id. The explorer already handles that unattended (chain id or
+genesis mismatch, or the head dropping below the indexed height, truncates only the chain tables
+and re-indexes; users and API keys survive). Node E has run `dbea18c` on chain 5 since
+2026-09-11.
+
+Verified against this build on 2026-09-12: the real-node integration test
+(`crates/randscan-api/tests/real_node.rs`) now also deploys the `private_payment` guest, proves
+and submits a call through the wallet CLI, and checks that the explorer's transaction, receipt,
+program `code_hash` and account balance equal the node's. Set `SHRUGG_NODE_BIN` to the node
+binary; the wallet is picked up from the sibling `shrugg` binary or `SHRUGG_CLI`.

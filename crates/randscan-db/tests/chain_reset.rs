@@ -70,6 +70,9 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     upsert_account(&mut conn, "2nRd", "5", 1, 0).await.unwrap();
     set_next_height(&mut conn, 1, Some(&"ab".repeat(32))).await.unwrap();
     set_chain_id(&mut conn, 4).await.unwrap();
+    // The database is shared across runs and users survive the reset by design, so drop any
+    // copy of this user a previous run left behind before inserting it again.
+    sqlx::query("DELETE FROM users WHERE email = 'reset@example.com'").execute(&mut *conn).await.unwrap();
     sqlx::query("INSERT INTO users (email, password_hash) VALUES ('reset@example.com', 'x')")
         .execute(&mut *conn)
         .await

@@ -3,7 +3,11 @@
 //! agree with the node on every number it publishes.
 //!
 //! Needs `DATABASE_URL` and `SHRUGG_NODE_BIN` (path to a built `shrugg-node`, e.g.
-//! `../fullnode/target/release/shrugg-node`); skips when either is unset.
+//! `../fullnode/target/release/shrugg-node`); skips when either is unset. When the wallet CLI
+//! (`shrugg`) sits next to the node binary (or `SHRUGG_CLI` points at it) the test also deploys
+//! a guest, proves and submits one confidential call, and checks the explorer's receipt against
+//! the node's — the proof is made under whatever zkVM constraint set the node was built with, so
+//! this is what notices a zkVM re-sync changing the receipt shape.
 
 mod common;
 
@@ -193,5 +197,67 @@ async fn explorer_agrees_with_a_real_node() {
 
     let (status, _, found) = call(&live.app, json_req("GET", &format!("/api/v1/search?q={mint_hash}"), None, None)).await;
     assert_eq!(status, 200, "{found}");
+
+    // Confidential call: deploy the private_payment guest, prove locally (test FRI profile, a few
+    // seconds), submit, and compare the explorer's view with the node's.
+    let cli = std::env::var("SHRUGG_CLI").map(PathBuf::from).unwrap_or_else(|_| bin.with_file_name("shrugg"));
+    if !cli.is_file() {
+        eprintln!("no wallet CLI at {}: skipping the confidential call", cli.display());
+        drop(node);
+        return;
+    }
+    let key = user_key.to_str().unwrap();
+    let program_json = node._dir.path().join("program.json");
+    run(&cli, &["program", "build", "--guest", "private_payment", "--arg", "100", "--out", program_json.to_str().unwrap()]);
+    let out = run(&cli, &["program", "deploy", program_json.to_str().unwrap(), "--rpc", &node.url, "--key", key]);
+    let program_id = out
+        .lines()
+        .find_map(|l| l.strip_prefix("program id: "))
+        .and_then(|r| r.split(' ').next())
+        .unwrap_or_else(|| panic!("no program id in deploy output: {out}"))
+        .to_string();
+    let out = run(
+        &cli,
+        &[
+            "call", &program_id, "--input", "400", "--input", "250", "--input", "0", "--input", "0", "--to",
+            &validator_addr, "--rpc", &node.url, "--key", key,
+        ],
+    );
+    let call_hash = out
+        .lines()
+        .find_map(|l| l.strip_prefix("submitted call "))
+        .and_then(|r| r.split(' ').next())
+        .unwrap_or_else(|| panic!("no call hash in call output: {out}"))
+        .to_string();
+
+    let node_receipt = rpc(&client, &node.url, "shrugg_getReceipt", json!([call_hash])).await;
+    assert!(node_receipt.is_object(), "node has no receipt for {call_hash}: {node_receipt}");
+    let tx = live.wait_for(&format!("/api/v1/transactions/{call_hash}"), WAIT, |t| t["receipt"].is_object()).await;
+    assert_eq!(tx["kind"], "call");
+    assert_eq!(tx["program"], program_id);
+    assert_eq!(tx["recipients"], json!([validator_addr]));
+    assert!(tx["proof_len"].as_u64().unwrap_or(0) > 0, "{tx}");
+    let receipt = &tx["receipt"];
+    assert_eq!(receipt["tier"], node_receipt["tier"]);
+    assert_eq!(receipt["outputs"], node_receipt["outputs"]);
+    assert_eq!(receipt["effect"]["to"], node_receipt["effect"]["to"]);
+    assert_eq!(receipt["effect"]["amount"], node_receipt["effect"]["amount"]);
+    assert_eq!(receipt["height"], node_receipt["height"]);
+    // private_payment(100) with inputs (400, 250) pays 400 + 250 - 100 = 550 to recipient 0.
+    assert_eq!(receipt["effect"]["amount"], "550");
+
+    let node_program = rpc(&client, &node.url, "shrugg_getProgram", json!([program_id])).await;
+    let program = live.wait_for(&format!("/api/v1/programs/{program_id}"), WAIT, |p| p["call_count"] == 1).await;
+    assert_eq!(program["code_hash"], node_program["code_hash"]);
+    assert_eq!(program["words_len"], node_program["words_len"]);
+    assert_eq!(program["deployer"], user_addr);
+
+    let head = rpc(&client, &node.url, "shrugg_getHead", json!([])).await["height"].as_i64().unwrap();
+    live.wait_for("/api/v1/health", WAIT, |h| h["indexer"]["current_height"].as_i64().unwrap_or(-1) >= head).await;
+    let node_acc = rpc(&client, &node.url, "shrugg_getAccount", json!([user_addr])).await;
+    let acc = live.wait_for(&format!("/api/v1/accounts/{user_addr}"), WAIT, |a| a["tx_count"] == 4).await;
+    assert_eq!(acc["balance"], node_acc["balance"], "explorer vs node balance after deploy + call");
+    assert_eq!(acc["nonce"], node_acc["nonce"]);
+    assert_eq!(acc["programs_deployed"], 1);
     drop(node);
 }
