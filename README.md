@@ -67,6 +67,8 @@ WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are str
 `docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`; a guide for integrators with
 examples in [docs/api.md](docs/api.md). How the fullnode review fixes (M1–M4) shape confidential
 calls and what the explorer shows for them: [docs/confidential-transactions-after-review-fixes.md](docs/confidential-transactions-after-review-fixes.md).
+The guardian bridge end to end (trust model, wire format, admission, storage, RPC, and what
+the explorer indexes and shows), with a diagram: [docs/bridge-architecture.md](docs/bridge-architecture.md).
 
 Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed requests use
 `Authorization: Bearer rsk_...`. Details and quotas in [docs/api.md](docs/api.md).

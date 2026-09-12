@@ -1,0 +1,263 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1000" viewBox="0 0 1500 1000" font-family="Helvetica, Arial, sans-serif">
+  <defs>
+    <marker id="arrow-in" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#1f5fbf"/>
+    </marker>
+    <marker id="arrow-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#c2410c"/>
+    </marker>
+    <marker id="arrow-read" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#6b7280"/>
+    </marker>
+    <style>
+      .title { font-size: 26px; font-weight: 700; fill: #111827; }
+      .sub { font-size: 14px; fill: #4b5563; }
+      .box-title { font-size: 16px; font-weight: 700; fill: #111827; }
+      .box-sub { font-size: 12px; fill: #6b7280; }
+      .t { font-size: 12.5px; fill: #1f2937; }
+      .mono { font-family: Menlo, Consolas, monospace; font-size: 11.5px; fill: #1f2937; }
+      .mono-s { font-family: Menlo, Consolas, monospace; font-size: 10.5px; fill: #374151; }
+      .region { fill: #f9fafb; stroke: #d1d5db; stroke-width: 1.5; rx: 10; }
+      .comp { fill: #ffffff; stroke: #9ca3af; stroke-width: 1.2; rx: 8; }
+      .in { stroke: #1f5fbf; stroke-width: 2; fill: none; marker-end: url(#arrow-in); }
+      .out { stroke: #c2410c; stroke-width: 2; fill: none; marker-end: url(#arrow-out); stroke-dasharray: 7 4; }
+      .read { stroke: #6b7280; stroke-width: 1.6; fill: none; marker-end: url(#arrow-read); stroke-dasharray: 2 4; }
+      .step-in { fill: #1f5fbf; }
+      .step-out { fill: #c2410c; }
+      .step-txt { font-size: 11px; font-weight: 700; fill: #ffffff; }
+      .lbl-in { font-size: 11.5px; fill: #1f5fbf; font-weight: 600; }
+      .lbl-out { font-size: 11.5px; fill: #c2410c; font-weight: 600; }
+    </style>
+  </defs>
+
+  <rect width="1500" height="1000" fill="#ffffff"/>
+  <text x="40" y="44" class="title">Guardian bridge: program architecture</text>
+  <text x="40" y="66" class="sub">Value moves between Rand and four other chains by guardian-signed attestations. Left to right: where an attestation is born, who signs it, who carries it, how the Rand fullnode admits it, and what RandScan shows.</text>
+
+  <!-- ============ Row 1: other chains ============ -->
+  <rect x="40" y="95" width="340" height="250" class="region"/>
+  <text x="56" y="120" class="box-title">Other chains</text>
+  <text x="56" y="138" class="box-sub">source and destination of bridged value</text>
+  <rect x="56" y="150" width="308" height="86" class="comp"/>
+  <text x="68" y="170" class="t"><tspan font-weight="700">Solidity bridge contracts</tspan></text>
+  <text x="68" y="188" class="t">Ethereum (2), BSC (3), Tron (4)</text>
+  <text x="68" y="206" class="t">lock token, emit message; release on a</text>
+  <text x="68" y="222" class="t">guardian-signed burn message from Rand</text>
+  <rect x="56" y="246" width="308" height="86" class="comp"/>
+  <text x="68" y="266" class="t"><tspan font-weight="700">Solana program</tspan></text>
+  <text x="68" y="284" class="t">Solana (5), non-EVM, same wire format</text>
+  <text x="68" y="302" class="t">32-byte addresses used as-is; EVM/Tron</text>
+  <text x="68" y="318" class="t">addresses are left-padded with 12 zero bytes</text>
+
+  <!-- ============ Row 1: guardians ============ -->
+  <rect x="420" y="95" width="320" height="250" class="region"/>
+  <text x="436" y="120" class="box-title">Guardian committee</text>
+  <text x="436" y="138" class="box-sub">the whole trust model; no light client</text>
+  <rect x="436" y="150" width="288" height="182" class="comp"/>
+  <text x="448" y="170" class="t">fixed set of <tspan font-weight="700">secp256k1</tspan> keys, indexed by set</text>
+  <text x="448" y="188" class="t">id = keccak256(pubkey)[12..], an ETH address</text>
+  <text x="448" y="210" class="mono">quorum = n*2/3 + 1</text>
+  <text x="448" y="228" class="mono">mu = keccak256(keccak256(body))</text>
+  <text x="448" y="246" class="t">each sig (index, r, s, v) must be low-s</text>
+  <text x="448" y="268" class="t">rotation: GuardianSetUpgrade signed by the</text>
+  <text x="448" y="284" class="t">current set only, index +1, keys unique and</text>
+  <text x="448" y="300" class="t">non-zero; old set keeps a 86 400 s grace</text>
+  <text x="448" y="316" class="t">window for in-flight transfers</text>
+
+  <!-- ============ Row 1: relayer / wallet ============ -->
+  <rect x="780" y="95" width="320" height="250" class="region"/>
+  <text x="796" y="120" class="box-title">Relayer / wallet</text>
+  <text x="796" y="138" class="box-sub">crates/shrugg-client (shrugg CLI)</text>
+  <rect x="796" y="150" width="288" height="182" class="comp"/>
+  <text x="808" y="170" class="mono">shrugg bridge-mint &lt;attestation&gt;</text>
+  <text x="808" y="186" class="t">submit a signed envelope; its fee pays the submitter</text>
+  <text x="808" y="208" class="mono">bridge-burn &lt;asset&gt; &lt;amount&gt; &lt;chain&gt; &lt;to&gt;</text>
+  <text x="808" y="224" class="t">check_burn_recipient runs the on-chain rule first</text>
+  <text x="808" y="246" class="mono">asset-balance, bridge-status</text>
+  <text x="808" y="268" class="t">RpcClient wraps the five bridge RPC methods;</text>
+  <text x="808" y="284" class="t">any relayer can carry an attestation, the digest</text>
+  <text x="808" y="300" class="t">is the dedup key, so who submits does not matter</text>
+  <text x="808" y="316" class="t">for correctness, only for who earns the fee</text>
+
+  <!-- ============ Row 2: Rand fullnode ============ -->
+  <rect x="40" y="385" width="1060" height="420" class="region"/>
+  <text x="56" y="410" class="box-title">Rand fullnode</text>
+  <text x="56" y="428" class="box-sub">shrugg-node, shrugg-core::bridge</text>
+
+  <!-- RPC -->
+  <rect x="56" y="442" width="230" height="330" class="comp"/>
+  <text x="68" y="462" class="t"><tspan font-weight="700">JSON-RPC</tspan> (rpc.rs)</text>
+  <text x="68" y="484" class="mono-s">shrugg_sendTransaction</text>
+  <text x="68" y="500" class="box-sub">bridge_attest / bridge_burn in</text>
+  <text x="68" y="526" class="mono-s">shrugg_getBridgeState</text>
+  <text x="68" y="542" class="mono-s">shrugg_getBridgeBurn [seq]</text>
+  <text x="68" y="558" class="mono-s">shrugg_getAssetBalance</text>
+  <text x="68" y="574" class="mono-s">shrugg_getAssets</text>
+  <text x="68" y="590" class="mono-s">shrugg_bridgeAssetId</text>
+  <text x="68" y="616" class="mono-s">shrugg_getBlockByHeight</text>
+  <text x="68" y="632" class="mono-s">shrugg_getTransaction</text>
+  <text x="68" y="648" class="box-sub">what RandScan reads; tx JSON</text>
+  <text x="68" y="662" class="box-sub">carries type bridge_attest with</text>
+  <text x="68" y="676" class="box-sub">attestation hex, or bridge_burn</text>
+  <text x="68" y="690" class="box-sub">with asset, amount, to_chain,</text>
+  <text x="68" y="704" class="box-sub">to, fee</text>
+  <text x="68" y="730" class="box-sub">{"enabled": false} on a chain</text>
+  <text x="68" y="744" class="box-sub">whose genesis has no bridge</text>
+
+  <!-- Ledger admission -->
+  <rect x="302" y="442" width="270" height="330" class="comp"/>
+  <text x="314" y="462" class="t"><tspan font-weight="700">Ledger::validate_inner</tspan></text>
+  <text x="314" y="478" class="box-sub">cheap before expensive, in this order</text>
+  <text x="314" y="502" class="t"><tspan font-weight="700">BridgeAttest</tspan></text>
+  <text x="314" y="519" class="t">1  size cap 16 KiB, before any parsing</text>
+  <text x="314" y="535" class="t">2  bridge configured? else Disabled</text>
+  <text x="314" y="551" class="t">3  decode envelope, resolve guardian set</text>
+  <text x="314" y="567" class="t">4  replay check: mu already in spent?</text>
+  <text x="314" y="583" class="t">5  payload decode, emitter binding,</text>
+  <text x="314" y="599" class="t">    token chain, recipient shape</text>
+  <text x="314" y="615" class="t">6  signatures last: expiry, quorum,</text>
+  <text x="314" y="631" class="t">    low-s, ECDSA recovery</text>
+  <text x="314" y="657" class="t"><tspan font-weight="700">BridgeBurn</tspan></text>
+  <text x="314" y="674" class="t">bridge configured, asset registered,</text>
+  <text x="314" y="690" class="t">to_chain = home chain, recipient shape,</text>
+  <text x="314" y="706" class="t">fee &lt;= amount, amount != 0, balance</text>
+  <text x="314" y="732" class="box-sub">both kinds pay only the flat SHRUGG fee;</text>
+  <text x="314" y="746" class="box-sub">no gas metering, no receipt</text>
+
+  <!-- BridgeState -->
+  <rect x="588" y="442" width="240" height="330" class="comp"/>
+  <text x="600" y="462" class="t"><tspan font-weight="700">BridgeState</tspan> (bridge/state.rs)</text>
+  <text x="600" y="486" class="mono-s">emitter, emitters{chain->addr}</text>
+  <text x="600" y="502" class="mono-s">guardian_sets{idx}, current_set</text>
+  <text x="600" y="518" class="mono-s">assets{id -> (chain, token)}</text>
+  <text x="600" y="534" class="mono-s">balances{(asset, addr) -> u128}</text>
+  <text x="600" y="550" class="mono-s">spent{mu}   (inbound replay)</text>
+  <text x="600" y="566" class="mono-s">burn_sequence, burns{seq}</text>
+  <text x="600" y="592" class="t">apply_attest: spent += mu,</text>
+  <text x="600" y="608" class="t">register asset, credit amount - fee</text>
+  <text x="600" y="624" class="t">to recipient and fee to submitter</text>
+  <text x="600" y="646" class="t">apply_burn: debit, append record</text>
+  <text x="600" y="662" class="t">with the next sequence number</text>
+  <text x="600" y="688" class="t">root() folds into state_root only</text>
+  <text x="600" y="704" class="t">when a bridge exists; burns are</text>
+  <text x="600" y="720" class="t">excluded (derivable from history)</text>
+  <text x="600" y="742" class="box-sub">bridged balances are a separate ledger,</text>
+  <text x="600" y="756" class="box-sub">never touching SHRUGG accounts</text>
+
+  <!-- Storage -->
+  <rect x="844" y="442" width="240" height="330" class="comp"/>
+  <text x="856" y="462" class="t"><tspan font-weight="700">RocksDB</tspan> (storage.rs)</text>
+  <text x="856" y="486" class="mono-s">meta["bridge_state"]</text>
+  <text x="856" y="500" class="box-sub">bincode(BridgeMeta); its presence</text>
+  <text x="856" y="514" class="box-sub">makes a chain "bridged" on disk</text>
+  <text x="856" y="538" class="mono-s">cf bridge_balances</text>
+  <text x="856" y="552" class="box-sub">asset||addr -> u128, deleted at 0</text>
+  <text x="856" y="574" class="mono-s">cf bridge_spent</text>
+  <text x="856" y="588" class="box-sub">digest -> (set)</text>
+  <text x="856" y="610" class="mono-s">cf bridge_burns</text>
+  <text x="856" y="624" class="box-sub">BE sequence -> BridgeBurnRecord</text>
+  <text x="856" y="650" class="t">per-block commit touches only the</text>
+  <text x="856" y="666" class="t">rows a block moved; undecodable</text>
+  <text x="856" y="682" class="t">payload is a Corrupt (torn block)</text>
+  <text x="856" y="698" class="t">error, never a silent skip</text>
+  <text x="856" y="724" class="t">startup compares stored vs replayed</text>
+  <text x="856" y="740" class="t">bridge state, since the root does</text>
+  <text x="856" y="756" class="t">not cover the burn log</text>
+
+  <!-- bridge-codec strip -->
+  <rect x="56" y="778" width="1028" height="22" fill="#eef2ff" stroke="#c7d2fe" rx="4"/>
+  <text x="66" y="793" class="mono-s">crates/bridge-codec (no_std, zero deps): the envelope and payload byte layout shared verbatim by the Solidity contracts, the Solana program and this node</text>
+
+  <!-- ============ Right column: RandScan ============ -->
+  <rect x="1140" y="95" width="320" height="710" class="region"/>
+  <text x="1156" y="120" class="box-title">RandScan explorer</text>
+  <text x="1156" y="138" class="box-sub">read-only; never submits, never verifies</text>
+
+  <rect x="1156" y="150" width="288" height="150" class="comp"/>
+  <text x="1168" y="170" class="t"><tspan font-weight="700">Indexer</tspan> (randscan-indexer)</text>
+  <text x="1168" y="190" class="t">polls shrugg_getBlockByHeight, decodes</text>
+  <text x="1168" y="206" class="mono-s">RpcTxKind::BridgeAttest {attestation}</text>
+  <text x="1168" y="222" class="mono-s">RpcTxKind::BridgeBurn {asset, amount,</text>
+  <text x="1168" y="238" class="mono-s">  to_chain, to, fee}</text>
+  <text x="1168" y="258" class="t">unknown kinds become `other` with the</text>
+  <text x="1168" y="274" class="t">node's tag kept, so a newer node never</text>
+  <text x="1168" y="290" class="t">stalls indexing</text>
+
+  <rect x="1156" y="316" width="288" height="150" class="comp"/>
+  <text x="1168" y="336" class="t"><tspan font-weight="700">Postgres</tspan> transactions (migration 004)</text>
+  <text x="1168" y="356" class="mono-s">kind VARCHAR(32)</text>
+  <text x="1168" y="372" class="mono-s">asset, bridge_amount, to_chain,</text>
+  <text x="1168" y="388" class="mono-s">bridge_to, bridge_fee, attestation</text>
+  <text x="1168" y="410" class="t">a burn's foreign destination lives in</text>
+  <text x="1168" y="426" class="t">bridge_to, never in `to`, so it never</text>
+  <text x="1168" y="442" class="t">becomes an account row</text>
+  <text x="1168" y="458" class="box-sub">reset on a chain switch; users survive</text>
+
+  <rect x="1156" y="482" width="288" height="130" class="comp"/>
+  <text x="1168" y="502" class="t"><tspan font-weight="700">API</tspan> (randscan-api)</text>
+  <text x="1168" y="522" class="mono-s">GET /api/v1/transactions</text>
+  <text x="1168" y="538" class="mono-s">    ?kind=bridge_burn | bridge_attest</text>
+  <text x="1168" y="554" class="mono-s">GET /api/v1/transactions/{hash}</text>
+  <text x="1168" y="574" class="t">detail carries the six bridge fields;</text>
+  <text x="1168" y="590" class="t">amounts are strings of 8-decimal units</text>
+  <text x="1168" y="606" class="box-sub">to / amount stay SHRUGG-only and null here</text>
+
+  <rect x="1156" y="628" width="288" height="164" class="comp"/>
+  <text x="1168" y="648" class="t"><tspan font-weight="700">Frontend</tspan> (Next.js)</text>
+  <text x="1168" y="668" class="t">badges "Bridge in" / "Bridge out", kind filter,</text>
+  <text x="1168" y="684" class="t">burn panel: amount and relayer fee at</text>
+  <text x="1168" y="700" class="t">8 decimals, chain name (Ethereum, BSC,</text>
+  <text x="1168" y="716" class="t">Tron, Solana), unpadded EVM address</text>
+  <text x="1168" y="736" class="t">attestation panel: size and raw hex, not</text>
+  <text x="1168" y="752" class="t">decoded (recipient and amount are inside</text>
+  <text x="1168" y="768" class="t">the message); "other" panel for new kinds</text>
+
+  <!-- ============ Flow arrows ============ -->
+  <!-- inbound: contracts -> guardians -> relayer -> RPC -> validate -> state -> storage -->
+  <path d="M364,193 L436,193" class="in"/>
+  <path d="M724,193 L796,193" class="in"/>
+  <path d="M940,332 L940,372 L250,372 L250,442" class="in"/>
+  <path d="M286,520 L302,520" class="in"/>
+  <path d="M572,520 L588,520" class="in"/>
+  <path d="M828,520 L844,520" class="in"/>
+  <!-- outbound: wallet -> RPC (dashed), storage burns -> relayer/guardians -> contracts -->
+  <path d="M1000,332 L1000,360 L272,360 L272,442" class="out"/>
+  <path d="M964,442 L964,352 L880,352 L880,332" class="out"/>
+  <path d="M796,290 L740,290" class="out"/>
+  <path d="M436,290 L364,290" class="out"/>
+  <!-- read path: RPC -> RandScan indexer -->
+  <path d="M1100,225 L1156,225" class="read"/>
+  <path d="M1084,620 L1120,620 L1120,225" class="read"/>
+  <path d="M1300,300 L1300,316" class="read"/>
+  <path d="M1300,466 L1300,482" class="read"/>
+  <path d="M1300,612 L1300,628" class="read"/>
+
+  <!-- inbound step markers -->
+  <g>
+    <circle cx="380" cy="176" r="10" class="step-in"/><text x="376.5" y="180" class="step-txt">1</text>
+    <circle cx="740" cy="176" r="10" class="step-in"/><text x="736.5" y="180" class="step-txt">2</text>
+    <circle cx="940" cy="352" r="10" class="step-in"/><text x="936.5" y="356" class="step-txt">3</text>
+    <circle cx="294" cy="504" r="10" class="step-in"/><text x="290.5" y="508" class="step-txt">4</text>
+    <circle cx="580" cy="504" r="10" class="step-in"/><text x="576.5" y="508" class="step-txt">5</text>
+    <circle cx="836" cy="504" r="10" class="step-in"/><text x="832.5" y="508" class="step-txt">6</text>
+  </g>
+  <!-- outbound step markers -->
+  <g>
+    <circle cx="1000" cy="346" r="10" class="step-out"/><text x="995.5" y="350" class="step-txt">A</text>
+    <circle cx="964" cy="420" r="10" class="step-out"/><text x="959.5" y="424" class="step-txt">B</text>
+    <circle cx="768" cy="276" r="10" class="step-out"/><text x="763.5" y="280" class="step-txt">C</text>
+    <circle cx="400" cy="276" r="10" class="step-out"/><text x="395.5" y="280" class="step-txt">D</text>
+  </g>
+
+  <!-- ============ Legend ============ -->
+  <rect x="40" y="830" width="1420" height="150" class="region"/>
+  <text x="56" y="855" class="box-title">Flows</text>
+  <path d="M56,878 L116,878" class="in"/>
+  <text x="126" y="882" class="lbl-in">Inbound (bridge_attest, "Bridge in")</text>
+  <text x="126" y="900" class="t">1 a contract or program locks a token and emits a message.  2 guardians observe it and sign mu.  3 any relayer submits it with bridge-mint.  4 the ledger runs the cheap checks first,</text>
+  <text x="126" y="916" class="t">then the signatures.  5 apply_attest records mu as spent, registers the asset on first sight, credits amount - fee to the recipient and fee to the submitter.  6 storage commits the rows the block moved.</text>
+  <path d="M56,938 L116,938" class="out"/>
+  <text x="126" y="942" class="lbl-out">Outbound (bridge_burn, "Bridge out")</text>
+  <text x="126" y="960" class="t">A the wallet pre-checks the recipient and submits bridge-burn.  B check_burn, then apply_burn debits the balance and appends a BridgeBurnRecord under the next sequence number.</text>
+  <text x="126" y="976" class="t">C a relayer reads it back with shrugg_getBridgeBurn and hands it to the guardians.  D they sign, and the destination chain releases the token.  Grey dotted: RandScan reads over the same RPC and only displays.</text>
+</svg>
