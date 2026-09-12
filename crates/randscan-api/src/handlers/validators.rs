@@ -6,14 +6,14 @@ use axum::{
 use randscan_core::{Validator, ValidatorDetail};
 use randscan_db as db;
 
-async fn total_stake(pool: &db::PgPool) -> ApiResult<u128> {
+async fn active_stake(pool: &db::PgPool) -> ApiResult<u128> {
     Ok(db::total_stake(pool).await?.parse().unwrap_or(0))
 }
 
-/// GET /api/v1/validators
+/// GET /api/v1/validators — the register, in address order (active entries are the rotation).
 pub async fn list_validators(State(state): State<AppState>) -> ApiResult<Json<Vec<Validator>>> {
     let pool = state.db.inner();
-    let total = total_stake(pool).await?;
+    let total = active_stake(pool).await?;
     let rows = db::list_validators(pool).await?;
     Ok(Json(
         rows.into_iter().map(|r| r.into_validator(total)).collect(),
@@ -29,7 +29,7 @@ pub async fn get_validator(
     let row = db::get_validator(pool, &address)
         .await?
         .ok_or_else(|| AppError::NotFound("validator".into()))?;
-    let total = total_stake(pool).await?;
+    let total = active_stake(pool).await?;
     let recent = db::list_blocks(pool, 0, 10, Some(&address)).await?;
     Ok(Json(ValidatorDetail {
         validator: row.into_validator(total),

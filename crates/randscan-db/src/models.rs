@@ -2,8 +2,8 @@
 
 use chrono::{DateTime, Utc};
 use randscan_core::{
-    BlockSummary, GeoInfo, NetworkStats, ProgramSummary, Receipt, ReceiptEffect,
-    TransactionSummary, TxKind, Validator,
+    BlockSummary, Bundle, GeoInfo, NetworkStats, Note, Nullifier, PendingStake, ProgramSummary,
+    Receipt, TransactionDetail, TransactionSummary, TxKind, Validator,
 };
 use sqlx::FromRow;
 
@@ -36,30 +36,21 @@ impl From<BlockRow> for BlockSummary {
     }
 }
 
+/// The columns a transaction list needs. `TxDetailRow` carries the rest.
 #[derive(Debug, Clone, FromRow)]
 pub struct TxRow {
     pub hash: String,
     pub block_hash: String,
     pub height: i64,
     pub tx_index: i32,
-    pub sender: String,
-    pub nonce: i64,
-    pub fee: String,
     pub kind: String,
-    pub chain_id: i64,
+    pub fee: String,
     pub timestamp_ms: i64,
-    pub to_address: Option<String>,
-    pub amount: Option<String>,
+    pub has_bundle: bool,
     pub program_id: Option<String>,
-    pub base_pc: Option<i64>,
-    pub words_len: Option<i64>,
-    pub proof_len: Option<i64>,
-    pub recipients: Vec<String>,
-    pub asset: Option<String>,
-    pub bridge_amount: Option<String>,
-    pub to_chain: Option<i32>,
-    pub bridge_to: Option<String>,
-    pub bridge_fee: Option<String>,
+    pub validator: Option<String>,
+    pub amount: Option<String>,
+    pub asset_index: Option<i64>,
 }
 
 impl From<TxRow> for TransactionSummary {
@@ -69,24 +60,103 @@ impl From<TxRow> for TransactionSummary {
             height: t.height,
             block_hash: t.block_hash,
             tx_index: t.tx_index,
-            sender: t.sender,
-            nonce: t.nonce,
-            fee: t.fee,
             kind: TxKind::parse_lossy(&t.kind),
+            fee: t.fee,
             timestamp_ms: t.timestamp_ms,
-            to: t.to_address,
-            amount: t.amount,
+            has_bundle: t.has_bundle,
             program: t.program_id,
+            validator: t.validator,
+            amount: t.amount,
+            asset_index: t.asset_index,
         }
     }
 }
 
-/// Transaction row joined with the account role.
+/// Every column of a transaction row.
 #[derive(Debug, Clone, FromRow)]
-pub struct AccountTxRow {
+pub struct TxDetailRow {
     #[sqlx(flatten)]
     pub tx: TxRow,
-    pub role: String,
+    pub chain_id: i64,
+    pub anchor: Option<String>,
+    pub nullifier_1: Option<String>,
+    pub nullifier_2: Option<String>,
+    pub commitment_1: Option<String>,
+    pub commitment_2: Option<String>,
+    pub burn: Option<String>,
+    pub asset: Option<i64>,
+    pub bundle_time: Option<i64>,
+    pub proof_len: Option<i64>,
+    pub envelope_len_1: Option<i64>,
+    pub envelope_len_2: Option<i64>,
+    pub words_len: Option<i64>,
+    pub call_proof_len: Option<i64>,
+    pub input_envelope_len: Option<i64>,
+    pub cm: Option<String>,
+    pub registered: Option<bool>,
+    pub action_nonce: Option<i64>,
+    pub attestation_len: Option<i64>,
+    pub recipient: Option<String>,
+    pub note_time: Option<i64>,
+    pub relayer_fee: Option<String>,
+    pub to_chain: Option<i32>,
+    pub bridge_to: Option<String>,
+    pub asset_bundle: Option<serde_json::Value>,
+}
+
+impl TxDetailRow {
+    /// The fee bundle, when the row has one.
+    pub fn bundle(&self) -> Option<Bundle> {
+        if !self.tx.has_bundle {
+            return None;
+        }
+        Some(Bundle {
+            anchor: self.anchor.clone().unwrap_or_default(),
+            nullifiers: [
+                self.nullifier_1.clone().unwrap_or_default(),
+                self.nullifier_2.clone().unwrap_or_default(),
+            ],
+            commitments: [
+                self.commitment_1.clone().unwrap_or_default(),
+                self.commitment_2.clone().unwrap_or_default(),
+            ],
+            fee: self.tx.fee.clone(),
+            burn: self.burn.clone().unwrap_or_else(|| "0".into()),
+            asset: self.asset.unwrap_or(0),
+            time: self.bundle_time.unwrap_or(0),
+            proof_len: self.proof_len.unwrap_or(0),
+            envelope_len: [
+                self.envelope_len_1.unwrap_or(0),
+                self.envelope_len_2.unwrap_or(0),
+            ],
+        })
+    }
+
+    pub fn into_detail(self, receipt: Option<Receipt>) -> TransactionDetail {
+        let bundle = self.bundle();
+        let asset_bundle = self
+            .asset_bundle
+            .and_then(|v| serde_json::from_value(v).ok());
+        TransactionDetail {
+            chain_id: self.chain_id,
+            bundle,
+            words_len: self.words_len,
+            call_proof_len: self.call_proof_len,
+            input_envelope_len: self.input_envelope_len,
+            receipt,
+            cm: self.cm,
+            registered: self.registered,
+            action_nonce: self.action_nonce,
+            attestation_len: self.attestation_len,
+            recipient: self.recipient,
+            note_time: self.note_time,
+            relayer_fee: self.relayer_fee,
+            to_chain: self.to_chain,
+            bridge_to: self.bridge_to,
+            asset_bundle,
+            summary: self.tx.into(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]
@@ -95,44 +165,72 @@ pub struct ReceiptRow {
     pub program: String,
     pub tier: i32,
     pub outputs: Vec<i64>,
-    pub effect_to: Option<String>,
-    pub effect_amount: Option<String>,
     pub height: i64,
     pub tx_index: i32,
+    pub h_in: String,
 }
 
 impl From<ReceiptRow> for Receipt {
     fn from(r: ReceiptRow) -> Self {
-        let effect = match (r.effect_to, r.effect_amount) {
-            (Some(to), Some(amount)) => Some(ReceiptEffect { to, amount }),
-            _ => None,
-        };
         Receipt {
             tx: r.tx_hash,
             program: r.program,
             tier: r.tier,
             outputs: r.outputs,
-            effect,
             height: r.height,
             index: r.tx_index,
+            h_in: r.h_in,
         }
     }
 }
 
 #[derive(Debug, Clone, FromRow)]
-pub struct AccountRow {
-    pub address: String,
-    pub balance: String,
-    pub nonce: i64,
-    pub tx_count: i64,
-    pub first_seen_height: i64,
-    pub last_seen_height: i64,
+pub struct NoteRow {
+    pub leaf_index: i64,
+    pub cm: String,
+    pub height: i64,
+    pub tx_hash: Option<String>,
+}
+
+impl From<NoteRow> for Note {
+    fn from(n: NoteRow) -> Self {
+        Note {
+            leaf_index: n.leaf_index,
+            cm: n.cm,
+            height: n.height,
+            tx_hash: n.tx_hash,
+        }
+    }
+}
+
+#[derive(Debug, Clone, FromRow)]
+pub struct NullifierRow {
+    pub nullifier: String,
+    pub tx_hash: String,
+    pub height: i64,
+    pub tx_index: i32,
+}
+
+impl From<NullifierRow> for Nullifier {
+    fn from(n: NullifierRow) -> Self {
+        Nullifier {
+            nullifier: n.nullifier,
+            tx_hash: n.tx_hash,
+            height: n.height,
+            tx_index: n.tx_index,
+        }
+    }
 }
 
 #[derive(Debug, Clone, FromRow)]
 pub struct ValidatorRow {
     pub address: String,
     pub stake: String,
+    pub rewards: String,
+    pub pending: serde_json::Value,
+    pub payout: Option<String>,
+    pub nonce: i64,
+    pub active: bool,
     pub sort_index: i32,
     pub blocks_proposed: i64,
     pub last_proposed_height: Option<i64>,
@@ -140,16 +238,23 @@ pub struct ValidatorRow {
 }
 
 impl ValidatorRow {
-    pub fn into_validator(self, total_stake: u128) -> Validator {
+    /// `active_stake` is the sum over the active set; an inactive validator's share is 0.
+    pub fn into_validator(self, active_stake: u128) -> Validator {
         let stake: u128 = self.stake.parse().unwrap_or(0);
-        let share_percent = if total_stake == 0 {
+        let share_percent = if active_stake == 0 || !self.active {
             0.0
         } else {
-            (stake as f64 / total_stake as f64) * 100.0
+            (stake as f64 / active_stake as f64) * 100.0
         };
+        let pending: Vec<PendingStake> = serde_json::from_value(self.pending).unwrap_or_default();
         Validator {
             address: self.address,
             stake: self.stake,
+            rewards: self.rewards,
+            pending,
+            payout: self.payout,
+            nonce: self.nonce,
+            active: self.active,
             share_percent,
             blocks_proposed: self.blocks_proposed,
             last_proposed_height: self.last_proposed_height,
@@ -162,7 +267,6 @@ impl ValidatorRow {
 #[derive(Debug, Clone, FromRow)]
 pub struct ProgramRow {
     pub id: String,
-    pub deployer: String,
     pub deploy_tx: String,
     pub deployed_at_height: i64,
     pub base_pc: i64,
@@ -176,7 +280,6 @@ impl From<ProgramRow> for ProgramSummary {
     fn from(p: ProgramRow) -> Self {
         ProgramSummary {
             id: p.id,
-            deployer: p.deployer,
             deploy_tx: p.deploy_tx,
             deployed_at_height: p.deployed_at_height,
             base_pc: p.base_pc,
@@ -196,10 +299,13 @@ pub struct NetworkStatsRow {
     pub height: i64,
     pub view: i64,
     pub total_transactions: i64,
-    pub total_accounts: i64,
+    pub notes: i64,
+    pub nullifiers: i64,
     pub validator_count: i64,
+    pub active_validator_count: i64,
     pub total_stake: String,
     pub total_supply: String,
+    pub pool_value: Option<String>,
     pub program_count: i64,
     pub avg_block_time_ms: f64,
     pub peer_count: i32,
@@ -208,6 +314,10 @@ pub struct NetworkStatsRow {
     pub faucet: bool,
     pub confidential: bool,
     pub current_leader: Option<String>,
+    pub tree_root: Option<String>,
+    pub hc_bundle: Option<String>,
+    pub epoch: Option<i64>,
+    pub epoch_blocks: Option<i64>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -220,10 +330,13 @@ impl From<NetworkStatsRow> for NetworkStats {
             height: s.height,
             view: s.view,
             total_transactions: s.total_transactions,
-            total_accounts: s.total_accounts,
+            notes: s.notes,
+            nullifiers: s.nullifiers,
             validator_count: s.validator_count,
+            active_validator_count: s.active_validator_count,
             total_stake: s.total_stake,
             total_supply: s.total_supply,
+            pool_value: s.pool_value,
             program_count: s.program_count,
             avg_block_time_ms: s.avg_block_time_ms,
             peer_count: s.peer_count,
@@ -232,6 +345,10 @@ impl From<NetworkStatsRow> for NetworkStats {
             faucet: s.faucet,
             confidential: s.confidential,
             current_leader: s.current_leader,
+            tree_root: s.tree_root,
+            hc_bundle: s.hc_bundle,
+            epoch: s.epoch,
+            epoch_blocks: s.epoch_blocks,
             updated_at: s.updated_at.to_rfc3339(),
         }
     }
@@ -244,6 +361,8 @@ pub struct IndexerStateRow {
     pub is_syncing: bool,
     /// Chain id of the indexed data; `None` before the indexer first reached a node.
     pub chain_id: Option<i64>,
+    /// Next commitment-tree leaf to fetch from `shrugg_getCommitments`.
+    pub next_leaf: i64,
 }
 
 #[derive(Debug, Clone, FromRow)]

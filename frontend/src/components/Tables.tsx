@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { Column, DataTable } from './DataTable';
 import { Hash } from './Hash';
 import { KindBadge } from './KindBadge';
-import { formatAmount, formatNumber, formatTimestamp } from '@/lib/utils';
-import type { AccountTransaction, BlockSummary, TransactionSummary } from '@/types';
+import { formatAmount, formatAssetAmount, formatNumber, formatTimestamp } from '@/lib/utils';
+import type { BlockSummary, TransactionSummary } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Blocks
@@ -78,10 +78,43 @@ export function BlocksTable({ blocks, isLoading, emptyMessage }: BlocksTableProp
 // Transactions
 // ---------------------------------------------------------------------------
 
-/** Amount cell: transfers/mints carry an amount, deploys/calls usually do not. */
-function amountCell(tx: TransactionSummary) {
-  if (tx.amount === null) return <span className="text-mute">—</span>;
-  return <span className="font-mono text-text">{formatAmount(tx.amount)}</span>;
+/**
+ * What the action touched: the program of a deploy/call, the validator of a staking move or
+ * mint, the public amount of a deposit. A plain transfer shows nothing, by design.
+ */
+function actionCell(tx: TransactionSummary) {
+  const parts: React.ReactNode[] = [];
+  if (tx.program) {
+    parts.push(
+      <Hash key="program" value={tx.program} href={`/programs/${tx.program}`} start={6} end={6} />
+    );
+  }
+  if (tx.validator) {
+    parts.push(
+      <Hash
+        key="validator"
+        value={tx.validator}
+        href={`/validators/${tx.validator}`}
+        start={6}
+        end={6}
+      />
+    );
+  }
+  if (tx.amount !== null) {
+    parts.push(
+      <span key="amount" className="font-mono text-text">
+        {formatAssetAmount(tx.amount, tx.asset_index)}
+      </span>
+    );
+  }
+  if (parts.length === 0) {
+    return (
+      <span className="text-mute" title="Sender, receiver and amount are hidden inside the bundle">
+        {tx.kind === 'transfer' ? 'shielded' : '—'}
+      </span>
+    );
+  }
+  return <span className="inline-flex flex-wrap items-center gap-2">{parts}</span>;
 }
 
 export function transactionColumns(): Column<TransactionSummary>[] {
@@ -106,31 +139,21 @@ export function transactionColumns(): Column<TransactionSummary>[] {
       ),
     },
     {
-      key: 'sender',
-      header: 'From',
-      render: (tx) => <Hash value={tx.sender} href={`/account/${tx.sender}`} start={6} end={6} />,
-    },
-    {
-      key: 'to',
-      header: 'To',
-      render: (tx) =>
-        tx.to ? (
-          <Hash value={tx.to} href={`/account/${tx.to}`} start={6} end={6} />
-        ) : tx.program ? (
-          <Hash value={tx.program} href={`/programs/${tx.program}`} start={6} end={6} />
-        ) : (
-          <span className="text-mute">—</span>
-        ),
-    },
-    {
-      key: 'amount',
-      header: 'Amount',
-      render: amountCell,
+      key: 'action',
+      header: 'Action',
+      render: actionCell,
     },
     {
       key: 'fee',
       header: 'Fee',
-      render: (tx) => <span className="font-mono text-mute">{formatAmount(tx.fee)}</span>,
+      render: (tx) =>
+        tx.has_bundle ? (
+          <span className="font-mono text-mute">{formatAmount(tx.fee)}</span>
+        ) : (
+          <span className="text-mute" title="Validator-signed action: no bundle, no fee">
+            —
+          </span>
+        ),
     },
     {
       key: 'timestamp_ms',
@@ -167,61 +190,6 @@ export function TransactionsTable({
       keyExtractor={(tx) => tx.hash}
       isLoading={isLoading}
       emptyMessage={emptyMessage ?? 'No transactions found'}
-    />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Account transactions (adds the sender/recipient role)
-// ---------------------------------------------------------------------------
-
-function RoleCell({ role }: { role: AccountTransaction['role'] }) {
-  const outgoing = role === 'sender';
-  return (
-    <span
-      className={
-        outgoing
-          ? 'inline-flex items-center gap-1.5 text-accent-3'
-          : 'inline-flex items-center gap-1.5 text-accent'
-      }
-    >
-      <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d={outgoing ? 'M14 5l7 7m0 0l-7 7m7-7H3' : 'M10 19l-7-7m0 0l7-7m-7 7h18'}
-        />
-      </svg>
-      {outgoing ? 'Sent' : 'Received'}
-    </span>
-  );
-}
-
-interface AccountTransactionsTableProps {
-  transactions: AccountTransaction[];
-  isLoading?: boolean;
-}
-
-export function AccountTransactionsTable({
-  transactions,
-  isLoading,
-}: AccountTransactionsTableProps) {
-  const columns: Column<AccountTransaction>[] = [
-    {
-      key: 'role',
-      header: 'Role',
-      render: (tx) => <RoleCell role={tx.role} />,
-    },
-    ...(transactionColumns() as Column<AccountTransaction>[]),
-  ];
-
-  return (
-    <DataTable
-      columns={columns}
-      data={transactions}
-      keyExtractor={(tx) => `${tx.hash}-${tx.role}`}
-      isLoading={isLoading}
-      emptyMessage="No transactions for this account"
     />
   );
 }

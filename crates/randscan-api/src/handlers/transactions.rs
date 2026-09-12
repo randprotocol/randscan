@@ -20,20 +20,28 @@ pub async fn list_transactions(
         ),
         None => None,
     };
-    let kind = kind.map(|k| k.as_str());
+    let program = match q.program.as_deref().filter(|p| !p.is_empty()) {
+        Some(p) => match classify_query(p) {
+            QueryKind::Hash(h) => Some(h),
+            _ => {
+                return Err(AppError::BadRequest(
+                    "program must be 64 hex characters".into(),
+                ))
+            }
+        },
+        None => None,
+    };
+    let filter = db::TxFilter {
+        kind: kind.map(|k| k.as_str()),
+        height: q.height,
+        validator: q.validator.as_deref().filter(|v| !v.is_empty()),
+        program: program.as_deref(),
+    };
     let pool = state.db.inner();
     let pg = q.pagination();
     let p = &pg;
-    let rows = db::list_transactions(
-        pool,
-        p.offset(),
-        p.limit(),
-        kind,
-        q.sender.as_deref(),
-        q.height,
-    )
-    .await?;
-    let total = db::count_transactions(pool, kind, q.sender.as_deref(), q.height).await?;
+    let rows = db::list_transactions(pool, p.offset(), p.limit(), &filter).await?;
+    let total = db::count_transactions(pool, &filter).await?;
     Ok(Json(PaginatedResponse {
         data: rows.into_iter().map(Into::into).collect(),
         pagination: PaginationInfo::new(p, total),
@@ -66,29 +74,10 @@ pub async fn get_transaction(
     let row = db::get_transaction(pool, &hash)
         .await?
         .ok_or_else(|| AppError::NotFound("transaction".into()))?;
-    let receipt = if row.kind == "call" {
+    let receipt = if row.tx.kind == "call" {
         db::get_receipt(pool, &hash).await?.map(Into::into)
     } else {
         None
     };
-    let attestation = if row.kind == "bridge_attest" {
-        db::get_attestation(pool, &hash).await?
-    } else {
-        None
-    };
-    Ok(Json(TransactionDetail {
-        chain_id: row.chain_id,
-        base_pc: row.base_pc,
-        words_len: row.words_len,
-        proof_len: row.proof_len,
-        recipients: row.recipients.clone(),
-        receipt,
-        asset: row.asset.clone(),
-        bridge_amount: row.bridge_amount.clone(),
-        to_chain: row.to_chain,
-        bridge_to: row.bridge_to.clone(),
-        bridge_fee: row.bridge_fee.clone(),
-        attestation,
-        summary: row.into(),
-    }))
+    Ok(Json(row.into_detail(receipt)))
 }

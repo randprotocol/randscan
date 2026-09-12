@@ -10,10 +10,16 @@ Block explorer for the Rand Protocol SHRUGG chain (the network served by
 
 ## What it indexes
 
-Committed blocks (hash, height, HotStuff view, proposer, roots, `justify_view`), the four transaction
-kinds (`transfer`, `mint`, `deploy`, `call`), confidential-call receipts (tier, outputs, effect),
-accounts (balance and nonce read back from the node), validators (stake, blocks proposed), deployed
-programs, network stats, and the node's libp2p peers with geolocated IPs.
+SHRUGG is a fully shielded chain (fullnode shielded-pool phases S1–S3): there are no accounts,
+and every transaction is a shielded bundle (anchor, two nullifiers, two commitments, fee, burn,
+proof) plus an optional public action. The explorer indexes committed blocks (hash, height,
+HotStuff view, proposer, roots, `justify_view`), every transaction's public bundle fields and its
+action (`transfer`, `mint`, `deploy`, `call`, `bond`, `unbond`, `withdraw`, `bridge_attest`,
+`bridge_burn`), confidential-call receipts (tier, outputs, `h_in`), the commitment tree leaf by
+leaf and the nullifier set, the validator register (stake, rewards, unbonding queue, active
+set), deployed programs, the supply audit and bridge state, network stats, and the node's libp2p
+peers with geolocated IPs. Balances and a transfer's parties are visible only to a viewing key,
+which the explorer does not hold. Design: `docs/superpowers/specs/2026-09-12-shielded-chain-design.md`.
 
 ## Run locally
 
@@ -34,6 +40,15 @@ Set `COOKIE_SECURE=false` in `.env` for local http so sign-in works.
 
 The schema (`migrations/001_initial_schema.sql`) is created automatically on first start. The
 indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERVAL_MS`.
+
+### Integration tests
+
+`crates/randscan-api/tests/mock_node.rs` runs the indexer, API and broadcast against a scripted
+shielded node (every action kind, the tree, the register, two hard forks); `tests/real_node.rs`
+spawns a real shielded `shrugg-node` plus the `shrugg` wallet (faucet, a proved transfer, a
+deploy and a confidential call) and compares every public number. Both need `DATABASE_URL`;
+the real-node test also needs `SHRUGG_NODE_BIN` (a build of the fullnode's `shielded-s3` branch
+or later, with `shrugg` beside it or `SHRUGG_CLI` set).
 
 ### Environment
 
@@ -59,16 +74,17 @@ indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERV
 
 ## API
 
-REST under `/api/v1` (`health`, `stats`, `blocks`, `blocks/latest`, `blocks/:id`, `transactions`,
-`transactions/latest`, `transactions/:hash`, `accounts/:address`, `accounts/:address/transactions`,
-`validators`, `validators/:address`, `programs`, `programs/:id`, `nodes`, `search?q=`) and a
-WebSocket at `/ws` (channels `blocks`, `transactions`, `stats`). Amounts are strings of units
-(1 SHRUGG = 10^9 units); timestamps are `timestamp_ms`. Full shapes in
-`docs/superpowers/specs/2026-09-10-shrugg-retarget-design.md`; a guide for integrators with
-examples in [docs/api.md](docs/api.md). How the fullnode review fixes (M1–M4) shape confidential
-calls and what the explorer shows for them: [docs/confidential-transactions-after-review-fixes.md](docs/confidential-transactions-after-review-fixes.md).
-The guardian bridge end to end (trust model, wire format, admission, storage, RPC, and what
-the explorer indexes and shows), with a diagram: [docs/bridge-architecture.md](docs/bridge-architecture.md).
+REST under `/api/v1` (`health`, `stats`, `supply`, `bridge`, `blocks`, `blocks/latest`,
+`blocks/:id`, `transactions`, `transactions/latest`, `transactions/:hash`, `notes`, `notes/:id`,
+`nullifiers/:nf`, `validators`, `validators/:address`, `programs`, `programs/:id`, `nodes`,
+`search?q=`; `accounts/*` answers 410) and a WebSocket at `/ws` (channels `blocks`,
+`transactions`, `stats`). Amounts are strings of units (1 SHRUGG = 10^9 units); timestamps are
+`timestamp_ms`. Full shapes in `docs/superpowers/specs/2026-09-12-shielded-chain-design.md`; a
+guide for integrators with examples in [docs/api.md](docs/api.md). Two documents from the
+account chain remain for history: how the fullnode review fixes shaped confidential calls
+([docs/confidential-transactions-after-review-fixes.md](docs/confidential-transactions-after-review-fixes.md))
+and the guardian bridge end to end with a diagram ([docs/bridge-architecture.md](docs/bridge-architecture.md));
+their account-side details (balances, recipients, effects) no longer apply.
 
 Accounts and API keys: sign up at `/signup`, create keys at `/dashboard`; keyed requests use
 `Authorization: Bearer rsk_...`. Details and quotas in [docs/api.md](docs/api.md).
@@ -98,14 +114,21 @@ process listings.
 
 The indexer records the chain id of the data it holds (`indexer_state.chain_id`). When the node it
 follows serves a different chain id, or a different genesis block under the same id, the indexer
-logs a warning, truncates only the chain-derived tables (blocks, transactions, receipts, accounts,
-programs, validators) and re-indexes from height 0. Users, sessions, API keys, password resets and
-the peer geolocation cache are kept. Nothing to do by hand: restart (or re-point) the node and, if
-you want it picked up immediately rather than within ten seconds, `systemctl restart randscan-api`.
-Do **not** drop the database; that would delete user accounts and API keys.
+logs a warning, truncates only the chain-derived tables (blocks, transactions, nullifiers, notes,
+receipts, programs, validators) and re-indexes from height 0 and tree leaf 0. Users, sessions,
+API keys, password resets and the peer geolocation cache are kept. Nothing to do by hand: restart
+(or re-point) the node and, if you want it picked up immediately rather than within ten seconds,
+`systemctl restart randscan-api`. Do **not** drop the database; that would delete user accounts
+and API keys.
+
+The switch to the shielded chain is also a schema change: migration `005_shielded_chain.sql`
+drops and recreates the chain tables (users and keys untouched) the first time this build
+starts. This build reads only the shielded node's RPC (bundles, actions, `shrugg_getCommitments`,
+the register); pointed at an account-chain node it will not index. Deploy it together with the
+shielded node.
 
 Transaction kinds the node serves that this build does not decode are indexed as kind `other`
-(hash, sender, fee and block only) so a newer node never stalls the explorer.
+(hash, bundle, fee and block only) so a newer node never stalls the explorer.
 
 ## Deploy on a node
 

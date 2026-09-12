@@ -117,17 +117,31 @@ export function formatAmount(
 }
 
 /**
- * Stake is a raw consensus weight, not a token balance — it carries no decimals
- * and no symbol. Rendered as a grouped integer followed by "stake".
+ * Stake is SHRUGG that left the pool into the validator register, so it is units with the
+ * token's nine decimals. `suffix` is appended after the symbol ("1,000 SHRUGG total stake").
  */
 export function formatStake(
   value: string | number | bigint | null | undefined,
-  suffix = 'stake'
+  suffix = ''
 ): string {
-  if (value === null || value === undefined) return `0 ${suffix}`;
-  const units = toBigInt(value);
-  if (units === null) return `${String(value)} ${suffix}`;
-  return `${units.toLocaleString('en-US')} ${suffix}`;
+  const base = formatAmount(value ?? 0);
+  return suffix ? `${base} ${suffix}` : base;
+}
+
+/**
+ * An amount in a bridged asset's own smallest unit (the registry index says which asset; index
+ * 0 or null is SHRUGG and gets the usual nine-decimal rendering). Bridged units have no fixed
+ * decimals on this chain.
+ */
+export function formatAssetAmount(
+  units: string | number | bigint | null | undefined,
+  assetIndex: number | null | undefined
+): string {
+  if (units === null || units === undefined) return '—';
+  if (assetIndex === null || assetIndex === undefined || assetIndex === 0) {
+    return formatAmount(units);
+  }
+  return `${formatUnits(units, 0)} units of asset #${assetIndex}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,15 +247,21 @@ export const TRANSACTION_KINDS: TransactionKind[] = [
   'mint',
   'deploy',
   'call',
+  'bond',
+  'unbond',
+  'withdraw',
   'bridge_attest',
   'bridge_burn',
 ];
 
 const KIND_LABELS: Record<TransactionKind, string> = {
-  transfer: 'Transfer',
+  transfer: 'Transfer (shielded)',
   mint: 'Mint (faucet)',
   deploy: 'Deploy',
   call: 'Call (confidential)',
+  bond: 'Bond',
+  unbond: 'Unbond',
+  withdraw: 'Withdraw',
   bridge_attest: 'Bridge in (attestation)',
   bridge_burn: 'Bridge out (burn)',
   other: 'Other',
@@ -252,6 +272,9 @@ const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
   mint: 'Mint',
   deploy: 'Deploy',
   call: 'Call',
+  bond: 'Bond',
+  unbond: 'Unbond',
+  withdraw: 'Withdraw',
   bridge_attest: 'Bridge in',
   bridge_burn: 'Bridge out',
   other: 'Other',
@@ -262,16 +285,28 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   mint: 'badge badge-mint',
   deploy: 'badge badge-deploy',
   call: 'badge badge-call',
+  bond: 'badge badge-stake',
+  unbond: 'badge badge-stake',
+  withdraw: 'badge badge-stake',
   bridge_attest: 'badge badge-bridge',
   bridge_burn: 'badge badge-bridge',
   other: 'badge badge-neutral',
 };
 
+/** Kinds whose `amount` is in a bridged asset's own unit rather than SHRUGG units. */
+export function amountIsBridged(kind: string): boolean {
+  return kind === 'bridge_attest' || kind === 'bridge_burn';
+}
+
 // ---------------------------------------------------------------------------
 // Bridge
 // ---------------------------------------------------------------------------
 
-/** Bridged assets carry 8 decimals, not SHRUGG's 9 (see fullnode/docs/cli.md). */
+/**
+ * Bridged assets used to carry 8 decimals on the account chain; on the shielded chain a
+ * bridged amount is in the asset's own smallest unit (see formatAssetAmount). Kept for the
+ * legacy rendering of a two-part "tokens (units)" string.
+ */
 export const BRIDGED_DECIMALS = 8;
 
 const BRIDGE_CHAIN_NAMES: Record<number, string> = {

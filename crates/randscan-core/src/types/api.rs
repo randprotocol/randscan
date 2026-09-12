@@ -134,9 +134,10 @@ pub struct SearchResult {
 pub enum SearchResultType {
     Block,
     Transaction,
-    Account,
     Validator,
     Program,
+    Note,
+    Nullifier,
 }
 
 // Note: `#[serde(flatten)]` does not work with query strings (numbers arrive as strings),
@@ -167,8 +168,11 @@ pub struct TransactionQuery {
     #[serde(default = "default_limit")]
     pub limit: u32,
     pub kind: Option<String>,
-    pub sender: Option<String>,
     pub height: Option<i64>,
+    /// bond / unbond / withdraw / mint touching this validator address
+    pub validator: Option<String>,
+    /// deploy / call of this program id
+    pub program: Option<String>,
 }
 
 impl TransactionQuery {

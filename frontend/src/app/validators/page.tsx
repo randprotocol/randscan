@@ -8,6 +8,16 @@ import { useValidators } from '@/hooks/useApi';
 import { formatNumber, formatPercentage, formatStake, formatTimestamp } from '@/lib/utils';
 import type { Validator } from '@/types';
 
+function pendingTotal(v: Validator): bigint {
+  return v.pending.reduce((sum, p) => {
+    try {
+      return sum + BigInt(p.amount || '0');
+    } catch {
+      return sum;
+    }
+  }, BigInt(0));
+}
+
 const columns: Column<Validator>[] = [
   {
     key: 'address',
@@ -17,9 +27,37 @@ const columns: Column<Validator>[] = [
     ),
   },
   {
+    key: 'active',
+    header: 'Epoch set',
+    render: (validator) =>
+      validator.active ? (
+        <span className="badge badge-accent">Active</span>
+      ) : (
+        <span className="badge badge-neutral">Inactive</span>
+      ),
+  },
+  {
     key: 'stake',
     header: 'Stake',
     render: (validator) => <span className="text-text">{formatStake(validator.stake)}</span>,
+  },
+  {
+    key: 'rewards',
+    header: 'Rewards',
+    render: (validator) => <span className="text-soft">{formatStake(validator.rewards)}</span>,
+  },
+  {
+    key: 'pending',
+    header: 'Unbonding',
+    render: (validator) =>
+      validator.pending.length === 0 ? (
+        <span className="text-mute">—</span>
+      ) : (
+        <span className="text-soft">
+          {formatStake(pendingTotal(validator))}
+          <span className="ml-1 text-mute">({validator.pending.length})</span>
+        </span>
+      ),
   },
   {
     key: 'share_percent',
@@ -71,12 +109,13 @@ export default function ValidatorsPage() {
     return (
       <>
         <PageHeader title="Validators" />
-        <ErrorState message="Could not load the validator set." onRetry={() => void mutate()} />
+        <ErrorState message="Could not load the validator register." onRetry={() => void mutate()} />
       </>
     );
   }
 
-  const totalStake = (data ?? []).reduce((sum, v) => {
+  const active = (data ?? []).filter((v) => v.active);
+  const activeStake = active.reduce((sum, v) => {
     try {
       return sum + BigInt(v.stake || '0');
     } catch {
@@ -90,7 +129,7 @@ export default function ValidatorsPage() {
         title="Validators"
         subtitle={
           data
-            ? `${formatNumber(data.length)} validators · ${formatStake(totalStake, 'total stake')}`
+            ? `${formatNumber(active.length)} active of ${formatNumber(data.length)} registered · ${formatStake(activeStake, 'active stake')}`
             : 'Loading validators…'
         }
       />
@@ -102,6 +141,12 @@ export default function ValidatorsPage() {
         isLoading={isLoading && !data}
         emptyMessage="No validators reported"
       />
+
+      <p className="text-xs text-mute">
+        The register is the one place this chain stores amounts in the clear. Active validators are
+        the set running the current epoch; the leader of view v is the active entry v mod n in
+        address order.
+      </p>
     </div>
   );
 }

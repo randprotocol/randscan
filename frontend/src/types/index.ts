@@ -8,20 +8,22 @@ export type TransactionKind =
   | 'mint'
   | 'deploy'
   | 'call'
+  | 'bond'
+  | 'unbond'
+  | 'withdraw'
   | 'bridge_attest'
   | 'bridge_burn'
   | 'other';
 
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
 
-export type AccountRole = 'sender' | 'recipient';
-
 export type SearchResultType =
   | 'block'
   | 'transaction'
-  | 'account'
   | 'validator'
-  | 'program';
+  | 'program'
+  | 'note'
+  | 'nullifier';
 
 // ---------------------------------------------------------------------------
 // Pagination
@@ -66,24 +68,46 @@ export interface BlockDetail extends BlockSummary {
 // Transactions
 // ---------------------------------------------------------------------------
 
+/** The public fields of a shielded bundle: what every observer sees of a transfer. */
+export interface Bundle {
+  anchor: string;
+  nullifiers: [string, string];
+  commitments: [string, string];
+  /** Units of SHRUGG. */
+  fee: string;
+  /** Units leaving the pool into the action (bond, bridge burn). */
+  burn: string;
+  /** 0 = SHRUGG; otherwise the bridge registry index of the balanced asset. */
+  asset: number;
+  /** Block height the sender targeted. */
+  time: number;
+  proof_len: number;
+  envelope_len: [number, number];
+}
+
+/**
+ * There is no sender, recipient or nonce: a shielded transaction has none. `amount` is the one
+ * public amount an action carries (a deposit's note value or a staking move).
+ */
 export interface TransactionSummary {
   hash: string;
   height: number;
   block_hash: string;
   tx_index: number;
-  sender: string;
-  nonce: number;
-  fee: string;
   kind: TransactionKind;
+  /** SHRUGG fee paid by the bundle ("0" for a validator-signed action without one). */
+  fee: string;
   timestamp_ms: number;
-  to: string | null;
-  amount: string | null;
+  /** False for mint / unbond / withdraw, which are signed by a validator instead. */
+  has_bundle: boolean;
+  /** deploy: deployed program id; call: called program id */
   program: string | null;
-}
-
-export interface ReceiptEffect {
-  to: string;
-  amount: string;
+  /** bond / unbond / withdraw: the validator; mint: the minting validator */
+  validator: string | null;
+  /** mint, bond, unbond, withdraw: SHRUGG units; bridge_attest, bridge_burn: bridged units */
+  amount: string | null;
+  /** bridge_attest / bridge_burn: the bridged asset's registry index */
+  asset_index: number | null;
 }
 
 export interface Receipt {
@@ -91,59 +115,119 @@ export interface Receipt {
   program: string;
   tier: number;
   outputs: number[];
-  effect: ReceiptEffect | null;
   height: number;
   index: number;
+  /** The proof's salted commitment to the call's private inputs (zkVM M4.1). */
+  h_in: string;
 }
 
 export interface TransactionDetail extends TransactionSummary {
   chain_id: number;
-  base_pc: number | null;
+  /** The fee bundle; null for a validator-signed action. */
+  bundle: Bundle | null;
+  /** deploy: program length in words */
   words_len: number | null;
-  proof_len: number | null;
-  recipients: string[];
+  /** call: size of the call's own proof */
+  call_proof_len: number | null;
+  /** call: size of the sealed input transcript, null when the caller published none */
+  input_envelope_len: number | null;
   receipt: Receipt | null;
-  /** bridge_burn: bridged asset id (hex) */
-  asset: string | null;
-  /** bridge_burn: amount in bridged units (8 decimals, not SHRUGG's 9) */
-  bridge_amount: string | null;
-  /** bridge_burn: destination chain id (2 Ethereum, 3 BSC, 4 Tron, 5 Solana) */
+  /** mint: the deposit note's commitment */
+  cm: string | null;
+  /** bond: whether this bond registered a new validator */
+  registered: boolean | null;
+  /** unbond / withdraw: the register nonce the validator signed */
+  action_nonce: number | null;
+  /** bridge_attest: size of the guardian-signed message */
+  attestation_len: number | null;
+  /** bridge_attest: the depositor's shielded address (shrugg1…) */
+  recipient: string | null;
+  /** bridge_attest: the deposit note's time word */
+  note_time: number | null;
+  /** bridge_burn: relayer fee in bridged units */
+  relayer_fee: string | null;
+  /** bridge_burn: destination chain id (1 Rand, 2 Ethereum, 3 BSC, 4 Tron, 5 Solana) */
   to_chain: number | null;
   /** bridge_burn: destination address, 32 bytes hex */
   bridge_to: string | null;
-  /** bridge_burn: relayer fee in bridged units */
-  bridge_fee: string | null;
-  /** bridge_attest: guardian-signed message, hex */
-  attestation: string | null;
-}
-
-export interface AccountTransaction extends TransactionSummary {
-  role: AccountRole;
+  /** bridge_burn: the second bundle, which burns the bridged asset */
+  asset_bundle: Bundle | null;
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
+// Notes, nullifiers, bridge, supply
 // ---------------------------------------------------------------------------
 
-export interface AccountDetail {
-  address: string;
-  balance: string;
-  nonce: number;
-  tx_count: number;
-  first_seen_height: number;
-  last_seen_height: number;
-  is_validator: boolean;
-  stake: string | null;
-  programs_deployed: number;
+/** One leaf of the commitment tree. `tx_hash` is null for genesis, withdraw and bridge deposits. */
+export interface Note {
+  leaf_index: number;
+  cm: string;
+  height: number;
+  tx_hash: string | null;
+}
+
+export interface Nullifier {
+  nullifier: string;
+  tx_hash: string;
+  height: number;
+  tx_index: number;
+}
+
+export interface BridgeAsset {
+  index: number;
+  chain: number;
+  token: string;
+  asset_id: string;
+}
+
+export interface BridgeState {
+  enabled: boolean;
+  emitter: string | null;
+  /** source chain id -> the emitter address trusted there */
+  emitters: Record<string, string>;
+  guardian_set_index: number | null;
+  guardians: string[];
+  burn_sequence: number | null;
+  next_index: number | null;
+  assets: BridgeAsset[];
+}
+
+/** The node's supply audit; every amount is a unit string. */
+export interface Supply {
+  height: number;
+  genesis_deposited: string;
+  genesis_staked: string;
+  faucet_minted: string;
+  withdraw_deposited: string;
+  fees_paid: string;
+  burned: string;
+  pool_value: string;
+  register_total: string;
+  total_supply: string;
+  invariant_holds: boolean;
 }
 
 // ---------------------------------------------------------------------------
 // Validators
 // ---------------------------------------------------------------------------
 
+export interface PendingStake {
+  release_epoch: number;
+  amount: string;
+}
+
+/** An entry of the public validator register. */
 export interface Validator {
   address: string;
+  /** Units of SHRUGG. */
   stake: string;
+  /** Bundle fees credited as proposer, not yet withdrawn (units). */
+  rewards: string;
+  pending: PendingStake[];
+  payout: string | null;
+  nonce: number;
+  /** In the set running the current epoch. */
+  active: boolean;
   share_percent: number;
   blocks_proposed: number;
   last_proposed_height: number | null;
@@ -161,7 +245,6 @@ export interface ValidatorDetail extends Validator {
 
 export interface ProgramSummary {
   id: string;
-  deployer: string;
   deploy_tx: string;
   deployed_at_height: number;
   base_pc: number;
@@ -186,10 +269,16 @@ export interface NetworkStats {
   height: number;
   view: number;
   total_transactions: number;
-  total_accounts: number;
+  /** Leaves in the commitment tree. */
+  notes: number;
+  /** Nullifiers published. */
+  nullifiers: number;
   validator_count: number;
+  active_validator_count: number;
   total_stake: string;
+  /** The supply audit's total, or "0" on a node without one. */
   total_supply: string;
+  pool_value: string | null;
   program_count: number;
   avg_block_time_ms: number;
   peer_count: number;
@@ -198,6 +287,10 @@ export interface NetworkStats {
   faucet: boolean;
   confidential: boolean;
   current_leader: string | null;
+  tree_root: string | null;
+  hc_bundle: string | null;
+  epoch: number | null;
+  epoch_blocks: number | null;
   updated_at: string;
 }
 

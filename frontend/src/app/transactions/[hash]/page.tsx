@@ -9,16 +9,16 @@ import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/compo
 import { isNotFound, useTransaction } from '@/hooks/useApi';
 import {
   formatAmount,
+  formatAssetAmount,
   formatBridgeAddress,
   formatBridgeChain,
-  formatBridgedAmount,
   formatBytes,
   formatDateTime,
   formatNumber,
   formatTimestamp,
   getKindLabel,
 } from '@/lib/utils';
-import type { Receipt, TransactionDetail } from '@/types';
+import type { Bundle, Receipt, TransactionDetail } from '@/types';
 
 export default function TransactionDetailPage() {
   const params = useParams<{ hash: string }>();
@@ -77,19 +77,39 @@ export default function TransactionDetailPage() {
             <span className="text-mute">({formatTimestamp(tx.timestamp_ms)})</span>
           </span>
         </DetailRow>
-        <DetailRow label="Sender">
-          <Hash value={tx.sender} href={`/account/${tx.sender}`} full />
+        <DetailRow label="Fee">
+          {tx.has_bundle ? (
+            formatAmount(tx.fee)
+          ) : (
+            <span className="text-mute">None (no bundle)</span>
+          )}
         </DetailRow>
-        <DetailRow label="Nonce">
-          <span className="font-mono">{formatNumber(tx.nonce)}</span>
+        <DetailRow label="Bundle">
+          {tx.has_bundle ? (
+            <span>Yes: paid from the sender&apos;s own notes, proved with a STARK</span>
+          ) : (
+            <span className="inline-flex flex-wrap items-center gap-2">
+              <span>No: signed by validator</span>
+              {tx.validator ? (
+                <Hash value={tx.validator} href={`/validators/${tx.validator}`} />
+              ) : (
+                <span className="text-mute">—</span>
+              )}
+            </span>
+          )}
         </DetailRow>
-        <DetailRow label="Fee">{formatAmount(tx.fee)}</DetailRow>
         <DetailRow label="Chain ID">
           <span className="font-mono">{formatNumber(tx.chain_id)}</span>
         </DetailRow>
       </Panel>
 
+      {tx.bundle && <BundlePanel title="Bundle" bundle={tx.bundle} />}
+
       <KindPanel tx={tx} />
+
+      {tx.kind === 'bridge_burn' && tx.asset_bundle && (
+        <BundlePanel title="Asset bundle" bundle={tx.asset_bundle} asset />
+      )}
 
       {tx.kind === 'call' && <ReceiptPanel receipt={tx.receipt} />}
     </div>
@@ -97,21 +117,113 @@ export default function TransactionDetailPage() {
 }
 
 // ---------------------------------------------------------------------------
+// Bundle
+// ---------------------------------------------------------------------------
+
+function BundlePanel({ title, bundle, asset }: { title: string; bundle: Bundle; asset?: boolean }) {
+  return (
+    <Panel title={title}>
+      <DetailRow label="Anchor">
+        <Hash value={bundle.anchor} full />
+      </DetailRow>
+      {bundle.nullifiers.map((nf, i) => (
+        <DetailRow key={`nf-${i}`} label={`Nullifier ${i + 1}`}>
+          <Hash value={nf} full />
+        </DetailRow>
+      ))}
+      {bundle.commitments.map((cm, i) => (
+        <DetailRow key={`cm-${i}`} label={`Commitment ${i + 1}`}>
+          <Hash value={cm} href={`/notes/${cm}`} full />
+        </DetailRow>
+      ))}
+      <DetailRow label="Fee">
+        {asset ? (
+          <span className="text-mute">0 (the fee bundle pays)</span>
+        ) : (
+          formatAmount(bundle.fee)
+        )}
+      </DetailRow>
+      <DetailRow label="Burn">
+        {bundle.burn === '0' ? (
+          <span className="text-mute">0</span>
+        ) : (
+          <span className="font-semibold text-strong">
+            {formatAssetAmount(bundle.burn, bundle.asset)}
+          </span>
+        )}
+      </DetailRow>
+      <DetailRow label="Asset">
+        <span className="font-mono">
+          {bundle.asset === 0 ? '0 (SHRUGG)' : `#${formatNumber(bundle.asset)} (bridged)`}
+        </span>
+      </DetailRow>
+      <DetailRow label="Time (target height)">
+        <Link href={`/blocks/${bundle.time}`} className="link font-mono">
+          #{formatNumber(bundle.time)}
+        </Link>
+      </DetailRow>
+      <DetailRow label="Proof size">
+        <span className="font-mono">{formatBytes(bundle.proof_len)}</span>
+      </DetailRow>
+      <DetailRow label="Envelope sizes">
+        <span className="font-mono">
+          {formatBytes(bundle.envelope_len[0])} · {formatBytes(bundle.envelope_len[1])}
+        </span>
+      </DetailRow>
+      <p className="px-4 py-3 text-xs text-mute">
+        The proof and the two note envelopes are reported by size only. Nothing in a bundle
+        reveals the sender, the receiver or the amount; a dummy input or output looks like a real
+        one.
+      </p>
+    </Panel>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Kind-specific detail
 // ---------------------------------------------------------------------------
+
+function ValidatorRow({ label, address }: { label: string; address: string | null }) {
+  return (
+    <DetailRow label={label}>
+      {address ? (
+        <Hash value={address} href={`/validators/${address}`} full />
+      ) : (
+        <span className="text-mute">—</span>
+      )}
+    </DetailRow>
+  );
+}
 
 function KindPanel({ tx }: { tx: TransactionDetail }) {
   const title = `${getKindLabel(tx.kind)} details`;
 
-  if (tx.kind === 'transfer' || tx.kind === 'mint') {
+  if (tx.kind === 'transfer') {
     return (
       <Panel title={title}>
-        <DetailRow label={tx.kind === 'mint' ? 'Minted to' : 'Recipient'}>
-          {tx.to ? <Hash value={tx.to} href={`/account/${tx.to}`} full /> : <span className="text-mute">—</span>}
+        <p className="px-4 py-3 text-sm text-mute">
+          A plain shielded transfer: up to two notes spent, up to two created, and the fee. Who
+          paid whom, and how much, is known only to the two parties and to whoever they hand a
+          viewing key.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'mint') {
+    return (
+      <Panel title={title}>
+        <DetailRow label="Deposit note">
+          {tx.cm ? <Hash value={tx.cm} href={`/notes/${tx.cm}`} full /> : <span className="text-mute">—</span>}
         </DetailRow>
         <DetailRow label="Amount">
           <span className="text-base font-semibold text-strong">{formatAmount(tx.amount)}</span>
         </DetailRow>
+        <ValidatorRow label="Minted by" address={tx.validator} />
+        <p className="px-4 py-3 text-xs text-mute">
+          A testnet faucet deposit. The amount is public in this one transaction; the note it
+          created is indistinguishable from any other afterwards.
+        </p>
       </Panel>
     );
   }
@@ -126,9 +238,6 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Base PC">
-          <span className="font-mono">{tx.base_pc === null ? '—' : formatNumber(tx.base_pc)}</span>
-        </DetailRow>
         <DetailRow label="Words length">
           <span className="font-mono">
             {tx.words_len === null ? '—' : `${formatNumber(tx.words_len)} words`}
@@ -138,16 +247,84 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
     );
   }
 
+  if (tx.kind === 'call') {
+    return (
+      <Panel title={title}>
+        <DetailRow label="Program">
+          {tx.program ? (
+            <Hash value={tx.program} href={`/programs/${tx.program}`} full />
+          ) : (
+            <span className="text-mute">—</span>
+          )}
+        </DetailRow>
+        <DetailRow label="Call proof size">
+          <span className="font-mono">{formatBytes(tx.call_proof_len)}</span>
+        </DetailRow>
+        <DetailRow label="Input transcript">
+          {tx.input_envelope_len === null ? (
+            <span className="text-mute">None published (the caller chose --no-envelope)</span>
+          ) : (
+            <span className="font-mono">{formatBytes(tx.input_envelope_len)} sealed</span>
+          )}
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          The call&apos;s private inputs never leave the wallet in the clear. When a transcript is
+          published it opens only for the caller&apos;s viewing key, a per-call key, or the
+          auditor the caller named.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'bond' || tx.kind === 'unbond' || tx.kind === 'withdraw') {
+    return (
+      <Panel title={title}>
+        <ValidatorRow label="Validator" address={tx.validator} />
+        <DetailRow label="Amount">
+          <span className="text-base font-semibold text-strong">{formatAmount(tx.amount)}</span>
+        </DetailRow>
+        {tx.kind === 'bond' && (
+          <DetailRow label="Registration">
+            {tx.registered ? (
+              <span className="badge badge-accent">New validator</span>
+            ) : (
+              <span className="text-mute">Existing validator</span>
+            )}
+          </DetailRow>
+        )}
+        {tx.kind !== 'bond' && (
+          <DetailRow label="Register nonce">
+            <span className="font-mono">
+              {tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}
+            </span>
+          </DetailRow>
+        )}
+        <p className="px-4 py-3 text-xs text-mute">
+          {tx.kind === 'bond'
+            ? 'Value left the pool (the bundle’s burn) into the validator’s public stake.'
+            : tx.kind === 'unbond'
+              ? 'Stake moved to the unbonding queue, signed by the validator’s key.'
+              : 'Released stake and rewards became one new note of public amount at the validator’s payout address.'}
+        </p>
+      </Panel>
+    );
+  }
+
   if (tx.kind === 'bridge_burn') {
     return (
       <Panel title={title}>
         <DetailRow label="Asset">
-          {tx.asset ? <Hash value={tx.asset} full /> : <span className="text-mute">—</span>}
+          <span className="font-mono">
+            {tx.asset_index === null ? '—' : `#${formatNumber(tx.asset_index)}`}
+          </span>
         </DetailRow>
         <DetailRow label="Amount burned">
           <span className="text-base font-semibold text-strong">
-            {formatBridgedAmount(tx.bridge_amount)}
+            {formatAssetAmount(tx.amount, tx.asset_index)}
           </span>
+        </DetailRow>
+        <DetailRow label="Relayer fee">
+          <span>{formatAssetAmount(tx.relayer_fee, tx.asset_index)}</span>
         </DetailRow>
         <DetailRow label="Destination chain">
           <span>{formatBridgeChain(tx.to_chain)}</span>
@@ -161,84 +338,65 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Relayer fee">
-          <span>{formatBridgedAmount(tx.bridge_fee)}</span>
-        </DetailRow>
         <p className="px-4 py-3 text-xs text-mute">
-          Bridged assets use 8 decimals. The transaction fee above is paid in SHRUGG; the relayer
-          fee is carried inside the outbound message for whoever delivers it.
+          The one two-bundle transaction: the fee bundle above pays in SHRUGG and the asset bundle
+          below burns the bridged notes. Bridged amounts are in the asset&apos;s own smallest unit.
         </p>
       </Panel>
     );
   }
 
   if (tx.kind === 'bridge_attest') {
-    const hex = tx.attestation ?? '';
     return (
       <Panel title={title}>
         <DetailRow label="Attestation size">
-          <span className="font-mono">{formatBytes(hex.length / 2)}</span>
+          <span className="font-mono">{formatBytes(tx.attestation_len)}</span>
         </DetailRow>
-        <DetailRow label="Attestation (hex)">
-          {hex ? (
-            <details className="max-w-full">
-              <summary className="cursor-pointer text-sm text-soft">Show {hex.length} hex characters</summary>
-              <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded border border-border bg-surface-2 p-3 font-mono text-xs text-text">
-                {hex}
-              </pre>
-            </details>
+        <DetailRow label="Recipient">
+          {tx.recipient ? (
+            <Hash value={tx.recipient} full />
           ) : (
             <span className="text-mute">—</span>
           )}
         </DetailRow>
+        <DetailRow label="Asset">
+          <span className="font-mono">
+            {tx.asset_index === null ? '—' : `#${formatNumber(tx.asset_index)}`}
+          </span>
+        </DetailRow>
+        <DetailRow label="Amount">
+          {tx.amount === null ? (
+            <span className="text-mute">Guardian-set rotation, no deposit</span>
+          ) : (
+            <span className="text-base font-semibold text-strong">
+              {formatAssetAmount(tx.amount, tx.asset_index)}
+            </span>
+          )}
+        </DetailRow>
+        <DetailRow label="Note time">
+          {tx.note_time === null ? (
+            <span className="text-mute">—</span>
+          ) : (
+            <Link href={`/blocks/${tx.note_time}`} className="link font-mono">
+              #{formatNumber(tx.note_time)}
+            </Link>
+          )}
+        </DetailRow>
         <p className="px-4 py-3 text-xs text-mute">
-          A guardian-signed message that mints bridged tokens on this chain. The recipient and
-          amount are inside the message; the sender collects its relayer fee.
+          A guardian-signed message that deposits a bridged asset as a note for the recipient.
+          The amount is public here and nowhere else.
         </p>
       </Panel>
     );
   }
 
-  if (tx.kind === 'other') {
-    return (
-      <Panel title={title}>
-        <p className="px-4 py-3 text-sm text-mute">
-          This transaction kind is newer than this explorer build. It was indexed with its hash,
-          sender, fee and block; decoded fields will appear after the explorer is updated.
-        </p>
-      </Panel>
-    );
-  }
-
-  // call
+  // other
   return (
     <Panel title={title}>
-      <DetailRow label="Program">
-        {tx.program ? (
-          <Hash value={tx.program} href={`/programs/${tx.program}`} full />
-        ) : (
-          <span className="text-mute">—</span>
-        )}
-      </DetailRow>
-      <DetailRow label="Proof size">
-        <span className="font-mono">{formatBytes(tx.proof_len)}</span>
-      </DetailRow>
-      <DetailRow label={`Recipients (${tx.recipients.length})`}>
-        {tx.recipients.length === 0 ? (
-          <span className="text-mute">None declared</span>
-        ) : (
-          <ul className="space-y-1.5">
-            {tx.recipients.map((recipient, index) => (
-              <li key={`${recipient}-${index}`} className="flex items-center gap-2">
-                <span className="w-6 flex-shrink-0 text-right font-mono text-xs text-mute">
-                  {index}
-                </span>
-                <Hash value={recipient} href={`/account/${recipient}`} full />
-              </li>
-            ))}
-          </ul>
-        )}
-      </DetailRow>
+      <p className="px-4 py-3 text-sm text-mute">
+        This transaction kind is newer than this explorer build. It was indexed with its hash,
+        bundle, fee and block; decoded fields will appear after the explorer is updated.
+      </p>
     </Panel>
   );
 }
@@ -274,6 +432,9 @@ function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
           <span className="text-mute">· index {formatNumber(receipt.index)}</span>
         </span>
       </DetailRow>
+      <DetailRow label="Input commitment (H_IN)">
+        {receipt.h_in ? <Hash value={receipt.h_in} full /> : <span className="text-mute">—</span>}
+      </DetailRow>
       <DetailRow label="Outputs">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {receipt.outputs.map((output, index) => (
@@ -288,17 +449,11 @@ function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
           ))}
         </div>
       </DetailRow>
-      <DetailRow label="Effect">
-        {receipt.effect ? (
-          <span className="inline-flex flex-wrap items-center gap-2">
-            <Hash value={receipt.effect.to} href={`/account/${receipt.effect.to}`} />
-            <span className="text-mute">received</span>
-            <span className="font-semibold text-strong">{formatAmount(receipt.effect.amount)}</span>
-          </span>
-        ) : (
-          <span className="text-mute">No effect</span>
-        )}
-      </DetailRow>
+      <p className="px-4 py-3 text-xs text-mute">
+        The eight public output words are recorded and nothing else moves: value moves only
+        through the bundle that paid for the call. H_IN is a salted digest of the private inputs
+        and discloses nothing on its own.
+      </p>
     </Panel>
   );
 }

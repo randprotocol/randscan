@@ -1,16 +1,14 @@
 use crate::{ProgramRow, Result};
 use sqlx::{PgConnection, PgPool};
 
-const SELECT: &str = "SELECT p.id, p.deployer, p.deploy_tx, p.deployed_at_height, p.base_pc, p.words_len, p.code_hash,
+const SELECT: &str = "SELECT p.id, p.deploy_tx, p.deployed_at_height, p.base_pc, p.words_len, p.code_hash,
         (SELECT COUNT(*) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS call_count,
         (SELECT MAX(t.height) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS last_called_height
      FROM programs p";
 
-#[allow(clippy::too_many_arguments)]
 pub async fn insert_program(
     conn: &mut PgConnection,
     id: &str,
-    deployer: &str,
     deploy_tx: &str,
     deployed_at_height: i64,
     base_pc: i64,
@@ -18,11 +16,10 @@ pub async fn insert_program(
     code_hash: &str,
 ) -> Result<()> {
     sqlx::query(
-        "INSERT INTO programs (id, deployer, deploy_tx, deployed_at_height, base_pc, words_len, code_hash)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO programs (id, deploy_tx, deployed_at_height, base_pc, words_len, code_hash)
+         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
     )
     .bind(id)
-    .bind(deployer)
     .bind(deploy_tx)
     .bind(deployed_at_height)
     .bind(base_pc)
@@ -54,13 +51,4 @@ pub async fn count_programs(pool: &PgPool) -> Result<i64> {
     Ok(sqlx::query_scalar("SELECT COUNT(*) FROM programs")
         .fetch_one(pool)
         .await?)
-}
-
-pub async fn count_programs_by_deployer(pool: &PgPool, deployer: &str) -> Result<i64> {
-    Ok(
-        sqlx::query_scalar("SELECT COUNT(*) FROM programs WHERE deployer = $1")
-            .bind(deployer)
-            .fetch_one(pool)
-            .await?,
-    )
 }

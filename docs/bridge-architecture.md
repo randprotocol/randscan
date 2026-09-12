@@ -1,5 +1,12 @@
 # The guardian bridge: architecture
 
+> **Partly superseded (2026-09-12).** On the shielded chain (phase S3) bridged value is notes, not
+> balances: `bridge_attest` deposits a note of public amount for a `shrugg1…` recipient and
+> `bridge_burn` burns from a second bundle; there is no `shrugg_getAssetBalance` and no per-address
+> balance in the explorer. The trust model, wire format, guardian sets and the burn log below
+> are unchanged; the "what the explorer indexes" section is replaced by
+> `docs/superpowers/specs/2026-09-12-shielded-chain-design.md` and `docs/api.md`.
+
 How value moves between Rand and other chains, how the Rand fullnode admits and records bridge
 transactions, and what RandScan indexes and shows for them. This is the explorer-side reference;
 the authoritative description of the node is `docs/bridge.md` in the fullnode repository, which

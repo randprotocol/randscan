@@ -94,18 +94,22 @@ export default function DashboardPage() {
             />
             <StatsCard
               title="Validators"
-              value={formatNumber(stats?.validator_count ?? 0)}
-              subtitle={stats ? formatStake(stats.total_stake) : undefined}
+              value={
+                stats
+                  ? `${formatNumber(stats.active_validator_count)} / ${formatNumber(stats.validator_count)}`
+                  : '0'
+              }
+              subtitle={stats ? formatStake(stats.total_stake, 'active stake') : undefined}
             />
             <StatsCard
               title="Transactions"
               value={formatNumber(stats?.total_transactions ?? 0)}
-              subtitle={stats ? `${formatNumber(stats.total_accounts)} accounts` : undefined}
+              subtitle={stats ? `${formatNumber(stats.program_count)} programs` : undefined}
             />
             <StatsCard
-              title="Programs"
-              value={formatNumber(stats?.program_count ?? 0)}
-              subtitle={stats?.confidential ? 'Confidential calls enabled' : 'Confidential calls off'}
+              title="Notes"
+              value={formatNumber(stats?.notes ?? 0)}
+              subtitle={stats ? `${formatNumber(stats.nullifiers)} spent` : undefined}
             />
           </>
         )}
@@ -117,8 +121,12 @@ export default function DashboardPage() {
         <MiniStat label="Peers" value={stats ? formatNumber(stats.peer_count) : '—'} />
         <MiniStat label="Mempool" value={stats ? formatNumber(stats.mempool_size) : '—'} />
         <MiniStat
-          label="Chain / view"
-          value={stats ? `${stats.chain_id} / ${formatNumber(stats.view)}` : '—'}
+          label="Epoch"
+          value={
+            stats && stats.epoch !== null
+              ? `${formatNumber(stats.epoch)} (${formatNumber(stats.epoch_blocks ?? 0)} blocks)`
+              : '—'
+          }
         />
         <MiniStat
           label="Current leader"
@@ -138,9 +146,26 @@ export default function DashboardPage() {
       </StatsRow>
 
       {stats && (
-        <p className="text-xs text-mute">
-          Total supply {formatAmount(stats.total_supply)} · faucet{' '}
-          {stats.faucet ? 'enabled' : 'disabled'} · {TOKEN_SYMBOL} has {stats.decimals} decimals
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
+          <span>
+            {stats.total_supply !== '0'
+              ? `Total supply ${formatAmount(stats.total_supply)}`
+              : 'Supply audit unavailable'}
+          </span>
+          <span>· view {formatNumber(stats.view)}</span>
+          <span className="inline-flex items-center gap-1">
+            · tree root{' '}
+            {stats.tree_root ? <Hash value={stats.tree_root} start={8} end={6} /> : '—'}
+          </span>
+          <span className="inline-flex items-center gap-1">
+            · bundle guest{' '}
+            {stats.hc_bundle ? <Hash value={stats.hc_bundle} start={8} end={6} /> : '—'}
+          </span>
+          <span>· faucet {stats.faucet ? 'enabled' : 'disabled'}</span>
+          <span>· confidential calls {stats.confidential ? 'on' : 'off'}</span>
+          <span>
+            · {TOKEN_SYMBOL} has {stats.decimals} decimals
+          </span>
         </p>
       )}
 
@@ -170,7 +195,7 @@ export default function DashboardPage() {
           <TransactionsTable
             transactions={transactions}
             isLoading={txsLoading && transactions.length === 0}
-            hideColumns={['fee', 'to']}
+            hideColumns={['fee']}
           />
         </section>
       </div>

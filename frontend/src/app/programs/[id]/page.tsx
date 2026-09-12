@@ -56,9 +56,6 @@ export default function ProgramDetailPage() {
         <DetailRow label="Program id">
           <Hash value={program.id} full />
         </DetailRow>
-        <DetailRow label="Deployer">
-          <Hash value={program.deployer} href={`/account/${program.deployer}`} full />
-        </DetailRow>
         <DetailRow label="Deploy transaction">
           <Hash value={program.deploy_tx} href={`/transactions/${program.deploy_tx}`} full />
         </DetailRow>
@@ -94,7 +91,7 @@ export default function ProgramDetailPage() {
         <h2 className="chip">Recent calls</h2>
         <TransactionsTable
           transactions={program.recent_calls}
-          hideColumns={['to', 'amount']}
+          hideColumns={['action']}
           emptyMessage="This program has not been called yet"
         />
       </section>

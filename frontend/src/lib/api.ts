@@ -1,18 +1,20 @@
 import type {
-  AccountDetail,
-  AccountTransaction,
   ApiErrorBody,
   ApiKey,
   BlockDetail,
   BlockSummary,
+  BridgeState,
   CreatedApiKey,
   Health,
   NetworkStats,
   NodeInfo,
+  Note,
+  Nullifier,
   Paginated,
   ProgramDetail,
   ProgramSummary,
   SearchResult,
+  Supply,
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
@@ -146,16 +148,19 @@ export interface TransactionListParams {
   page?: number;
   limit?: number;
   kind?: TransactionKind | null;
-  sender?: string | null;
   height?: number | null;
+  /** bond / unbond / withdraw / mint touching this validator */
+  validator?: string | null;
+  /** deploy / call of this program id */
+  program?: string | null;
 }
 
 export function getTransactions(
   params: TransactionListParams = {}
 ): Promise<Paginated<TransactionSummary>> {
-  const { page = 1, limit = 25, kind, sender, height } = params;
+  const { page = 1, limit = 25, kind, height, validator, program } = params;
   return request<Paginated<TransactionSummary>>(
-    `/transactions${buildQuery({ page, limit, kind, sender, height })}`
+    `/transactions${buildQuery({ page, limit, kind, height, validator, program })}`
   );
 }
 
@@ -170,21 +175,30 @@ export function getTransaction(hash: string): Promise<TransactionDetail> {
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
+// Notes, nullifiers, bridge, supply
 // ---------------------------------------------------------------------------
 
-export function getAccount(address: string): Promise<AccountDetail> {
-  return request<AccountDetail>(`/accounts/${encodeURIComponent(address)}`);
+/** The commitment tree, newest leaf first. */
+export function getNotes(page = 1, limit = 25): Promise<Paginated<Note>> {
+  return request<Paginated<Note>>(`/notes${buildQuery({ page, limit })}`);
 }
 
-export function getAccountTransactions(
-  address: string,
-  page = 1,
-  limit = 25
-): Promise<Paginated<AccountTransaction>> {
-  return request<Paginated<AccountTransaction>>(
-    `/accounts/${encodeURIComponent(address)}/transactions${buildQuery({ page, limit })}`
-  );
+/** `id` is a commitment (64 hex) or a leaf index. */
+export function getNote(id: string | number): Promise<Note> {
+  return request<Note>(`/notes/${encodeURIComponent(String(id))}`);
+}
+
+export function getNullifier(nf: string): Promise<Nullifier> {
+  return request<Nullifier>(`/nullifiers/${encodeURIComponent(nf)}`);
+}
+
+export function getBridge(): Promise<BridgeState> {
+  return request<BridgeState>('/bridge');
+}
+
+/** 404 on a node that serves no supply audit. */
+export function getSupply(): Promise<Supply> {
+  return request<Supply>('/supply');
 }
 
 // ---------------------------------------------------------------------------

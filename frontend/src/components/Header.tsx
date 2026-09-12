@@ -12,8 +12,10 @@ const navLinks = [
   { href: '/', label: 'Dashboard' },
   { href: '/blocks', label: 'Blocks' },
   { href: '/transactions', label: 'Transactions' },
+  { href: '/notes', label: 'Notes' },
   { href: '/validators', label: 'Validators' },
   { href: '/programs', label: 'Programs' },
+  { href: '/bridge', label: 'Bridge' },
   { href: '/nodes', label: 'Nodes' },
 ];
 

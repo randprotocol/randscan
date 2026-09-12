@@ -194,6 +194,11 @@
     border-style: dashed;
   }
 
+  .badge-stake {
+    color: var(--color-accent);
+    border-style: double;
+  }
+
   .badge-accent {
     color: var(--color-accent);
   }

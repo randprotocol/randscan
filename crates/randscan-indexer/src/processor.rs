@@ -1,10 +1,11 @@
-//! Turns an RPC block into database rows and refreshes the touched accounts.
+//! Turns an RPC block into database rows: the transaction (bundle + action), its nullifiers,
+//! call receipts and deployed programs. There are no accounts to refresh on this chain.
 
-use crate::rpc::{RpcBlock, RpcClient, RpcTxKind};
+use crate::rpc::{RpcAction, RpcBlock, RpcBundle, RpcClient};
 use anyhow::{Context, Result};
 use randscan_core::{BlockSummary, TransactionSummary, TxKind};
-use randscan_db::{self as db, DbPool, NewBlock, NewTx};
-use std::collections::{BTreeSet, HashMap};
+use randscan_db::{self as db, DbPool, NewBlock, NewBundle, NewTx};
+use std::collections::HashMap;
 use tracing::{debug, warn};
 
 pub struct BlockProcessor {
@@ -22,10 +23,15 @@ struct PreparedReceipt {
     program: String,
     tier: i32,
     outputs: Vec<i64>,
-    effect_to: Option<String>,
-    effect_amount: Option<String>,
     height: i64,
     index: i32,
+    h_in: String,
+}
+
+/// What `shrugg_getProgram` adds to a deploy action: the code hash and the base pc.
+struct ProgramMeta {
+    base_pc: i64,
+    code_hash: String,
 }
 
 impl BlockProcessor {
@@ -40,17 +46,16 @@ impl BlockProcessor {
         // Receipts come from the node; fetch them before opening the DB transaction.
         let mut receipts = Vec::new();
         for tx in &block.transactions {
-            if let RpcTxKind::Call { .. } = tx.kind {
+            if let RpcAction::Call { .. } = tx.action {
                 match self.rpc.receipt(&tx.hash).await {
                     Ok(Some(r)) => receipts.push(PreparedReceipt {
                         tx_hash: tx.hash.clone(),
                         program: r.program,
                         tier: r.tier as i32,
                         outputs: r.outputs,
-                        effect_to: r.effect.as_ref().map(|e| e.to.clone()),
-                        effect_amount: r.effect.as_ref().map(|e| e.amount.clone()),
                         height: r.height as i64,
                         index: r.index as i32,
+                        h_in: r.h_in,
                     }),
                     Ok(None) => warn!("no receipt yet for call {} at height {}", tx.hash, height),
                     Err(e) => warn!("receipt fetch failed for {}: {}", tx.hash, e),
@@ -58,24 +63,32 @@ impl BlockProcessor {
             }
         }
 
-        // Program code hashes come from the node (after the zkVM fork they are a Poseidon2 digest,
-        // distinct from the content id); fall back to the id if the record is not served yet.
-        let mut code_hashes: HashMap<String, String> = HashMap::new();
+        // A deploy action names the program id and its length; the code hash (a Poseidon2
+        // digest, distinct from the content id) and the base pc come from the node's record.
+        let mut programs: HashMap<String, ProgramMeta> = HashMap::new();
         for tx in &block.transactions {
-            if let RpcTxKind::Deploy { program, .. } = &tx.kind {
-                let hash = match self.rpc.program(program).await {
-                    Ok(Some(p)) => p.code_hash,
-                    Ok(None) => program.clone(),
+            if let RpcAction::Deploy { program, .. } = &tx.action {
+                let meta = match self.rpc.program(program).await {
+                    Ok(Some(p)) => ProgramMeta {
+                        base_pc: p.base_pc as i64,
+                        code_hash: p.code_hash,
+                    },
+                    Ok(None) => ProgramMeta {
+                        base_pc: 0,
+                        code_hash: program.clone(),
+                    },
                     Err(e) => {
                         warn!("program fetch {} failed: {}", program, e);
-                        program.clone()
+                        ProgramMeta {
+                            base_pc: 0,
+                            code_hash: program.clone(),
+                        }
                     }
                 };
-                code_hashes.insert(program.clone(), hash);
+                programs.insert(program.clone(), meta);
             }
         }
 
-        let mut touched: BTreeSet<String> = BTreeSet::new();
         let mut dbtx = self.pool.inner().begin().await?;
 
         db::insert_block(
@@ -100,11 +113,12 @@ impl BlockProcessor {
 
         for (i, tx) in block.transactions.iter().enumerate() {
             let tx_index = i as i32;
-            let f = TxFields::from_rpc(&tx.kind);
-            let kind = f.kind;
-            let to = f.to;
-            let amount = f.amount;
-            let program = f.program;
+            let f = TxFields::from_action(&tx.action);
+            let bundle = tx.bundle.as_ref().map(new_bundle);
+            let fee = bundle
+                .as_ref()
+                .map(|b| b.fee.clone())
+                .unwrap_or_else(|| "0".to_string());
 
             db::insert_transaction(
                 &mut dbtx,
@@ -113,63 +127,42 @@ impl BlockProcessor {
                     block_hash: &block.hash,
                     height,
                     tx_index,
-                    sender: &tx.from,
-                    nonce: tx.nonce as i64,
-                    fee: &tx.fee,
-                    kind: f.kind_tag,
                     chain_id: tx.chain_id as i64,
                     timestamp_ms: block.timestamp_ms as i64,
-                    to_address: to,
-                    amount,
-                    program_id: program,
-                    base_pc: f.base_pc,
+                    kind: f.kind_tag,
+                    bundle,
+                    program_id: f.program,
                     words_len: f.words_len,
-                    proof_len: f.proof_len,
-                    recipients: &f.recipients,
-                    asset: f.asset,
-                    bridge_amount: f.bridge_amount,
+                    call_proof_len: f.call_proof_len,
+                    input_envelope_len: f.input_envelope_len,
+                    amount: f.amount.clone(),
+                    cm: f.cm,
+                    validator: f.validator,
+                    registered: f.registered,
+                    action_nonce: f.action_nonce,
+                    attestation_len: f.attestation_len,
+                    recipient: f.recipient,
+                    note_time: f.note_time,
+                    asset_index: f.asset_index,
+                    relayer_fee: f.relayer_fee.clone(),
                     to_chain: f.to_chain,
                     bridge_to: f.bridge_to,
-                    bridge_fee: f.bridge_fee,
-                    attestation: f.attestation,
+                    asset_bundle: f.asset_bundle.map(new_bundle),
                 },
             )
             .await
             .with_context(|| format!("insert tx {}", tx.hash))?;
 
-            db::insert_account_transaction(
-                &mut dbtx, &tx.from, &tx.hash, "sender", height, tx_index,
-            )
-            .await?;
-            touched.insert(tx.from.clone());
-            if let Some(to) = to {
-                db::insert_account_transaction(
-                    &mut dbtx,
-                    to,
-                    &tx.hash,
-                    "recipient",
-                    height,
-                    tx_index,
-                )
-                .await?;
-                touched.insert(to.to_string());
-            }
-
-            if let RpcTxKind::Deploy {
-                base_pc,
-                words_len,
-                program,
-            } = &tx.kind
-            {
+            if let RpcAction::Deploy { program, words } = &tx.action {
+                let meta = programs.get(program);
                 db::insert_program(
                     &mut dbtx,
                     program,
-                    &tx.from,
                     &tx.hash,
                     height,
-                    *base_pc as i64,
-                    *words_len as i64,
-                    code_hashes.get(program).unwrap_or(program),
+                    meta.map(|m| m.base_pc).unwrap_or(0),
+                    *words as i64,
+                    meta.map(|m| m.code_hash.as_str()).unwrap_or(program),
                 )
                 .await?;
             }
@@ -179,63 +172,30 @@ impl BlockProcessor {
                 height,
                 block_hash: block.hash.clone(),
                 tx_index,
-                sender: tx.from.clone(),
-                nonce: tx.nonce as i64,
-                fee: tx.fee.clone(),
-                kind,
+                kind: f.kind,
+                fee,
                 timestamp_ms: block.timestamp_ms as i64,
-                to: to.map(str::to_string),
-                amount: amount.map(str::to_string),
-                program: program.map(str::to_string),
+                has_bundle: tx.bundle.is_some(),
+                program: f.program.map(str::to_string),
+                validator: f.validator.map(str::to_string),
+                amount: f.amount,
+                asset_index: f.asset_index,
             });
         }
 
         for r in &receipts {
             db::insert_receipt(
-                &mut dbtx,
-                &r.tx_hash,
-                &r.program,
-                r.tier,
-                &r.outputs,
-                r.effect_to.as_deref(),
-                r.effect_amount.as_deref(),
-                r.height,
-                r.index,
+                &mut dbtx, &r.tx_hash, &r.program, r.tier, &r.outputs, r.height, r.index, &r.h_in,
             )
             .await?;
-            if let Some(to) = &r.effect_to {
-                db::insert_account_transaction(
-                    &mut dbtx,
-                    to,
-                    &r.tx_hash,
-                    "recipient",
-                    r.height,
-                    r.index,
-                )
-                .await?;
-                touched.insert(to.clone());
-            }
         }
 
-        // Fees go to the proposer, so its balance moved if the block had transactions.
-        if !block.transactions.is_empty() {
-            touched.insert(block.proposer.clone());
-        }
-
+        // Leaves of this height fetched before the block (after a rewind) get their tx now.
+        db::link_notes_at(&mut dbtx, height).await?;
         db::set_next_height(&mut dbtx, height + 1, Some(&block.hash)).await?;
         dbtx.commit().await?;
 
-        // Balances and nonces are read back from the node rather than re-deriving ledger rules.
-        for address in &touched {
-            self.refresh_account(address, height).await;
-        }
-
-        debug!(
-            "indexed block {} ({} txs, {} accounts touched)",
-            height,
-            summaries.len(),
-            touched.len()
-        );
+        debug!("indexed block {} ({} txs)", height, summaries.len());
 
         Ok(ProcessedBlock {
             block: BlockSummary {
@@ -252,49 +212,52 @@ impl BlockProcessor {
         })
     }
 
-    /// Forget everything indexed and start over at height 0 for `chain_id`. Accounts, API keys
+    /// Fetch the commitment tree from leaf `next_leaf` onwards, a page at a time, until the
+    /// node's reply is short. Returns the next leaf to fetch.
+    pub async fn sync_notes(&self, mut next_leaf: i64) -> Result<i64> {
+        const PAGE: u64 = 1000;
+        loop {
+            let rows = self.rpc.commitments(next_leaf as u64, PAGE).await?;
+            if rows.is_empty() {
+                return Ok(next_leaf);
+            }
+            let batch: Vec<(i64, String, i64)> = rows
+                .iter()
+                .map(|r| (r.index as i64, r.cm.clone(), r.height as i64))
+                .collect();
+            let last = batch.last().map(|r| r.0).unwrap_or(next_leaf);
+            let mut dbtx = self.pool.inner().begin().await?;
+            db::insert_notes(&mut dbtx, &batch).await?;
+            db::set_next_leaf(&mut dbtx, last + 1).await?;
+            dbtx.commit().await?;
+            debug!("indexed notes {}..={}", next_leaf, last);
+            next_leaf = last + 1;
+            if (rows.len() as u64) < PAGE {
+                return Ok(next_leaf);
+            }
+        }
+    }
+
+    /// Forget everything indexed and start over at height 0 for `chain_id`. Users, API keys
     /// and sessions are not chain data and survive.
     pub async fn reset_chain(&self, chain_id: i64) -> Result<()> {
         let mut conn = self.pool.inner().acquire().await?;
         db::reset_chain_data(&mut conn, chain_id).await?;
-        warn!("chain data reset; re-indexing chain {} from height 0", chain_id);
+        warn!(
+            "chain data reset; re-indexing chain {} from height 0",
+            chain_id
+        );
         Ok(())
     }
 
-    /// Fetch an account from the node and upsert it. Failures are logged, not fatal.
-    pub async fn refresh_account(&self, address: &str, seen_height: i64) {
-        match self.rpc.account(address).await {
-            Ok(acc) => {
-                let mut conn = match self.pool.inner().acquire().await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        warn!("db acquire failed: {}", e);
-                        return;
-                    }
-                };
-                if let Err(e) = db::upsert_account(
-                    &mut conn,
-                    address,
-                    &acc.balance,
-                    acc.nonce as i64,
-                    seen_height,
-                )
-                .await
-                {
-                    warn!("upsert account {} failed: {}", address, e);
-                }
-                if let Err(e) = db::refresh_account_tx_count(&mut conn, address).await {
-                    warn!("refresh tx_count {} failed: {}", address, e);
-                }
-            }
-            Err(e) => warn!("account fetch {} failed: {}", address, e),
-        }
-    }
-
-    /// Drop blocks at and above `height` so they are re-fetched.
+    /// Drop blocks at and above `height` so they are re-fetched. Tree leaves of those heights go
+    /// too: the tree past a lost block is not the tree the node will serve.
     pub async fn rewind_to(&self, height: i64) -> Result<()> {
         let mut dbtx = self.pool.inner().begin().await?;
         let n = db::delete_blocks_from(&mut dbtx, height).await?;
+        let leaves = db::delete_notes_from(&mut dbtx, height).await?;
+        let next_leaf = db::next_leaf_after_rewind(&mut dbtx).await?;
+        db::set_next_leaf(&mut dbtx, next_leaf).await?;
         let last_hash = if height > 0 {
             db::get_block_hash_at(self.pool.inner(), height - 1).await?
         } else {
@@ -302,31 +265,50 @@ impl BlockProcessor {
         };
         db::set_next_height(&mut dbtx, height, last_hash.as_deref()).await?;
         dbtx.commit().await?;
-        warn!("rewound {} block(s); next height {}", n, height);
+        warn!(
+            "rewound {} block(s) and {} leaves; next height {}, next leaf {}",
+            n, leaves, height, next_leaf
+        );
         Ok(())
     }
 }
 
-/// The database columns one RPC transaction kind fills. Borrowed from the RPC value.
+fn new_bundle(b: &RpcBundle) -> NewBundle {
+    NewBundle {
+        anchor: b.anchor.clone(),
+        nullifiers: b.nullifiers.clone(),
+        commitments: b.commitments.clone(),
+        fee: b.fee.0.clone(),
+        burn: b.burn.0.clone(),
+        asset: b.asset as i64,
+        time: b.time as i64,
+        proof_len: b.proof_len as i64,
+        envelope_len: [b.envelope_len[0] as i64, b.envelope_len[1] as i64],
+    }
+}
+
+/// The action columns one RPC action fills. Borrowed from the RPC value.
 struct TxFields<'a> {
     kind: TxKind,
-    /// What goes in the `kind` column: the enum name, or the node's own tag for unknown kinds.
+    /// What goes in the `kind` column: the explorer kind, or the node's own tag for unknown kinds.
     kind_tag: &'a str,
-    /// Native (SHRUGG) recipient only; a bridge destination is a foreign address and goes in
-    /// `bridge_to` so it never becomes an account row.
-    to: Option<&'a str>,
-    amount: Option<&'a str>,
     program: Option<&'a str>,
-    base_pc: Option<i64>,
     words_len: Option<i64>,
-    proof_len: Option<i64>,
-    recipients: Vec<String>,
-    asset: Option<&'a str>,
-    bridge_amount: Option<&'a str>,
+    call_proof_len: Option<i64>,
+    input_envelope_len: Option<i64>,
+    amount: Option<String>,
+    cm: Option<&'a str>,
+    validator: Option<&'a str>,
+    registered: Option<bool>,
+    action_nonce: Option<i64>,
+    attestation_len: Option<i64>,
+    recipient: Option<&'a str>,
+    note_time: Option<i64>,
+    asset_index: Option<i64>,
+    relayer_fee: Option<String>,
     to_chain: Option<i32>,
     bridge_to: Option<&'a str>,
-    bridge_fee: Option<&'a str>,
-    attestation: Option<&'a str>,
+    asset_bundle: Option<&'a RpcBundle>,
 }
 
 impl<'a> TxFields<'a> {
@@ -334,59 +316,111 @@ impl<'a> TxFields<'a> {
         TxFields {
             kind,
             kind_tag: kind.as_str(),
-            to: None,
-            amount: None,
             program: None,
-            base_pc: None,
             words_len: None,
-            proof_len: None,
-            recipients: vec![],
-            asset: None,
-            bridge_amount: None,
+            call_proof_len: None,
+            input_envelope_len: None,
+            amount: None,
+            cm: None,
+            validator: None,
+            registered: None,
+            action_nonce: None,
+            attestation_len: None,
+            recipient: None,
+            note_time: None,
+            asset_index: None,
+            relayer_fee: None,
             to_chain: None,
             bridge_to: None,
-            bridge_fee: None,
-            attestation: None,
+            asset_bundle: None,
         }
     }
 
-    fn from_rpc(kind: &'a RpcTxKind) -> Self {
-        match kind {
-            RpcTxKind::Transfer { to, amount } => TxFields {
-                to: Some(to),
-                amount: Some(amount),
-                ..Self::empty(TxKind::Transfer)
-            },
-            RpcTxKind::Mint { to, amount } => TxFields {
-                to: Some(to),
-                amount: Some(amount),
+    fn from_action(action: &'a RpcAction) -> Self {
+        match action {
+            RpcAction::None => Self::empty(TxKind::Transfer),
+            RpcAction::Mint { cm, amount, minter } => TxFields {
+                cm: Some(cm),
+                amount: Some(amount.0.clone()),
+                validator: Some(minter),
                 ..Self::empty(TxKind::Mint)
             },
-            RpcTxKind::Deploy { base_pc, words_len, program } => TxFields {
+            RpcAction::Deploy { program, words } => TxFields {
                 program: Some(program),
-                base_pc: Some(*base_pc as i64),
-                words_len: Some(*words_len as i64),
+                words_len: Some(*words as i64),
                 ..Self::empty(TxKind::Deploy)
             },
-            RpcTxKind::Call { program, proof_len, recipients } => TxFields {
+            RpcAction::Call {
+                program,
+                proof_len,
+                input_envelope_len,
+            } => TxFields {
                 program: Some(program),
-                proof_len: Some(*proof_len as i64),
-                recipients: recipients.clone(),
+                call_proof_len: Some(*proof_len as i64),
+                input_envelope_len: input_envelope_len.map(|n| n as i64),
                 ..Self::empty(TxKind::Call)
             },
-            RpcTxKind::BridgeAttest { attestation } => TxFields {
-                attestation: Some(attestation),
+            RpcAction::Bond {
+                validator,
+                amount,
+                registered,
+            } => TxFields {
+                validator: Some(validator),
+                amount: Some(amount.0.clone()),
+                registered: Some(*registered),
+                ..Self::empty(TxKind::Bond)
+            },
+            RpcAction::Unbond {
+                validator,
+                amount,
+                nonce,
+            } => TxFields {
+                validator: Some(validator),
+                amount: Some(amount.0.clone()),
+                action_nonce: Some(*nonce as i64),
+                ..Self::empty(TxKind::Unbond)
+            },
+            RpcAction::Withdraw {
+                validator,
+                amount,
+                nonce,
+            } => TxFields {
+                validator: Some(validator),
+                amount: Some(amount.0.clone()),
+                action_nonce: Some(*nonce as i64),
+                ..Self::empty(TxKind::Withdraw)
+            },
+            RpcAction::BridgeAttest {
+                attestation_len,
+                recipient,
+                asset_index,
+                amount,
+                time,
+            } => TxFields {
+                attestation_len: Some(*attestation_len as i64),
+                recipient: Some(recipient),
+                asset_index: asset_index.map(|a| a as i64),
+                amount: amount.as_ref().map(|a| a.0.clone()),
+                note_time: time.map(|t| t as i64),
                 ..Self::empty(TxKind::BridgeAttest)
             },
-            RpcTxKind::BridgeBurn { asset, amount, to_chain, to, fee } => TxFields {
-                asset: Some(asset),
-                bridge_amount: Some(amount),
+            RpcAction::BridgeBurn {
+                asset,
+                amount,
+                relayer_fee,
+                to_chain,
+                to,
+                asset_bundle,
+            } => TxFields {
+                asset_index: Some(*asset as i64),
+                amount: Some(amount.0.clone()),
+                relayer_fee: Some(relayer_fee.0.clone()),
                 to_chain: Some(i32::from(*to_chain)),
                 bridge_to: Some(to),
-                bridge_fee: Some(fee),
+                asset_bundle: Some(asset_bundle),
                 ..Self::empty(TxKind::BridgeBurn)
             },
-            RpcTxKind::Unknown { kind: tag } => TxFields {
+            RpcAction::Unknown { kind: tag } => TxFields {
                 // The column is VARCHAR(32); a longer tag is stored truncated on a char boundary.
                 kind_tag: truncate_chars(tag, 32),
                 ..Self::empty(TxKind::Other)
@@ -405,32 +439,71 @@ fn truncate_chars(s: &str, max: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::rpc::Units;
 
     #[test]
-    fn bridge_burn_keeps_foreign_address_out_of_to() {
-        let k = RpcTxKind::BridgeBurn {
-            asset: "8f1c".into(),
-            amount: "500".into(),
-            to_chain: 2,
-            to: "00".repeat(32),
-            fee: "5".into(),
+    fn a_plain_transfer_is_kind_transfer_with_no_action_fields() {
+        let f = TxFields::from_action(&RpcAction::None);
+        assert_eq!(f.kind, TxKind::Transfer);
+        assert_eq!(f.kind_tag, "transfer");
+        assert!(f.amount.is_none() && f.validator.is_none() && f.program.is_none());
+    }
+
+    #[test]
+    fn a_burn_keeps_the_foreign_address_and_asset_index() {
+        let asset_bundle = RpcBundle {
+            anchor: "a".into(),
+            nullifiers: ["n1".into(), "n2".into()],
+            commitments: ["c1".into(), "c2".into()],
+            fee: Units("0".into()),
+            burn: Units("500".into()),
+            asset: 2,
+            time: 9,
+            proof_len: 1,
+            envelope_len: [1, 1],
         };
-        let f = TxFields::from_rpc(&k);
+        let k = RpcAction::BridgeBurn {
+            asset: 2,
+            amount: Units("400".into()),
+            relayer_fee: Units("100".into()),
+            to_chain: 5,
+            to: "00".repeat(32),
+            asset_bundle: Box::new(asset_bundle),
+        };
+        let f = TxFields::from_action(&k);
         assert_eq!(f.kind, TxKind::BridgeBurn);
-        assert_eq!(f.kind_tag, "bridge_burn");
-        assert!(f.to.is_none() && f.amount.is_none());
-        assert_eq!(f.bridge_amount, Some("500"));
-        assert_eq!(f.to_chain, Some(2));
+        assert_eq!(f.asset_index, Some(2));
+        assert_eq!(f.amount.as_deref(), Some("400"));
+        assert_eq!(f.relayer_fee.as_deref(), Some("100"));
+        assert_eq!(f.to_chain, Some(5));
         assert_eq!(f.bridge_to.map(str::len), Some(64));
+        assert_eq!(f.asset_bundle.unwrap().burn.0, "500");
+    }
+
+    #[test]
+    fn a_mint_records_the_minting_validator_as_validator() {
+        let k = RpcAction::Mint {
+            cm: "cm".into(),
+            amount: Units("7".into()),
+            minter: "2nRd".into(),
+        };
+        let f = TxFields::from_action(&k);
+        assert_eq!(f.kind, TxKind::Mint);
+        assert_eq!(f.validator, Some("2nRd"));
+        assert_eq!(f.cm, Some("cm"));
     }
 
     #[test]
     fn unknown_kind_is_stored_under_the_node_tag() {
-        let k = RpcTxKind::Unknown { kind: "x".repeat(40) };
-        let f = TxFields::from_rpc(&k);
+        let k = RpcAction::Unknown {
+            kind: "x".repeat(40),
+        };
+        let f = TxFields::from_action(&k);
         assert_eq!(f.kind, TxKind::Other);
         assert_eq!(f.kind_tag.len(), 32);
-        let k = RpcTxKind::Unknown { kind: "shielded".into() };
-        assert_eq!(TxFields::from_rpc(&k).kind_tag, "shielded");
+        let k = RpcAction::Unknown {
+            kind: "slash".into(),
+        };
+        assert_eq!(TxFields::from_action(&k).kind_tag, "slash");
     }
 }

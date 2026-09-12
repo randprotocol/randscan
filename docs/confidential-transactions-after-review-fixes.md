@@ -1,5 +1,11 @@
 # Confidential transactions after the fullnode review fixes (M1–M4)
 
+> **Superseded (2026-09-12).** This document describes confidential calls on the *account* chain
+> (chain 4/5). On the shielded chain a call is paid by a bundle, has no caller account, no
+> recipient list and no effect kind 1, and its receipt carries `h_in`; see
+> `docs/superpowers/specs/2026-09-12-shielded-chain-design.md` and `docs/api.md`. The zkVM
+> review history below is still accurate.
+
 How the September 2026 fullnode review items change what a confidential transaction (a `call`
 carrying a zkVM proof) looks like on chain, and what that means for RandScan. The items are the
 Medium findings of `concerns/fullnode-review-2026-09-10.md` in the fullnode repository, merged

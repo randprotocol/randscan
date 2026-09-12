@@ -19,13 +19,6 @@ const columns: Column<ProgramSummary>[] = [
     render: (program) => <Hash value={program.id} href={`/programs/${program.id}`} />,
   },
   {
-    key: 'deployer',
-    header: 'Deployer',
-    render: (program) => (
-      <Hash value={program.deployer} href={`/account/${program.deployer}`} start={6} end={6} />
-    ),
-  },
-  {
     key: 'deployed_at_height',
     header: 'Deployed at',
     render: (program) => (

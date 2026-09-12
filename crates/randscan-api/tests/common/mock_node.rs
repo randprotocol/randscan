@@ -1,6 +1,7 @@
-//! An in-process stand-in for `shrugg-node`'s JSON-RPC (`fullnode/docs/rpc.md`), scripted from
-//! the test: the chain id, the committed blocks and the validator set can be swapped at any time,
-//! which is how the tests simulate a hard fork under a running indexer.
+//! An in-process stand-in for `shrugg-node`'s JSON-RPC on the shielded chain
+//! (`fullnode/docs/rpc.md`), scripted from the test: the chain id, the committed blocks, the
+//! tree leaves and the validator register can be swapped at any time, which is how the tests
+//! simulate a hard fork under a running indexer.
 
 #![allow(dead_code)]
 
@@ -10,13 +11,34 @@ use sha2::{Digest, Sha256};
 use std::sync::{Arc, Mutex};
 
 pub const VALIDATOR: &str = "2nRdFChBXRmKoe2sQE3ZYDzvdg53QmBZJJ9iweY7hk1v";
-pub const ALICE: &str = "ByDkxsEfDCR5DrmDufKftvcRsgvufypnZ4SgDQzJAQ7Z";
-pub const BOB: &str = "F6rYLexPhyMmwPNqbEmyyp5FiTmtQqDgZyqScUqYY4F6";
-pub const CAROL: &str = "5tMgLSzXL8keU1vg2wtGEXRJkmfBK6GzhjNjxrCFgCaj";
+pub const VALIDATOR_B: &str = "ByDkxsEfDCR5DrmDufKftvcRsgvufypnZ4SgDQzJAQ7Z";
+pub const SHIELDED_ADDR: &str = "shrugg1q9fexampleexampleexampleexampleexampleexampleexample";
 
 /// 64 lowercase hex characters derived from `seed`.
 pub fn h(seed: &str) -> String {
     hex::encode(Sha256::digest(seed.as_bytes()))
+}
+
+/// A register entry as the S2 node serves it.
+#[derive(Clone)]
+pub struct MockValidator {
+    pub address: String,
+    pub stake: String,
+    pub rewards: String,
+    pub pending: Vec<(u64, String)>,
+    pub active: bool,
+}
+
+impl MockValidator {
+    pub fn new(address: &str, stake: &str) -> Self {
+        MockValidator {
+            address: address.into(),
+            stake: stake.into(),
+            rewards: "0".into(),
+            pending: vec![],
+            active: true,
+        }
+    }
 }
 
 pub struct MockChain {
@@ -25,20 +47,27 @@ pub struct MockChain {
     pub salt: String,
     pub blocks: Vec<Value>,
     pub view: u64,
-    pub validators: Vec<String>,
+    pub validators: Vec<MockValidator>,
+    /// Serve the register in the S3-branch shape (`{address, stake, rewards: number}`) and
+    /// answer "unknown method" to `shrugg_getEpoch` / `shrugg_getSupply`.
+    pub pre_s2: bool,
+    /// The commitment tree: (cm, height), leaf index = position.
+    pub leaves: Vec<(String, u64)>,
     /// Every JSON-RPC method name the indexer called, in order.
     pub calls: Vec<String>,
 }
 
 impl MockChain {
-    /// A chain with only its genesis block.
+    /// A chain with only its genesis block and one genesis deposit note.
     pub fn new(chain_id: u64, salt: &str) -> Self {
         let mut c = MockChain {
             chain_id,
             salt: salt.to_string(),
             blocks: Vec::new(),
             view: 0,
-            validators: vec![VALIDATOR.to_string()],
+            validators: vec![MockValidator::new(VALIDATOR, "100000000000000")],
+            pre_s2: false,
+            leaves: vec![(h(&format!("genesis-note-{chain_id}-{salt}")), 0)],
             calls: Vec::new(),
         };
         c.push_block(vec![]);
@@ -49,7 +78,8 @@ impl MockChain {
         self.blocks.last().expect("genesis")
     }
 
-    /// Append a block holding `txs` (already built with [`tx`]); returns its hash.
+    /// Append a block holding `txs` (already built with [`tx`]); returns its hash. Every
+    /// commitment the block's bundles and mints carry becomes a tree leaf.
     pub fn push_block(&mut self, txs: Vec<Value>) -> String {
         let height = self.blocks.len() as u64;
         let parent = if height == 0 {
@@ -59,6 +89,18 @@ impl MockChain {
         };
         let hash = h(&format!("block-{}-{}-{}", self.chain_id, self.salt, height));
         self.view = height * 2;
+        for t in &txs {
+            for b in [&t["bundle"], &t["action"]["asset_bundle"]] {
+                if let Some(cms) = b["commitments"].as_array() {
+                    for cm in cms {
+                        self.leaves.push((cm.as_str().unwrap().to_string(), height));
+                    }
+                }
+            }
+            if let Some(cm) = t["action"]["cm"].as_str() {
+                self.leaves.push((cm.to_string(), height));
+            }
+        }
         self.blocks.push(json!({
             "hash": hash,
             "height": height,
@@ -73,6 +115,23 @@ impl MockChain {
             "transactions": txs,
         }));
         hash
+    }
+
+    fn nullifier_count(&self) -> usize {
+        self.blocks
+            .iter()
+            .flat_map(|b| b["transactions"].as_array().cloned().unwrap_or_default())
+            .map(|t| {
+                let mut n = 0;
+                if t["bundle"].is_object() {
+                    n += 2;
+                }
+                if t["action"]["asset_bundle"].is_object() {
+                    n += 2;
+                }
+                n
+            })
+            .sum()
     }
 
     fn dispatch(&mut self, method: &str, params: &Value) -> Result<Value, (i64, String)> {
@@ -92,7 +151,11 @@ impl MockChain {
                     "high_qc_view": self.view.saturating_sub(1), "syncing": false,
                     "sync_target": head["height"], "peer_count": 0, "mempool_size": 0,
                     "is_validator": false, "faucet": true, "confidential": true,
-                    "fri_profile": "test", "programs": 0, "address": VALIDATOR,
+                    "fri_profile": "test", "programs": 0,
+                    "notes": self.leaves.len(), "nullifiers": self.nullifier_count(),
+                    "tree_root": h(&format!("root-{}", self.leaves.len())),
+                    "hc_bundle": h("hc_bundle"),
+                    "address": null,
                     "peer_id": "12D3KooWmockmockmockmockmockmockmockmockmock"
                 })
             }
@@ -108,15 +171,55 @@ impl MockChain {
                     .cloned()
                     .unwrap_or(Value::Null)
             }
-            "shrugg_getAccount" => {
-                let address = p(0).as_str().unwrap_or("").to_string();
-                json!({ "address": address, "nonce": 1, "balance": "1000000000" })
+            "shrugg_getCommitments" => {
+                let from = p(0).as_u64().ok_or((-32602, "from_index".to_string()))? as usize;
+                let limit = p(1).as_u64().unwrap_or(1000).min(1000) as usize;
+                json!(self
+                    .leaves
+                    .iter()
+                    .enumerate()
+                    .skip(from)
+                    .take(limit)
+                    .map(|(i, (cm, height))| json!({
+                        "index": i, "cm": cm, "height": height,
+                        "envelope": { "kem_ct": "00", "to_receiver": "00", "to_sender": "00", "body": "00" }
+                    }))
+                    .collect::<Vec<_>>())
             }
+            "shrugg_getTreeInfo" => json!({
+                "next_index": self.leaves.len(), "root": h(&format!("root-{}", self.leaves.len())),
+                "nullifiers": self.nullifier_count()
+            }),
+            "shrugg_getValidators" if self.pre_s2 => json!(self
+                .validators
+                .iter()
+                .map(|v| json!({ "address": v.address, "stake": v.stake, "rewards": v.rewards.parse::<u64>().unwrap_or(0) }))
+                .collect::<Vec<_>>()),
             "shrugg_getValidators" => json!(self
                 .validators
                 .iter()
-                .map(|a| json!({ "address": a, "stake": "100000" }))
+                .map(|v| json!({
+                    "address": v.address, "stake": v.stake, "rewards": v.rewards,
+                    "pending": v.pending.iter().map(|(e, a)| json!({ "release_epoch": e, "amount": a })).collect::<Vec<_>>(),
+                    "payout": SHIELDED_ADDR, "nonce": 0, "active": v.active
+                }))
                 .collect::<Vec<_>>()),
+            "shrugg_getEpoch" if !self.pre_s2 => {
+                let height = self.head()["height"].as_u64().unwrap();
+                json!({ "epoch": height / 1000, "epoch_blocks": 1000,
+                        "next_set": self.validators.iter().filter(|v| v.active).map(|v| v.address.clone()).collect::<Vec<_>>() })
+            }
+            "shrugg_getSupply" if !self.pre_s2 => json!({
+                "height": self.head()["height"], "genesis_deposited": "1000000000000", "genesis_staked": "100000000000000",
+                "faucet_minted": "100000000000", "withdraw_deposited": "0", "fees_paid": "3000000", "burned": "0",
+                "pool_value": "1099997000000", "register_total": "100000003000000", "total_supply": "101100000000000",
+                "invariant_holds": true
+            }),
+            "shrugg_getBridgeState" => json!({
+                "enabled": true, "emitter": "01".repeat(32), "emitters": { "2": "02".repeat(32) },
+                "guardian_set_index": 0, "guardians": ["aa".repeat(20)], "burn_sequence": 1, "next_index": 2,
+                "assets": [{ "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1") }]
+            }),
             "shrugg_getPeers" => json!([]),
             "shrugg_getReceipt" | "shrugg_getProgram" => Value::Null,
             other => return Err((-32601, format!("unknown method {other}"))),
@@ -124,10 +227,21 @@ impl MockChain {
     }
 }
 
-/// A transaction as the node serializes it inside a block.
-pub fn tx(chain_id: u64, from: &str, nonce: u64, kind: Value) -> Value {
-    let hash = h(&format!("tx-{chain_id}-{from}-{nonce}-{kind}"));
-    json!({ "hash": hash, "from": from, "nonce": nonce, "fee": "1000", "chain_id": chain_id, "kind": kind })
+/// The public fields of a bundle, unique per `seed`.
+pub fn bundle(seed: &str) -> Value {
+    json!({
+        "anchor": h(&format!("anchor-{seed}")),
+        "nullifiers": [h(&format!("nf1-{seed}")), h(&format!("nf2-{seed}"))],
+        "commitments": [h(&format!("cm1-{seed}")), h(&format!("cm2-{seed}"))],
+        "fee": 1000000, "burn": 0, "asset": 0, "time": 1,
+        "proof_len": 302857, "envelope_len": [1380, 1380]
+    })
+}
+
+/// A transaction as the node serialises it inside a block: a bundle (or `null`) and an action.
+pub fn tx(chain_id: u64, seed: &str, bundle: Option<Value>, action: Value) -> Value {
+    let hash = h(&format!("tx-{chain_id}-{seed}-{action}"));
+    json!({ "hash": hash, "chain_id": chain_id, "bundle": bundle, "action": action })
 }
 
 pub struct MockNode {

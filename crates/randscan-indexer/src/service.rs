@@ -1,10 +1,10 @@
-//! Sync loop: follow the node head, index new blocks, refresh validators and stats.
+//! Sync loop: follow the node head, index new blocks and tree leaves, refresh the validator
+//! register, the bridge state, the supply audit and the stats.
 
 use crate::{BlockProcessor, Broadcaster, IndexerConfig, NodeTracker, RpcClient};
 use anyhow::Result;
-use randscan_core::NetworkStats;
-use randscan_core::NodeInfo;
-use randscan_db::{self as db, DbPool, StatsUpdate};
+use randscan_core::{BridgeState, NetworkStats, NodeInfo, Supply};
+use randscan_db::{self as db, DbPool, NewValidator, StatsUpdate};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
@@ -37,6 +37,9 @@ pub struct IndexerService {
     /// Last forced re-check (the node's head fell below the indexed height, or a fork).
     last_chain_check: RwLock<Option<Instant>>,
     last_stats: RwLock<Option<Instant>>,
+    /// The node's public bridge state and supply audit, refreshed with the stats.
+    bridge: RwLock<Option<BridgeState>>,
+    supply: RwLock<Option<Supply>>,
     nodes: Arc<NodeTracker>,
 }
 
@@ -63,6 +66,8 @@ impl IndexerService {
             chain_checked: AtomicBool::new(false),
             last_chain_check: RwLock::new(None),
             last_stats: RwLock::new(None),
+            bridge: RwLock::new(None),
+            supply: RwLock::new(None),
             nodes,
         }
     }
@@ -76,6 +81,16 @@ impl IndexerService {
         self.nodes.nodes().await
     }
 
+    /// The bridge's public state as last read from the node (`None` before the first refresh).
+    pub async fn bridge(&self) -> Option<BridgeState> {
+        self.bridge.read().await.clone()
+    }
+
+    /// The supply audit as last read from the node (`None` on a node without it).
+    pub async fn supply(&self) -> Option<Supply> {
+        self.supply.read().await.clone()
+    }
+
     pub async fn get_state(&self) -> IndexerState {
         self.state.read().await.clone()
     }
@@ -84,7 +99,10 @@ impl IndexerService {
         info!("indexer starting against {}", self.config.rpc_url);
         let st = db::get_indexer_state(self.pool.inner()).await?;
         self.state.write().await.current_height = st.next_height - 1;
-        info!("resuming from height {}", st.next_height);
+        info!(
+            "resuming from height {} (leaf {})",
+            st.next_height, st.next_leaf
+        );
 
         let tracker = self.nodes.clone();
         tokio::spawn(async move { tracker.run().await });
@@ -156,9 +174,14 @@ impl IndexerService {
         let Some(reason) = reason else {
             return Ok(false);
         };
-        warn!("{}; resetting chain data and re-indexing from height 0", reason);
+        warn!(
+            "{}; resetting chain data and re-indexing from height 0",
+            reason
+        );
         self.processor.reset_chain(node_chain).await?;
         *self.chain.write().await = None; // symbol/decimals may differ too
+        *self.bridge.write().await = None;
+        *self.supply.write().await = None;
         self.state.write().await.current_height = -1;
         Ok(true)
     }
@@ -209,6 +232,7 @@ impl IndexerService {
             }
         }
         if next > node_height {
+            self.sync_notes().await;
             self.maybe_refresh_stats(false).await;
             return Ok(true);
         }
@@ -262,10 +286,26 @@ impl IndexerService {
             if catching_up {
                 info!("caught up at height {}", node_height);
             }
+            self.sync_notes().await;
             self.maybe_refresh_stats(true).await;
             Ok(true)
         } else {
             Ok(false)
+        }
+    }
+
+    /// Page the commitment tree from where the last pass stopped. Failures are logged: a leaf
+    /// page that is missed now is fetched on the next pass.
+    async fn sync_notes(&self) {
+        let next_leaf = match db::get_indexer_state(self.pool.inner()).await {
+            Ok(st) => st.next_leaf,
+            Err(e) => {
+                warn!("indexer state read failed: {}", e);
+                return;
+            }
+        };
+        if let Err(e) = self.processor.sync_notes(next_leaf).await {
+            warn!("note sync from leaf {} failed: {:#}", next_leaf, e);
         }
     }
 
@@ -284,6 +324,14 @@ impl IndexerService {
         if let Err(e) = self.refresh_validators().await {
             warn!("validator refresh failed: {:#}", e);
         }
+        match self.rpc.bridge_state().await {
+            Ok(b) => *self.bridge.write().await = Some(b),
+            Err(e) => warn!("bridge state refresh failed: {:#}", e),
+        }
+        match self.rpc.supply().await {
+            Ok(s) => *self.supply.write().await = s,
+            Err(e) => warn!("supply refresh failed: {:#}", e),
+        }
         match self.refresh_stats().await {
             Ok(stats) => self.broadcaster.stats(stats),
             Err(e) => warn!("stats refresh failed: {:#}", e),
@@ -291,23 +339,29 @@ impl IndexerService {
     }
 
     async fn refresh_validators(&self) -> Result<()> {
-        let set = self.rpc.validators().await?;
-        let pairs: Vec<(String, String)> = set
-            .iter()
-            .map(|v| (v.address.clone(), v.stake.clone()))
+        let register = self.rpc.validators().await?;
+        let rows: Vec<NewValidator> = register
+            .into_iter()
+            .map(|v| NewValidator {
+                pending: serde_json::Value::Array(
+                    v.pending
+                        .iter()
+                        .map(|p| {
+                            serde_json::json!({ "release_epoch": p.release_epoch, "amount": p.amount.0 })
+                        })
+                        .collect(),
+                ),
+                address: v.address,
+                stake: v.stake.0,
+                rewards: v.rewards.0,
+                payout: v.payout,
+                nonce: v.nonce as i64,
+                // Before S2 the register is the genesis set and every entry is active.
+                active: v.active.unwrap_or(true),
+            })
             .collect();
         let mut conn = self.pool.inner().acquire().await?;
-        db::replace_validators(&mut conn, &pairs).await?;
-        drop(conn);
-        // Genesis allocations are not transactions: make sure validator accounts exist.
-        for v in &set {
-            if db::get_account(self.pool.inner(), &v.address)
-                .await?
-                .is_none()
-            {
-                self.processor.refresh_account(&v.address, 0).await;
-            }
-        }
+        db::replace_validators(&mut conn, &rows).await?;
         Ok(())
     }
 
@@ -325,23 +379,40 @@ impl IndexerService {
     async fn refresh_stats(&self) -> Result<NetworkStats> {
         let pool = self.pool.inner();
         let status = self.rpc.status().await?;
+        let epoch = match self.rpc.epoch().await {
+            Ok(e) => e,
+            Err(e) => {
+                warn!("epoch fetch failed: {:#}", e);
+                None
+            }
+        };
+        let supply = self.supply.read().await.clone();
         let (chain_id, symbol, decimals) = self.chain_info().await?;
         let height = db::max_block_height(pool).await?.unwrap_or(-1).max(0);
-        let total_transactions = db::count_transactions(pool, None, None, None).await?;
-        let total_accounts = db::count_accounts(pool).await?;
+        let total_transactions = db::count_transactions(pool, &db::TxFilter::default()).await?;
         let validators = db::list_validators(pool).await?;
-        let validator_count = validators.len() as i64;
+        let (validator_count, active_validator_count) = db::count_validators(pool).await?;
         let total_stake = db::total_stake(pool).await?;
-        let total_supply = db::total_supply(pool).await?;
         let program_count = db::count_programs(pool).await?;
         let avg_block_time_ms = db::avg_block_time_ms(pool, 100).await?;
-        let current_leader = if validators.is_empty() {
+        // The leader of view v is entry v mod n of the active set in address order.
+        let active: Vec<&str> = validators
+            .iter()
+            .filter(|v| v.active)
+            .map(|v| v.address.as_str())
+            .collect();
+        let current_leader = if active.is_empty() {
             None
         } else {
-            validators
-                .get((status.view % validators.len() as u64) as usize)
-                .map(|v| v.address.clone())
+            active
+                .get((status.view % active.len() as u64) as usize)
+                .map(|a| a.to_string())
         };
+        let total_supply = supply
+            .as_ref()
+            .map(|s| s.total_supply.clone())
+            .unwrap_or_else(|| "0".to_string());
+        let pool_value = supply.as_ref().map(|s| s.pool_value.clone());
 
         db::update_network_stats(
             pool,
@@ -352,10 +423,13 @@ impl IndexerService {
                 height,
                 view: status.view as i64,
                 total_transactions,
-                total_accounts,
+                notes: status.notes as i64,
+                nullifiers: status.nullifiers as i64,
                 validator_count,
+                active_validator_count,
                 total_stake: &total_stake,
                 total_supply: &total_supply,
+                pool_value: pool_value.as_deref(),
                 program_count,
                 avg_block_time_ms,
                 peer_count: status.peer_count as i32,
@@ -364,6 +438,14 @@ impl IndexerService {
                 faucet: status.faucet,
                 confidential: status.confidential,
                 current_leader: current_leader.as_deref(),
+                tree_root: Some(&status.tree_root)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.as_str()),
+                hc_bundle: Some(&status.hc_bundle)
+                    .filter(|s| !s.is_empty())
+                    .map(|s| s.as_str()),
+                epoch: epoch.as_ref().map(|e| e.epoch as i64),
+                epoch_blocks: epoch.as_ref().map(|e| e.epoch_blocks as i64),
             },
         )
         .await?;

@@ -36,11 +36,16 @@ pub fn create_router(state: AppState) -> Router {
         .route("/transactions", get(handlers::list_transactions))
         .route("/transactions/latest", get(handlers::latest_transactions))
         .route("/transactions/:hash", get(handlers::get_transaction))
-        .route("/accounts/:address", get(handlers::get_account))
+        .route("/accounts/:address", get(handlers::no_accounts))
         .route(
             "/accounts/:address/transactions",
-            get(handlers::account_transactions),
+            get(handlers::no_accounts),
         )
+        .route("/notes", get(handlers::list_notes))
+        .route("/notes/:id", get(handlers::get_note))
+        .route("/nullifiers/:nf", get(handlers::get_nullifier))
+        .route("/bridge", get(handlers::get_bridge))
+        .route("/supply", get(handlers::get_supply))
         .route("/validators", get(handlers::list_validators))
         .route("/validators/:address", get(handlers::get_validator))
         .route("/programs", get(handlers::list_programs))

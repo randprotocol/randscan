@@ -1,8 +1,8 @@
-//! JSON-RPC client for `shrugg-node` (see fullnode/docs/rpc.md).
+//! JSON-RPC client for `shrugg-node` on the shielded chain (see fullnode/docs/rpc.md).
 
 use anyhow::{anyhow, Result};
 use reqwest::Client;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Deserializer, Serialize};
 use std::time::Duration;
 
 #[derive(Clone)]
@@ -31,6 +31,9 @@ pub struct RpcError {
     pub message: String,
 }
 
+/// JSON-RPC "unknown method": what a node of an earlier phase answers for a method it lacks.
+const METHOD_NOT_FOUND: i64 = -32601;
+
 impl RpcClient {
     pub fn new(url: &str) -> Self {
         let client = Client::builder()
@@ -47,12 +50,11 @@ impl RpcClient {
         &self.url
     }
 
-    /// Send a request; a JSON `null` result is returned as `None`.
-    async fn call<T: DeserializeOwned>(
+    async fn raw(
         &self,
         method: &str,
         params: serde_json::Value,
-    ) -> Result<Option<T>> {
+    ) -> Result<Option<serde_json::Value>> {
         let req = JsonRpcRequest {
             jsonrpc: "2.0",
             id: 1,
@@ -69,10 +71,27 @@ impl RpcClient {
             .json()
             .await?;
         if let Some(e) = resp.error {
-            return Err(anyhow!("rpc {} failed: {} ({})", method, e.message, e.code));
+            return Err(RpcFailure {
+                method: method.to_string(),
+                code: e.code,
+                message: e.message,
+            }
+            .into());
         }
-        match resp.result {
-            None | Some(serde_json::Value::Null) => Ok(None),
+        Ok(match resp.result {
+            None | Some(serde_json::Value::Null) => None,
+            Some(v) => Some(v),
+        })
+    }
+
+    /// Send a request; a JSON `null` result is returned as `None`.
+    async fn call<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<Option<T>> {
+        match self.raw(method, params).await? {
+            None => Ok(None),
             Some(v) => Ok(Some(serde_json::from_value(v)?)),
         }
     }
@@ -85,6 +104,22 @@ impl RpcClient {
         self.call(method, params)
             .await?
             .ok_or_else(|| anyhow!("rpc {} returned null", method))
+    }
+
+    /// Like `call_required`, but a node that does not serve the method answers `None`
+    /// (phase S2 methods on an S1/S3 node).
+    async fn call_optional_method<T: DeserializeOwned>(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<Option<T>> {
+        match self.call(method, params).await {
+            Ok(v) => Ok(v),
+            Err(e) => match e.downcast_ref::<RpcFailure>() {
+                Some(f) if f.code == METHOD_NOT_FOUND => Ok(None),
+                _ => Err(e),
+            },
+        }
     }
 
     pub async fn chain_id(&self) -> Result<u64> {
@@ -117,13 +152,21 @@ impl RpcClient {
             .await
     }
 
-    pub async fn account(&self, address: &str) -> Result<RpcAccount> {
-        self.call_required("shrugg_getAccount", serde_json::json!([address]))
+    /// The validator register (every entry, active or not).
+    pub async fn validators(&self) -> Result<Vec<RpcValidator>> {
+        self.call_required("shrugg_getValidators", serde_json::json!([]))
             .await
     }
 
-    pub async fn validators(&self) -> Result<Vec<RpcValidator>> {
-        self.call_required("shrugg_getValidators", serde_json::json!([]))
+    /// Phase S2: the epoch schedule. `None` on a node without the method.
+    pub async fn epoch(&self) -> Result<Option<RpcEpoch>> {
+        self.call_optional_method("shrugg_getEpoch", serde_json::json!([]))
+            .await
+    }
+
+    /// Phase S2: the supply audit. `None` on a node without the method.
+    pub async fn supply(&self) -> Result<Option<randscan_core::Supply>> {
+        self.call_optional_method("shrugg_getSupply", serde_json::json!([]))
             .await
     }
 
@@ -142,8 +185,58 @@ impl RpcClient {
             .await
     }
 
+    /// A page of commitment-tree leaves from `from_index`, at most 1000 rows.
+    pub async fn commitments(&self, from_index: u64, limit: u64) -> Result<Vec<RpcCommitment>> {
+        self.call_required(
+            "shrugg_getCommitments",
+            serde_json::json!([from_index, limit]),
+        )
+        .await
+    }
+
+    pub async fn tree_info(&self) -> Result<RpcTreeInfo> {
+        self.call_required("shrugg_getTreeInfo", serde_json::json!([]))
+            .await
+    }
+
+    pub async fn bridge_state(&self) -> Result<randscan_core::BridgeState> {
+        self.call_required("shrugg_getBridgeState", serde_json::json!([]))
+            .await
+    }
+
     pub async fn is_connected(&self) -> bool {
         self.head().await.is_ok()
+    }
+}
+
+/// An error the node returned for a request.
+#[derive(Debug, thiserror::Error)]
+#[error("rpc {method} failed: {message} ({code})")]
+pub struct RpcFailure {
+    pub method: String,
+    pub code: i64,
+    pub message: String,
+}
+
+/// An amount of units as the node serialises it: a JSON integer in a transaction body, a decimal
+/// string in the register and the supply audit. Both are accepted; the value is kept as a
+/// decimal string (a `u128` stake does not fit an `f64`).
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Units(pub String);
+
+impl<'de> Deserialize<'de> for Units {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+        let v = serde_json::Value::deserialize(d)?;
+        match v {
+            serde_json::Value::Number(n) => Ok(Units(n.to_string())),
+            serde_json::Value::String(s) => {
+                if s.is_empty() || !s.bytes().all(|b| b.is_ascii_digit()) {
+                    return Err(serde::de::Error::custom(format!("not an amount: {s:?}")));
+                }
+                Ok(Units(s))
+            }
+            other => Err(serde::de::Error::custom(format!("not an amount: {other}"))),
+        }
     }
 }
 
@@ -180,6 +273,9 @@ pub struct NodeStatus {
     pub mempool_size: u32,
     #[serde(default)]
     pub is_validator: bool,
+    /// Phase S2: whether this node's key is in the set running the current epoch.
+    #[serde(default)]
+    pub active_validator: Option<bool>,
     #[serde(default)]
     pub faucet: bool,
     #[serde(default)]
@@ -188,8 +284,18 @@ pub struct NodeStatus {
     pub fri_profile: String,
     #[serde(default)]
     pub programs: u64,
+    /// Leaves in the commitment tree.
     #[serde(default)]
-    pub address: String,
+    pub notes: u64,
+    /// Nullifiers published.
+    #[serde(default)]
+    pub nullifiers: u64,
+    #[serde(default)]
+    pub tree_root: String,
+    #[serde(default)]
+    pub hc_bundle: String,
+    #[serde(default)]
+    pub address: Option<String>,
     #[serde(default)]
     pub peer_id: String,
 }
@@ -211,141 +317,284 @@ pub struct RpcBlock {
     pub transactions: Vec<RpcTx>,
 }
 
+/// A transaction as the node serialises it inside a block (`shrugg_getTransaction.tx`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcTx {
     pub hash: String,
-    pub from: String,
-    pub nonce: u64,
-    pub fee: String,
     pub chain_id: u64,
-    pub kind: RpcTxKind,
+    /// `None` for a validator-signed action (mint, unbond, withdraw).
+    #[serde(default)]
+    pub bundle: Option<RpcBundle>,
+    pub action: RpcAction,
 }
 
-/// Transaction kinds as the node serializes them (`fullnode/docs/rpc.md`, `shrugg_getTransaction`).
-///
-/// Kinds this client does not know become [`RpcTxKind::Unknown`] rather than a parse error, so a
-/// node that is newer than the explorer never stalls indexing on an unfamiliar block.
+/// The public fields of a bundle. The proof and the envelopes come by length only.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcBundle {
+    pub anchor: String,
+    pub nullifiers: [String; 2],
+    pub commitments: [String; 2],
+    pub fee: Units,
+    #[serde(default)]
+    pub burn: Units,
+    #[serde(default)]
+    pub asset: u32,
+    #[serde(default)]
+    pub time: u64,
+    #[serde(default)]
+    pub proof_len: u64,
+    #[serde(default)]
+    pub envelope_len: [u64; 2],
+}
+
+/// Actions as the node serialises them. Kinds this client does not know become
+/// [`RpcAction::Unknown`] rather than a parse error, so a node that is newer than the explorer
+/// never stalls indexing on an unfamiliar block.
 #[derive(Debug, Clone)]
-pub enum RpcTxKind {
-    Transfer {
-        to: String,
-        amount: String,
-    },
+pub enum RpcAction {
+    /// A plain shielded transfer.
+    None,
     Mint {
-        to: String,
-        amount: String,
+        cm: String,
+        amount: Units,
+        minter: String,
     },
     Deploy {
-        base_pc: u32,
-        words_len: u32,
         program: String,
+        words: u64,
     },
     Call {
         program: String,
         proof_len: u64,
-        recipients: Vec<String>,
+        input_envelope_len: Option<u64>,
     },
-    /// Guardian-signed inbound bridge message (`attestation` is hex).
+    Bond {
+        validator: String,
+        amount: Units,
+        registered: bool,
+    },
+    Unbond {
+        validator: String,
+        amount: Units,
+        nonce: u64,
+    },
+    Withdraw {
+        validator: String,
+        amount: Units,
+        nonce: u64,
+    },
     BridgeAttest {
-        attestation: String,
+        attestation_len: u64,
+        recipient: String,
+        asset_index: Option<u32>,
+        amount: Option<Units>,
+        time: Option<u64>,
     },
-    /// Outbound bridge transfer: burn `amount` of `asset` (bridged units, 8 decimals) for
-    /// `to` (32-byte hex) on `to_chain`; `fee` is the relayer fee in the same units.
     BridgeBurn {
-        asset: String,
-        amount: String,
+        asset: u32,
+        amount: Units,
+        relayer_fee: Units,
         to_chain: u16,
         to: String,
-        fee: String,
+        asset_bundle: Box<RpcBundle>,
     },
-    /// A kind this build does not decode; `kind` is the node's `type` tag.
+    /// A kind this build does not decode; `kind` is the node's tag.
     Unknown {
         kind: String,
     },
 }
 
 #[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-enum KnownTxKind {
-    Transfer {
-        to: String,
-        amount: String,
-    },
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum KnownAction {
+    None,
     Mint {
-        to: String,
-        amount: String,
+        cm: String,
+        amount: Units,
+        minter: String,
     },
     Deploy {
-        base_pc: u32,
-        words_len: u32,
         program: String,
+        words: u64,
     },
     Call {
         program: String,
         proof_len: u64,
         #[serde(default)]
-        recipients: Vec<String>,
+        input_envelope_len: Option<u64>,
+    },
+    Bond {
+        validator: String,
+        amount: Units,
+        #[serde(default)]
+        registered: bool,
+    },
+    Unbond {
+        validator: String,
+        amount: Units,
+        #[serde(default)]
+        nonce: u64,
+    },
+    Withdraw {
+        validator: String,
+        amount: Units,
+        #[serde(default)]
+        nonce: u64,
     },
     BridgeAttest {
-        attestation: String,
+        attestation_len: u64,
+        recipient: String,
+        #[serde(default)]
+        asset_index: Option<u32>,
+        #[serde(default)]
+        amount: Option<Units>,
+        #[serde(default)]
+        time: Option<u64>,
     },
     BridgeBurn {
-        asset: String,
-        amount: String,
+        asset: u32,
+        amount: Units,
+        #[serde(default)]
+        relayer_fee: Units,
         to_chain: u16,
         to: String,
-        fee: String,
+        asset_bundle: Box<RpcBundle>,
     },
 }
 
-impl<'de> Deserialize<'de> for RpcTxKind {
-    fn deserialize<D: serde::Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
+const KNOWN_TAGS: &[&str] = &[
+    "none",
+    "mint",
+    "deploy",
+    "call",
+    "bond",
+    "unbond",
+    "withdraw",
+    "bridge_attest",
+    "bridge_burn",
+];
+
+impl<'de> Deserialize<'de> for RpcAction {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> std::result::Result<Self, D::Error> {
         let value = serde_json::Value::deserialize(d)?;
         let tag = value
-            .get("type")
+            .get("kind")
             .and_then(|t| t.as_str())
-            .ok_or_else(|| serde::de::Error::missing_field("type"))?
+            .ok_or_else(|| serde::de::Error::missing_field("kind"))?
             .to_string();
-        match serde_json::from_value::<KnownTxKind>(value) {
+        match serde_json::from_value::<KnownAction>(value) {
             Ok(k) => Ok(match k {
-                KnownTxKind::Transfer { to, amount } => RpcTxKind::Transfer { to, amount },
-                KnownTxKind::Mint { to, amount } => RpcTxKind::Mint { to, amount },
-                KnownTxKind::Deploy { base_pc, words_len, program } => {
-                    RpcTxKind::Deploy { base_pc, words_len, program }
-                }
-                KnownTxKind::Call { program, proof_len, recipients } => {
-                    RpcTxKind::Call { program, proof_len, recipients }
-                }
-                KnownTxKind::BridgeAttest { attestation } => RpcTxKind::BridgeAttest { attestation },
-                KnownTxKind::BridgeBurn { asset, amount, to_chain, to, fee } => {
-                    RpcTxKind::BridgeBurn { asset, amount, to_chain, to, fee }
-                }
+                KnownAction::None => RpcAction::None,
+                KnownAction::Mint { cm, amount, minter } => RpcAction::Mint { cm, amount, minter },
+                KnownAction::Deploy { program, words } => RpcAction::Deploy { program, words },
+                KnownAction::Call {
+                    program,
+                    proof_len,
+                    input_envelope_len,
+                } => RpcAction::Call {
+                    program,
+                    proof_len,
+                    input_envelope_len,
+                },
+                KnownAction::Bond {
+                    validator,
+                    amount,
+                    registered,
+                } => RpcAction::Bond {
+                    validator,
+                    amount,
+                    registered,
+                },
+                KnownAction::Unbond {
+                    validator,
+                    amount,
+                    nonce,
+                } => RpcAction::Unbond {
+                    validator,
+                    amount,
+                    nonce,
+                },
+                KnownAction::Withdraw {
+                    validator,
+                    amount,
+                    nonce,
+                } => RpcAction::Withdraw {
+                    validator,
+                    amount,
+                    nonce,
+                },
+                KnownAction::BridgeAttest {
+                    attestation_len,
+                    recipient,
+                    asset_index,
+                    amount,
+                    time,
+                } => RpcAction::BridgeAttest {
+                    attestation_len,
+                    recipient,
+                    asset_index,
+                    amount,
+                    time,
+                },
+                KnownAction::BridgeBurn {
+                    asset,
+                    amount,
+                    relayer_fee,
+                    to_chain,
+                    to,
+                    asset_bundle,
+                } => RpcAction::BridgeBurn {
+                    asset,
+                    amount,
+                    relayer_fee,
+                    to_chain,
+                    to,
+                    asset_bundle,
+                },
             }),
             // A known tag with a malformed body is a real error; an unknown tag is tolerated.
             Err(e) => {
                 if KNOWN_TAGS.contains(&tag.as_str()) {
                     Err(serde::de::Error::custom(e))
                 } else {
-                    Ok(RpcTxKind::Unknown { kind: tag })
+                    Ok(RpcAction::Unknown { kind: tag })
                 }
             }
         }
     }
 }
 
-const KNOWN_TAGS: &[&str] = &["transfer", "mint", "deploy", "call", "bridge_attest", "bridge_burn"];
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct RpcAccount {
-    pub address: String,
-    pub nonce: u64,
-    pub balance: String,
-}
-
+/// One entry of the validator register. The S3 branch serves `{ address, stake, rewards }`; S2
+/// adds the unbonding queue, payout address, nonce and the active flag.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcValidator {
     pub address: String,
-    pub stake: String,
+    pub stake: Units,
+    #[serde(default)]
+    pub rewards: Units,
+    #[serde(default)]
+    pub pending: Vec<RpcPending>,
+    #[serde(default)]
+    pub payout: Option<String>,
+    #[serde(default)]
+    pub nonce: u64,
+    /// Absent before S2, where every register entry is in the set.
+    #[serde(default)]
+    pub active: Option<bool>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcPending {
+    pub release_epoch: u64,
+    pub amount: Units,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcEpoch {
+    pub epoch: u64,
+    pub epoch_blocks: u64,
+    #[serde(default)]
+    pub next_set: Vec<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -364,15 +613,10 @@ pub struct RpcReceipt {
     pub tier: u32,
     #[serde(default)]
     pub outputs: Vec<i64>,
-    pub effect: Option<RpcEffect>,
     pub height: u64,
     pub index: u32,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct RpcEffect {
-    pub to: String,
-    pub amount: String,
+    #[serde(default)]
+    pub h_in: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -381,91 +625,159 @@ pub struct RpcProgram {
     pub base_pc: u32,
     pub words_len: u32,
     pub code_hash: String,
-    pub deployer: String,
     pub deployed_at: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcCommitment {
+    pub index: u64,
+    pub cm: String,
+    pub height: u64,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcTreeInfo {
+    pub next_index: u64,
+    pub root: String,
+    pub nullifiers: u64,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    fn bundle_json() -> serde_json::Value {
+        serde_json::json!({
+            "anchor": "6b1d", "nullifiers": ["8c04", "5e77"], "commitments": ["2a9f", "b310"],
+            "fee": 1000000, "burn": 0, "asset": 0, "time": 5, "proof_len": 302857, "envelope_len": [1348, 1348]
+        })
+    }
+
     #[test]
-    fn parses_block_with_all_kinds() {
-        let json = r#"{"hash":"a9c8","height":10,"justify_view":31,"parent":"a070","proposer":"2nRd","state_root":"b364","timestamp_ms":1788977138048,
-          "transactions":[
-            {"chain_id":4,"fee":"4200000","from":"2nRd","hash":"dc97","kind":{"base_pc":0,"program":"675a","type":"deploy","words_len":42},"nonce":0},
-            {"chain_id":4,"fee":"1000000","from":"2nRd","hash":"d4c7","kind":{"program":"675a","proof_len":880866,"recipients":["ByDk"],"type":"call"},"nonce":1},
-            {"chain_id":4,"fee":"1000","from":"7th5","hash":"e7a7","kind":{"type":"transfer","to":"9W7d","amount":"3500000000"},"nonce":0},
-            {"chain_id":4,"fee":"0","from":"CxeG","hash":"ffff","kind":{"type":"mint","to":"ByDk","amount":"100000000000"},"nonce":3}
-          ],"tx_count":4,"tx_root":"dc97","view":32}"#;
-        let b: RpcBlock = serde_json::from_str(json).unwrap();
-        assert_eq!(b.height, 10);
-        assert_eq!(b.transactions.len(), 4);
+    fn parses_a_block_with_every_kind() {
+        let b = bundle_json();
+        let json = serde_json::json!({
+            "hash": "a9c8", "height": 10, "view": 32, "parent": "a070", "proposer": "2nRd", "timestamp_ms": 1,
+            "tx_root": "dc97", "state_root": "b364", "justify_view": 31, "tx_count": 9,
+            "transactions": [
+                { "hash": "t0", "chain_id": 7, "bundle": b, "action": { "kind": "none" } },
+                { "hash": "t1", "chain_id": 7, "bundle": null, "action": { "kind": "mint", "cm": "2a9f", "amount": 100000000000u64, "minter": "2nRd" } },
+                { "hash": "t2", "chain_id": 7, "bundle": b, "action": { "kind": "deploy", "program": "675a", "words": 412 } },
+                { "hash": "t3", "chain_id": 7, "bundle": b, "action": { "kind": "call", "program": "675a", "proof_len": 268123, "input_envelope_len": 1280 } },
+                { "hash": "t4", "chain_id": 7, "bundle": b, "action": { "kind": "bond", "validator": "2nRd", "amount": 500, "registered": false } },
+                { "hash": "t5", "chain_id": 7, "bundle": null, "action": { "kind": "unbond", "validator": "2nRd", "amount": 7, "nonce": 2 } },
+                { "hash": "t6", "chain_id": 7, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": 9, "nonce": 3 } },
+                { "hash": "t7", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "shrugg1abc", "asset_index": 1, "amount": 1000, "time": 41 } },
+                { "hash": "t8", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_burn", "asset": 2, "amount": 400, "relayer_fee": 100, "to_chain": 5, "to": "abab", "asset_bundle": b } }
+            ]
+        });
+        let b: RpcBlock = serde_json::from_value(json).unwrap();
+        assert_eq!(b.transactions.len(), 9);
+        assert!(matches!(b.transactions[0].action, RpcAction::None));
+        assert!(b.transactions[1].bundle.is_none());
+        match &b.transactions[1].action {
+            RpcAction::Mint { amount, .. } => assert_eq!(amount.0, "100000000000"),
+            other => panic!("{other:?}"),
+        }
         assert!(matches!(
-            &b.transactions[0].kind,
-            RpcTxKind::Deploy { words_len: 42, .. }
-        ));
-        assert!(matches!(
-            &b.transactions[1].kind,
-            RpcTxKind::Call {
-                proof_len: 880866,
+            &b.transactions[3].action,
+            RpcAction::Call {
+                input_envelope_len: Some(1280),
                 ..
             }
         ));
         assert!(matches!(
-            &b.transactions[2].kind,
-            RpcTxKind::Transfer { .. }
+            &b.transactions[6].action,
+            RpcAction::Withdraw { nonce: 3, .. }
         ));
-        assert!(matches!(&b.transactions[3].kind, RpcTxKind::Mint { .. }));
+        match &b.transactions[7].action {
+            RpcAction::BridgeAttest {
+                asset_index,
+                amount,
+                time,
+                ..
+            } => {
+                assert_eq!(*asset_index, Some(1));
+                assert_eq!(amount.as_ref().unwrap().0, "1000");
+                assert_eq!(*time, Some(41));
+            }
+            other => panic!("{other:?}"),
+        }
+        match &b.transactions[8].action {
+            RpcAction::BridgeBurn {
+                asset_bundle,
+                relayer_fee,
+                ..
+            } => {
+                assert_eq!(asset_bundle.nullifiers[1], "5e77");
+                assert_eq!(relayer_fee.0, "100");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert_eq!(b.transactions[0].bundle.as_ref().unwrap().fee.0, "1000000");
     }
 
     #[test]
-    fn parses_bridge_kinds() {
-        let json = r#"{"kind":{"type":"bridge_attest","attestation":"01000000"}}"#;
-        let v: serde_json::Value = serde_json::from_str(json).unwrap();
-        let k: RpcTxKind = serde_json::from_value(v["kind"].clone()).unwrap();
-        assert!(matches!(k, RpcTxKind::BridgeAttest { ref attestation } if attestation == "01000000"));
-
-        let json = r#"{"type":"bridge_burn","asset":"8f1c","amount":"99999000","to_chain":2,"to":"000000000000000000000000f10befe1e0794722d3baf8bfd5bdac47b2a33148","fee":"1000"}"#;
-        let k: RpcTxKind = serde_json::from_str(json).unwrap();
-        match k {
-            RpcTxKind::BridgeBurn { asset, amount, to_chain, to, fee } => {
-                assert_eq!(asset, "8f1c");
-                assert_eq!(amount, "99999000");
-                assert_eq!(to_chain, 2);
-                assert_eq!(to.len(), 64);
-                assert_eq!(fee, "1000");
+    fn a_rotation_attestation_has_no_deposit() {
+        let json = r#"{"kind":"bridge_attest","attestation_len":700,"recipient":"shrugg1x","asset_index":null,"amount":null,"time":3}"#;
+        let a: RpcAction = serde_json::from_str(json).unwrap();
+        assert!(matches!(
+            a,
+            RpcAction::BridgeAttest {
+                asset_index: None,
+                amount: None,
+                ..
             }
-            other => panic!("unexpected {other:?}"),
-        }
+        ));
     }
 
     #[test]
     fn unknown_kind_does_not_fail_the_block() {
-        let json = r#"{"hash":"a9c8","height":10,"justify_view":31,"parent":"a070","proposer":"2nRd","state_root":"b364","timestamp_ms":1,
-          "transactions":[{"chain_id":5,"fee":"1","from":"2nRd","hash":"dc97","kind":{"type":"shielded_transfer","note":"..."},"nonce":0}],
-          "tx_count":1,"tx_root":"dc97","view":32}"#;
-        let b: RpcBlock = serde_json::from_str(json).unwrap();
-        assert!(matches!(&b.transactions[0].kind, RpcTxKind::Unknown { kind } if kind == "shielded_transfer"));
+        let json = serde_json::json!({ "hash": "t", "chain_id": 7, "bundle": bundle_json(), "action": { "kind": "slash", "evidence": "…" } });
+        let t: RpcTx = serde_json::from_value(json).unwrap();
+        assert!(matches!(&t.action, RpcAction::Unknown { kind } if kind == "slash"));
     }
 
     #[test]
     fn malformed_known_kind_is_an_error() {
-        // A known tag with the wrong body must not be silently accepted as Unknown.
-        let json = r#"{"type":"transfer","to":"9W7d"}"#;
-        assert!(serde_json::from_str::<RpcTxKind>(json).is_err());
-        let json = r#"{"amount":"1"}"#;
-        assert!(serde_json::from_str::<RpcTxKind>(json).is_err());
+        assert!(serde_json::from_str::<RpcAction>(r#"{"kind":"mint","cm":"2a9f"}"#).is_err());
+        assert!(serde_json::from_str::<RpcAction>(r#"{"cm":"2a9f"}"#).is_err());
+    }
+
+    #[test]
+    fn amounts_accept_numbers_and_strings() {
+        assert_eq!(serde_json::from_str::<Units>("12").unwrap().0, "12");
+        assert_eq!(
+            serde_json::from_str::<Units>(r#""340282366920938463463374607431768211455""#)
+                .unwrap()
+                .0,
+            "340282366920938463463374607431768211455"
+        );
+        assert!(serde_json::from_str::<Units>(r#""1.5""#).is_err());
+        assert!(serde_json::from_str::<Units>("true").is_err());
+    }
+
+    #[test]
+    fn parses_both_register_shapes() {
+        let s3: Vec<RpcValidator> =
+            serde_json::from_str(r#"[{"address":"2nRd","stake":"100000","rewards":4000000}]"#)
+                .unwrap();
+        assert_eq!(s3[0].rewards.0, "4000000");
+        assert_eq!(s3[0].active, None);
+        assert!(s3[0].pending.is_empty());
+        let s2: Vec<RpcValidator> = serde_json::from_str(r#"[{"address":"2nRd","stake":"1000000000000","pending":[{"release_epoch":41,"amount":"5000000000"}],"rewards":"4000000","payout":"shrugg1x","nonce":3,"active":true}]"#).unwrap();
+        assert_eq!(s2[0].pending[0].release_epoch, 41);
+        assert_eq!(s2[0].payout.as_deref(), Some("shrugg1x"));
+        assert_eq!(s2[0].active, Some(true));
     }
 
     #[test]
     fn parses_receipt_and_status() {
-        let r: RpcReceipt = serde_json::from_str(r#"{"effect":{"amount":"25","to":"ByDk"},"height":19,"index":0,"outputs":[1,0,25,0,0,0,0,0],"program":"675a","tier":10,"tx":"d4c7"}"#).unwrap();
-        assert_eq!(r.effect.unwrap().amount, "25");
-        let r: RpcReceipt = serde_json::from_str(r#"{"effect":null,"height":78,"index":0,"outputs":[0,0,0,0,0,0,0,0],"program":"675a","tier":10,"tx":"dd1a"}"#).unwrap();
-        assert!(r.effect.is_none());
-        let s: NodeStatus = serde_json::from_str(r#"{"address":"CxeG","confidential":true,"faucet":true,"fri_profile":"production","head_hash":"02f0","height":324,"high_qc_view":664,"is_validator":false,"mempool_size":0,"peer_count":4,"peer_id":"12D3","programs":1,"sync_target":324,"syncing":false,"view":667}"#).unwrap();
-        assert_eq!(s.peer_count, 4);
-        assert!(s.confidential);
+        let r: RpcReceipt = serde_json::from_str(r#"{"tx":"d4c7","program":"675a","tier":14,"outputs":[1,0,25,0,0,0,0,0],"height":17,"index":0,"h_in":"9c0e"}"#).unwrap();
+        assert_eq!(r.h_in, "9c0e");
+        let s: NodeStatus = serde_json::from_str(r#"{"height":1998,"head_hash":"x","view":2251,"high_qc_view":2250,"syncing":false,"sync_target":1998,"peer_count":5,"mempool_size":0,"is_validator":true,"faucet":true,"confidential":true,"fri_profile":"production","programs":2,"notes":41,"nullifiers":12,"tree_root":"6b1d","hc_bundle":"f07a","address":null,"peer_id":"12D3"}"#).unwrap();
+        assert_eq!(s.notes, 41);
+        assert_eq!(s.address, None);
+        assert_eq!(s.active_validator, None);
     }
 }

@@ -3,18 +3,19 @@
 import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 import * as api from '@/lib/api';
 import type {
-  AccountDetail,
-  AccountTransaction,
   ApiKey,
   BlockDetail,
   BlockSummary,
+  BridgeState,
   Health,
   NetworkStats,
   NodeInfo,
+  Note,
   Paginated,
   ProgramDetail,
   ProgramSummary,
   SearchResult,
+  Supply,
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
@@ -102,11 +103,15 @@ export function useTransactions(
   page = 1,
   limit = 25,
   kind?: TransactionKind | null,
+  filter?: { validator?: string | null; program?: string | null; height?: number | null },
   config?: SWRConfiguration
 ): SWRResponse<Paginated<TransactionSummary>> {
+  const validator = filter?.validator ?? null;
+  const program = filter?.program ?? null;
+  const height = filter?.height ?? null;
   return useSWR<Paginated<TransactionSummary>>(
-    ['transactions', page, limit, kind ?? null],
-    () => api.getTransactions({ page, limit, kind }),
+    ['transactions', page, limit, kind ?? null, validator, program, height],
+    () => api.getTransactions({ page, limit, kind, validator, program, height }),
     { ...defaultConfig, keepPreviousData: true, ...config }
   );
 }
@@ -134,30 +139,53 @@ export function useTransaction(
 }
 
 // ---------------------------------------------------------------------------
-// Accounts
+// Notes, bridge, supply
 // ---------------------------------------------------------------------------
 
-export function useAccount(
-  address: string | null,
-  config?: SWRConfiguration
-): SWRResponse<AccountDetail> {
-  return useSWR<AccountDetail>(
-    address ? ['account', address] : null,
-    () => api.getAccount(address as string),
-    { ...defaultConfig, ...config }
-  );
-}
-
-export function useAccountTransactions(
-  address: string | null,
+export function useNotes(
   page = 1,
   limit = 25,
   config?: SWRConfiguration
-): SWRResponse<Paginated<AccountTransaction>> {
-  return useSWR<Paginated<AccountTransaction>>(
-    address ? ['account-transactions', address, page, limit] : null,
-    () => api.getAccountTransactions(address as string, page, limit),
-    { ...defaultConfig, keepPreviousData: true, ...config }
+): SWRResponse<Paginated<Note>> {
+  return useSWR<Paginated<Note>>(['notes', page, limit], () => api.getNotes(page, limit), {
+    ...defaultConfig,
+    keepPreviousData: true,
+    refreshInterval: 15_000,
+    ...config,
+  });
+}
+
+export function useNote(
+  id: string | null,
+  config?: SWRConfiguration
+): SWRResponse<Note> {
+  return useSWR<Note>(id ? ['note', id] : null, () => api.getNote(id as string), {
+    ...defaultConfig,
+    ...config,
+  });
+}
+
+export function useBridge(config?: SWRConfiguration): SWRResponse<BridgeState> {
+  return useSWR<BridgeState>('bridge', api.getBridge, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
+}
+
+/** `null` when the node serves no supply audit (404). */
+export function useSupply(config?: SWRConfiguration): SWRResponse<Supply | null> {
+  return useSWR<Supply | null>(
+    'supply',
+    async () => {
+      try {
+        return await api.getSupply();
+      } catch (err) {
+        if (api.isNotFoundError(err)) return null;
+        throw err;
+      }
+    },
+    { ...defaultConfig, refreshInterval: 30_000, ...config }
   );
 }
 

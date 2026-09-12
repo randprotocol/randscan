@@ -1,8 +1,9 @@
 //! Chain reset keeps user data. Runs against `DATABASE_URL`; skips when unset.
 
 use randscan_db::{
-    get_indexer_state, insert_block, insert_transaction, reset_chain_data, run_migrations,
-    set_chain_id, set_next_height, upsert_account, NewBlock, NewTx, CHAIN_TABLES,
+    get_indexer_state, insert_block, insert_notes, insert_transaction, reset_chain_data,
+    run_migrations, set_chain_id, set_next_height, set_next_leaf, NewBlock, NewBundle, NewTx,
+    CHAIN_TABLES,
 };
 use sqlx::postgres::PgPoolOptions;
 
@@ -16,7 +17,8 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     run_migrations(&pool).await.unwrap();
     let mut conn = pool.acquire().await.unwrap();
 
-    // One block with a bridge_burn (new columns) and a user that must survive.
+    // One block with a bridge_burn (two bundles, four nullifiers), one tree leaf, and a user
+    // that must survive.
     for t in CHAIN_TABLES {
         sqlx::query(&format!("TRUNCATE {t} CASCADE")).execute(&mut *conn).await.unwrap();
     }
@@ -37,6 +39,21 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     )
     .await
     .unwrap();
+    let bundle = |tag: &str| NewBundle {
+        anchor: "aa".repeat(32),
+        nullifiers: [format!("{tag}1").repeat(32), format!("{tag}2").repeat(32)],
+        commitments: [format!("{tag}3").repeat(32), format!("{tag}4").repeat(32)],
+        fee: "2000000".into(),
+        burn: "0".into(),
+        asset: 0,
+        time: 0,
+        proof_len: 302857,
+        envelope_len: [1380, 1380],
+    };
+    let mut asset_bundle = bundle("e");
+    asset_bundle.fee = "0".into();
+    asset_bundle.burn = "500".into();
+    asset_bundle.asset = 2;
     insert_transaction(
         &mut conn,
         &NewTx {
@@ -44,30 +61,23 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
             block_hash: &"ab".repeat(32),
             height: 0,
             tx_index: 0,
-            sender: "2nRd",
-            nonce: 0,
-            fee: "1",
-            kind: "bridge_burn",
             chain_id: 4,
             timestamp_ms: 1,
-            to_address: None,
-            amount: None,
-            program_id: None,
-            base_pc: None,
-            words_len: None,
-            proof_len: None,
-            recipients: &[],
-            asset: Some(&"8f".repeat(32)),
-            bridge_amount: Some("99999000"),
+            kind: "bridge_burn",
+            bundle: Some(bundle("d")),
+            asset_index: Some(2),
+            amount: Some("400".into()),
+            relayer_fee: Some("100".into()),
             to_chain: Some(2),
             bridge_to: Some(&"00".repeat(32)),
-            bridge_fee: Some("1000"),
-            attestation: None,
+            asset_bundle: Some(asset_bundle),
+            ..Default::default()
         },
     )
     .await
     .unwrap();
-    upsert_account(&mut conn, "2nRd", "5", 1, 0).await.unwrap();
+    insert_notes(&mut conn, &[(0, "d3".repeat(32), 0)]).await.unwrap();
+    set_next_leaf(&mut conn, 1).await.unwrap();
     set_next_height(&mut conn, 1, Some(&"ab".repeat(32))).await.unwrap();
     set_chain_id(&mut conn, 4).await.unwrap();
     // The database is shared across runs and users survive the reset by design, so drop any
@@ -78,14 +88,28 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
         .await
         .unwrap();
 
-    let stored: (String, Option<String>, Option<i32>) = sqlx::query_as(
-        "SELECT kind, bridge_amount::text, to_chain FROM transactions WHERE hash = $1",
+    let stored: (String, Option<String>, Option<i32>, bool) = sqlx::query_as(
+        "SELECT kind, amount::text, to_chain, has_bundle FROM transactions WHERE hash = $1",
     )
     .bind("cd".repeat(32))
     .fetch_one(&mut *conn)
     .await
     .unwrap();
-    assert_eq!(stored, ("bridge_burn".into(), Some("99999000".into()), Some(2)));
+    assert_eq!(stored, ("bridge_burn".into(), Some("400".into()), Some(2), true));
+    let nfs: i64 = sqlx::query_scalar("SELECT count(*) FROM nullifiers").fetch_one(&mut *conn).await.unwrap();
+    assert_eq!(nfs, 4, "both bundles' nullifiers are recorded");
+    let (asset_burn,): (String,) =
+        sqlx::query_as("SELECT asset_bundle->>'burn' FROM transactions WHERE hash = $1")
+            .bind("cd".repeat(32))
+            .fetch_one(&mut *conn)
+            .await
+            .unwrap();
+    assert_eq!(asset_burn, "500");
+    let linked: Option<String> = sqlx::query_scalar("SELECT tx_hash FROM notes WHERE leaf_index = 0")
+        .fetch_one(&mut *conn)
+        .await
+        .unwrap();
+    assert_eq!(linked.as_deref(), Some("cd".repeat(32).as_str()), "a leaf is linked to the tx that carried its commitment");
 
     reset_chain_data(&mut conn, 5).await.unwrap();
 
@@ -98,6 +122,7 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     }
     let st = get_indexer_state(&pool).await.unwrap();
     assert_eq!(st.next_height, 0);
+    assert_eq!(st.next_leaf, 0);
     assert_eq!(st.last_indexed_hash, None);
     assert_eq!(st.chain_id, Some(5));
     let users: i64 = sqlx::query_scalar("SELECT count(*) FROM users WHERE email = 'reset@example.com'")
@@ -105,10 +130,10 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
         .await
         .unwrap();
     assert_eq!(users, 1);
-    let (chain_id, height): (i64, i64) =
-        sqlx::query_as("SELECT chain_id, height FROM network_stats WHERE id = 1")
+    let (chain_id, height, notes): (i64, i64, i64) =
+        sqlx::query_as("SELECT chain_id, height, notes FROM network_stats WHERE id = 1")
             .fetch_one(&mut *conn)
             .await
             .unwrap();
-    assert_eq!((chain_id, height), (5, 0));
+    assert_eq!((chain_id, height, notes), (5, 0, 0));
 }
