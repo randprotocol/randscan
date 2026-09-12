@@ -319,6 +319,38 @@ computed by the chain and not on the wire). The leaf index is what a wallet uses
 for a Merkle witness. A wallet that wants to detect payments scans envelopes with its viewing
 key; the explorer cannot do that for you.
 
+### Envelopes and viewing keys
+
+| method and path | returns |
+|---|---|
+| `GET /transactions/:hash/envelopes` | the notes a transaction created, each with its envelope; for a call also `h_in` and the sealed input transcript |
+| `GET /envelopes?from_leaf&limit` | leaves with envelopes, oldest first (limit 1 to 1000, default 500), for a history scan |
+
+```json
+{
+  "hash": "5e90…ead", "kind": "transfer",
+  "notes": [{ "leaf_index": 8, "cm": "da4f…", "height": 114, "tx_hash": "5e90…ead",
+              "envelope": { "kem_ct": "…", "to_receiver": "…", "to_sender": "…", "body": "…" } }, …],
+  "h_in": null, "call_envelope": null
+}
+```
+
+An envelope is public chain data: the note plaintext under a per-transaction key, that key
+wrapped to the receiver's ML-KEM-768 address and under the sender's outgoing viewing key, all
+ChaCha20-Poly1305 with the commitment as associated data. Only a key opens it, and the explorer
+holds none: the transaction page and the History page do the opening in your browser with a
+WebAssembly build of the node's own code (`crates/randscan-viewing`). A **viewing key** (`nk`,
+64 hex) opens every note that party sent or received; a **transaction key** (32 bytes hex) opens
+one transaction; a **call key** opens one call's inputs. The wallet key file is accepted too and
+only its derived viewing key is kept. An opened note is verified by recomputing its commitment,
+so what the page shows is what the chain committed to, not what a ciphertext claims. To build
+your own tool, fetch these endpoints and use the crate; nothing about a key ever goes over the
+network.
+
+`GET /envelopes` pages with `next_leaf` (`null` on the last page) and reports `total_leaves`.
+`envelope` is `null` for a leaf indexed before envelopes were stored; it fills in on the next
+indexer pass.
+
 ### Accounts
 
 `GET /accounts/:address` and `GET /accounts/:address/transactions` answer **410**

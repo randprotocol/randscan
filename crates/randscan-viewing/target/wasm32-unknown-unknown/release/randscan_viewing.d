@@ -1,0 +1,1 @@
+/Users/dendisuhubdy/Github/randprotocol/randscan/crates/randscan-viewing/target/wasm32-unknown-unknown/release/randscan_viewing.wasm: /Users/dendisuhubdy/Github/randprotocol/randscan/crates/randscan-viewing/src/lib.rs

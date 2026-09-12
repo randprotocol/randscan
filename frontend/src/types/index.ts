@@ -173,6 +173,48 @@ export interface Nullifier {
   tx_index: number;
 }
 
+/** A note envelope as the node publishes it: hex fields, public, opened only by a key. */
+export interface EnvelopeHex {
+  kem_ct: string;
+  to_receiver: string;
+  to_sender: string;
+  body: string;
+}
+
+/** A call's sealed input transcript (`shrugg_getCallEnvelope`), hex fields. */
+export interface CallEnvelopeHex {
+  kem_ct: string;
+  to_sender: string;
+  to_auditor: string;
+  body: string;
+}
+
+/** A tree leaf with its envelope; `envelope` is null for a leaf indexed before envelopes were stored. */
+export interface NoteEnvelope {
+  leaf_index: number;
+  cm: string;
+  height: number;
+  tx_hash: string | null;
+  envelope: EnvelopeHex | null;
+}
+
+/** Everything a key can be tried against for one transaction. */
+export interface TransactionEnvelopes {
+  hash: string;
+  kind: TransactionKind;
+  notes: NoteEnvelope[];
+  h_in: string | null;
+  call_envelope: CallEnvelopeHex | null;
+}
+
+/** A page of leaves with envelopes, oldest first. */
+export interface NoteEnvelopePage {
+  from_leaf: number;
+  next_leaf: number | null;
+  total_leaves: number;
+  notes: NoteEnvelope[];
+}
+
 export interface BridgeAsset {
   index: number;
   chain: number;

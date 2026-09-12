@@ -221,6 +221,13 @@ impl MockChain {
                 "assets": [{ "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1") }]
             }),
             "shrugg_getPeers" => json!([]),
+            "shrugg_getCallEnvelope" => {
+                // A transcript for every call the mock knows about, sealed to nobody (opaque bytes).
+                let hash = p(0).as_str().unwrap_or("").to_string();
+                let is_call = self.blocks.iter().flat_map(|b| b["transactions"].as_array().cloned().unwrap_or_default())
+                    .any(|t| t["hash"] == hash && t["action"]["kind"] == "call");
+                if is_call { json!({ "tx": hash, "h_in": h("h_in"), "kem_ct": "", "to_sender": "0a".repeat(60), "to_auditor": "", "body": "0b".repeat(60) }) } else { Value::Null }
+            }
             "shrugg_getReceipt" | "shrugg_getProgram" => Value::Null,
             other => return Err((-32601, format!("unknown method {other}"))),
         })

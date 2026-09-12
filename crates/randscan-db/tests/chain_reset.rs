@@ -2,7 +2,7 @@
 
 use randscan_db::{
     get_indexer_state, insert_block, insert_notes, insert_transaction, reset_chain_data,
-    run_migrations, set_chain_id, set_next_height, set_next_leaf, NewBlock, NewBundle, NewTx,
+    run_migrations, set_chain_id, set_next_height, set_next_leaf, NewBlock, NewBundle, NewNote, NewTx,
     CHAIN_TABLES,
 };
 use sqlx::postgres::PgPoolOptions;
@@ -76,7 +76,7 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     )
     .await
     .unwrap();
-    insert_notes(&mut conn, &[(0, "d3".repeat(32), 0)]).await.unwrap();
+    insert_notes(&mut conn, &[NewNote { leaf_index: 0, cm: "d3".repeat(32), height: 0, envelope: None }]).await.unwrap();
     set_next_leaf(&mut conn, 1).await.unwrap();
     set_next_height(&mut conn, 1, Some(&"ab".repeat(32))).await.unwrap();
     set_chain_id(&mut conn, 4).await.unwrap();

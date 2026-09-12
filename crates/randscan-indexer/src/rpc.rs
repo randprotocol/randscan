@@ -199,6 +199,12 @@ impl RpcClient {
             .await
     }
 
+    /// A call's sealed input transcript (`null` when the call published none).
+    pub async fn call_envelope(&self, tx_hash: &str) -> Result<Option<serde_json::Value>> {
+        self.call("shrugg_getCallEnvelope", serde_json::json!([tx_hash]))
+            .await
+    }
+
     pub async fn bridge_state(&self) -> Result<randscan_core::BridgeState> {
         self.call_required("shrugg_getBridgeState", serde_json::json!([]))
             .await
@@ -633,6 +639,9 @@ pub struct RpcCommitment {
     pub index: u64,
     pub cm: String,
     pub height: u64,
+    /// `{ kem_ct, to_receiver, to_sender, body }`, hex; public, only a key opens it.
+    #[serde(default)]
+    pub envelope: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Clone, Deserialize)]

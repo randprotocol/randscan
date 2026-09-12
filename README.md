@@ -76,7 +76,8 @@ or later, with `shrugg` beside it or `SHRUGG_CLI` set).
 
 REST under `/api/v1` (`health`, `stats`, `supply`, `bridge`, `blocks`, `blocks/latest`,
 `blocks/:id`, `transactions`, `transactions/latest`, `transactions/:hash`, `notes`, `notes/:id`,
-`nullifiers/:nf`, `validators`, `validators/:address`, `programs`, `programs/:id`, `nodes`,
+`nullifiers/:nf`, `transactions/:hash/envelopes`, `envelopes`, `validators`, `validators/:address`,
+`programs`, `programs/:id`, `nodes`,
 `search?q=`; `accounts/*` answers 410) and a WebSocket at `/ws` (channels `blocks`,
 `transactions`, `stats`). Amounts are strings of units (1 SHRUGG = 10^9 units); timestamps are
 `timestamp_ms`. Full shapes in `docs/superpowers/specs/2026-09-12-shielded-chain-design.md`; a
@@ -156,6 +157,7 @@ crates/randscan-db        schema, row models, queries
 crates/randscan-indexer   RPC client, block processor, sync service, peer tracker, broadcaster
 crates/randscan-api       axum routes/handlers, binary randscan-api
 crates/randscan-ws        WebSocket manager/handler
+crates/randscan-viewing    envelope opener compiled to WebAssembly (viewing keys in the browser); built on its own, see its README
 frontend/                 Next.js app
 migrations/               SQL schema
 deploy/                   VPS install script, systemd units, Caddyfile

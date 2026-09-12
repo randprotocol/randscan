@@ -7,6 +7,9 @@ members = [
     "crates/randscan-api",
     "crates/randscan-ws",
 ]
+# Built on its own (Rust 1.98 for the Plonky3 crates) into frontend/public/viewing; see
+# crates/randscan-viewing/README.md.
+exclude = ["crates/randscan-viewing"]
 
 [workspace.package]
 version = "0.3.0"

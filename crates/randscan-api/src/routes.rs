@@ -36,6 +36,11 @@ pub fn create_router(state: AppState) -> Router {
         .route("/transactions", get(handlers::list_transactions))
         .route("/transactions/latest", get(handlers::latest_transactions))
         .route("/transactions/:hash", get(handlers::get_transaction))
+        .route(
+            "/transactions/:hash/envelopes",
+            get(handlers::transaction_envelopes),
+        )
+        .route("/envelopes", get(handlers::list_envelopes))
         .route("/accounts/:address", get(handlers::no_accounts))
         .route(
             "/accounts/:address/transactions",

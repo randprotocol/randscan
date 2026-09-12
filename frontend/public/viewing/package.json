@@ -1,0 +1,17 @@
+{
+  "name": "randscan-viewing",
+  "type": "module",
+  "description": "Opens shielded-chain envelopes with a viewing key or a per-transaction key, in the browser (WebAssembly)",
+  "version": "0.3.0",
+  "license": "MIT",
+  "files": [
+    "randscan_viewing_bg.wasm",
+    "randscan_viewing.js",
+    "randscan_viewing.d.ts"
+  ],
+  "main": "randscan_viewing.js",
+  "types": "randscan_viewing.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}

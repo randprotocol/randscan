@@ -5,25 +5,72 @@ use sqlx::{PgConnection, PgPool};
 
 const NOTE_COLS: &str = "leaf_index, cm, height, tx_hash";
 
-/// Store a page of tree leaves. A leaf that is already stored is left alone (the tree is
-/// append-only, so a re-read page carries the same rows). `tx_hash` is resolved from the
-/// indexed transactions that carried the commitment on the wire.
-pub async fn insert_notes(conn: &mut PgConnection, rows: &[(i64, String, i64)]) -> Result<()> {
-    for (leaf_index, cm, height) in rows {
+/// One tree leaf as the node serves it: index, commitment, height and the envelope (hex fields).
+pub struct NewNote {
+    pub leaf_index: i64,
+    pub cm: String,
+    pub height: i64,
+    pub envelope: Option<serde_json::Value>,
+}
+
+/// Store a page of tree leaves. The tree is append-only, so a re-read page carries the same
+/// rows: an existing leaf only gains its envelope when it had none (the backfill after
+/// migration 006). `tx_hash` is resolved from the indexed transactions that carried the
+/// commitment on the wire.
+pub async fn insert_notes(conn: &mut PgConnection, rows: &[NewNote]) -> Result<()> {
+    for n in rows {
         sqlx::query(
-            "INSERT INTO notes (leaf_index, cm, height, tx_hash)
+            "INSERT INTO notes (leaf_index, cm, height, tx_hash, envelope)
              VALUES ($1, $2, $3,
                 (SELECT hash FROM transactions WHERE commitment_1 = $2 OR commitment_2 = $2 OR cm = $2
-                    OR (asset_bundle IS NOT NULL AND asset_bundle->'commitments' ? $2) LIMIT 1))
-             ON CONFLICT (leaf_index) DO NOTHING",
+                    OR (asset_bundle IS NOT NULL AND asset_bundle->'commitments' ? $2) LIMIT 1), $4)
+             ON CONFLICT (leaf_index) DO UPDATE SET envelope = COALESCE(notes.envelope, EXCLUDED.envelope)",
         )
-        .bind(leaf_index)
-        .bind(cm)
-        .bind(height)
+        .bind(n.leaf_index)
+        .bind(&n.cm)
+        .bind(n.height)
+        .bind(&n.envelope)
         .execute(&mut *conn)
         .await?;
     }
     Ok(())
+}
+
+/// A leaf with its envelope, for the browser-side opener.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct NoteEnvelopeRow {
+    pub leaf_index: i64,
+    pub cm: String,
+    pub height: i64,
+    pub tx_hash: Option<String>,
+    pub envelope: Option<serde_json::Value>,
+}
+
+/// The leaves whose commitments the transaction `hash` published (bundle outputs, a mint's
+/// note, a burn's asset-bundle outputs), with their envelopes.
+pub async fn get_note_envelopes_for_tx(pool: &PgPool, hash: &str) -> Result<Vec<NoteEnvelopeRow>> {
+    Ok(sqlx::query_as::<_, NoteEnvelopeRow>(
+        "SELECT n.leaf_index, n.cm, n.height, n.tx_hash, n.envelope FROM notes n
+         WHERE n.tx_hash = $1
+            OR n.cm IN (SELECT commitment_1 FROM transactions WHERE hash = $1 AND commitment_1 IS NOT NULL
+                        UNION SELECT commitment_2 FROM transactions WHERE hash = $1 AND commitment_2 IS NOT NULL
+                        UNION SELECT cm FROM transactions WHERE hash = $1 AND cm IS NOT NULL)
+         ORDER BY n.leaf_index",
+    )
+    .bind(hash)
+    .fetch_all(pool)
+    .await?)
+}
+
+/// A page of leaves with envelopes from `from_leaf` upwards (for a history scan in the browser).
+pub async fn list_note_envelopes(pool: &PgPool, from_leaf: i64, limit: i64) -> Result<Vec<NoteEnvelopeRow>> {
+    Ok(sqlx::query_as::<_, NoteEnvelopeRow>(
+        "SELECT leaf_index, cm, height, tx_hash, envelope FROM notes WHERE leaf_index >= $1 ORDER BY leaf_index LIMIT $2",
+    )
+    .bind(from_leaf)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?)
 }
 
 /// Link notes of `height` to the transactions that created them (for leaves fetched before the

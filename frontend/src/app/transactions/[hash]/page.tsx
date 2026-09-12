@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { KindBadge } from '@/components/KindBadge';
+import { TransactionOpener } from '@/components/TransactionOpener';
 import { DetailSkeleton } from '@/components/Loading';
 import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/components/States';
 import { isNotFound, useTransaction } from '@/hooks/useApi';
@@ -112,6 +113,8 @@ export default function TransactionDetailPage() {
       )}
 
       {tx.kind === 'call' && <ReceiptPanel receipt={tx.receipt} />}
+
+      {tx.kind !== 'other' && <TransactionOpener hash={tx.hash} kind={tx.kind} />}
     </div>
   );
 }

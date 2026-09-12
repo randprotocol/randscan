@@ -63,6 +63,15 @@ export default function NoteDetailPage() {
           )}
         </DetailRow>
         <p className="px-4 py-3 text-xs text-mute">
+          {note.tx_hash && (
+            <>
+              Hold the receiver&apos;s or the sender&apos;s viewing key, or this transaction&apos;s key?{' '}
+              <Link href={`/transactions/${note.tx_hash}`} className="link">
+                Open it with a key on the transaction page
+              </Link>
+              . <br />
+            </>
+          )}
           The owner and the amount are inside the sealed envelope and open only for the
           receiver&apos;s and the sender&apos;s viewing keys. Whether this note has been spent is
           not public either: a nullifier cannot be matched to its leaf.

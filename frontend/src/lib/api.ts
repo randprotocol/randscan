@@ -1,4 +1,6 @@
 import type {
+  NoteEnvelopePage,
+  TransactionEnvelopes,
   ApiErrorBody,
   ApiKey,
   BlockDetail,
@@ -190,6 +192,16 @@ export function getNote(id: string | number): Promise<Note> {
 
 export function getNullifier(nf: string): Promise<Nullifier> {
   return request<Nullifier>(`/nullifiers/${encodeURIComponent(nf)}`);
+}
+
+/** The envelopes a transaction published (and a call's sealed transcript). Public data. */
+export function getTransactionEnvelopes(hash: string): Promise<TransactionEnvelopes> {
+  return request<TransactionEnvelopes>(`/transactions/${encodeURIComponent(hash)}/envelopes`);
+}
+
+/** A page of tree leaves with envelopes from `fromLeaf` upwards (limit 1 to 1000). */
+export function getEnvelopePage(fromLeaf = 0, limit = 1000): Promise<NoteEnvelopePage> {
+  return request<NoteEnvelopePage>(`/envelopes${buildQuery({ from_leaf: fromLeaf, limit })}`);
 }
 
 export function getBridge(): Promise<BridgeState> {

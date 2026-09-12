@@ -221,11 +221,16 @@ impl BlockProcessor {
             if rows.is_empty() {
                 return Ok(next_leaf);
             }
-            let batch: Vec<(i64, String, i64)> = rows
+            let batch: Vec<db::NewNote> = rows
                 .iter()
-                .map(|r| (r.index as i64, r.cm.clone(), r.height as i64))
+                .map(|r| db::NewNote {
+                    leaf_index: r.index as i64,
+                    cm: r.cm.clone(),
+                    height: r.height as i64,
+                    envelope: r.envelope.clone(),
+                })
                 .collect();
-            let last = batch.last().map(|r| r.0).unwrap_or(next_leaf);
+            let last = batch.last().map(|r| r.leaf_index).unwrap_or(next_leaf);
             let mut dbtx = self.pool.inner().begin().await?;
             db::insert_notes(&mut dbtx, &batch).await?;
             db::set_next_leaf(&mut dbtx, last + 1).await?;

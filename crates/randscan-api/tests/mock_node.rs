@@ -224,6 +224,29 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, n) = call_api(&live.app, &format!("/api/v1/notes/{}", h("cm2-ab"))).await;
     assert_eq!(n["tx_hash"], burn_hash, "an asset bundle's outputs are leaves too");
 
+    // Envelopes: every leaf carries the node's envelope, a transaction lists the leaves it
+    // created, and a call gets its sealed transcript from the node on demand.
+    let (status, _, env) = call_api(&live.app, &format!("/api/v1/transactions/{mint_hash}/envelopes")).await;
+    assert_eq!(status, 200, "{env}");
+    assert_eq!(env["kind"], "mint");
+    assert_eq!(env["notes"].as_array().unwrap().len(), 1);
+    assert_eq!(env["notes"][0]["cm"], h("cm-mint"));
+    assert_eq!(env["notes"][0]["envelope"]["kem_ct"], "00");
+    assert!(env["call_envelope"].is_null() && env["h_in"].is_null());
+    let (_, _, env) = call_api(&live.app, &format!("/api/v1/transactions/{burn_hash}/envelopes")).await;
+    assert_eq!(env["notes"].as_array().unwrap().len(), 4, "fee bundle and asset bundle outputs: {env}");
+    let (_, _, env) = call_api(&live.app, &format!("/api/v1/transactions/{}/envelopes", call_tx["hash"].as_str().unwrap())).await;
+    assert_eq!(env["kind"], "call");
+    assert_eq!(env["call_envelope"]["body"], "0b".repeat(60));
+    assert!(env["h_in"].is_null(), "no receipt indexed by the mock");
+    let (_, _, page) = call_api(&live.app, "/api/v1/envelopes?from_leaf=0&limit=1000").await;
+    assert_eq!(page["total_leaves"], expected_leaves);
+    assert_eq!(page["notes"].as_array().unwrap().len(), 1000);
+    assert_eq!(page["next_leaf"], 1000);
+    let (_, _, page) = call_api(&live.app, &format!("/api/v1/envelopes?from_leaf={}&limit=1000", expected_leaves - 5)).await;
+    assert_eq!(page["notes"].as_array().unwrap().len(), 5);
+    assert!(page["next_leaf"].is_null());
+
     // Search finds a commitment and a nullifier, and no accounts.
     let (_, _, found) = call_api(&live.app, &format!("/api/v1/search?q={}", h("cm-mint"))).await;
     assert_eq!(found[0]["type"], "note", "{found}");
