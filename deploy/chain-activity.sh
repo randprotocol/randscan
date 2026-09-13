@@ -14,8 +14,8 @@
 #        1.5–4 min, so run this where the node is local: a 2.6 MB hex submit over a slow uplink
 #        outruns the wallet's 15 s RPC timeout).
 set -uo pipefail
-BIN=${BIN:-$HOME/Github/randprotocol/fullnode/bin-03c9fb9}
-WALLETS=${WALLETS:-$HOME/Github/randprotocol/fullnode/wallets}
+BIN=${BIN:-${HOME:-/root}/Github/randprotocol/fullnode/bin-03c9fb9}
+WALLETS=${WALLETS:-${HOME:-/root}/Github/randprotocol/fullnode/wallets}
 RPC=${RPC:-http://127.0.0.1:8545}
 EXPLORER=${EXPLORER:-https://randscan.org/api/v1}
 STATE_DIR=${STATE_DIR:-${TMPDIR:-/tmp}/chain-activity}

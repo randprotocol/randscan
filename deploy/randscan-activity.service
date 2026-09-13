@@ -1,0 +1,13 @@
+[Unit]
+Description=One proved chain transaction (transfer/deploy/call rotation), checked on randscan.org
+After=shrugg-node.service network-online.target
+
+[Service]
+Type=oneshot
+Nice=10
+Environment=BIN=/usr/local/bin
+Environment=W1=/root/randscan-wallets/w1.key.json
+Environment=W2=/root/randscan-wallets/w2.key.json
+Environment=STATE_DIR=/root/randscan-activity
+ExecStart=/bin/bash /root/chain-activity.sh
+TimeoutStartSec=15min

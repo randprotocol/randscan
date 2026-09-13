@@ -1,0 +1,10 @@
+[Unit]
+Description=Fire randscan-activity every 5 minutes
+
+[Timer]
+OnCalendar=*-*-* *:00/5:00
+AccuracySec=10s
+Unit=randscan-activity.service
+
+[Install]
+WantedBy=timers.target
