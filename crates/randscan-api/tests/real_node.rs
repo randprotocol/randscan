@@ -76,10 +76,18 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     run(cli, &["keygen", "--key", wallet.to_str().unwrap()]);
     let wallet_addr = run(cli, &["address", "--key", wallet.to_str().unwrap()]).trim().to_string();
     assert!(wallet_addr.starts_with("shrugg1"), "not a shielded address: {wallet_addr}");
+    // Since phase S2 a genesis validator is `<key>,<stake in SHRUGG>,<payout shrugg1…>` at the
+    // staking minimum (1000 SHRUGG); the S3-only builds took the key alone.
+    let help = run(bin, &["genesis", "--help"]);
+    let validator = if help.contains("KEY,STAKE,PAYOUT") {
+        format!("{},1000,{wallet_addr}", key.to_str().unwrap())
+    } else {
+        key.to_str().unwrap().to_string()
+    };
     run(
         bin,
         &[
-            "genesis", "--chain-id", &CHAIN_ID.to_string(), "--validator", key.to_str().unwrap(),
+            "genesis", "--chain-id", &CHAIN_ID.to_string(), "--validator", &validator,
             "--faucet", "--fri-profile", "test", "--alloc", &format!("{wallet_addr}=1000"),
             "--out", genesis.to_str().unwrap(),
         ],
