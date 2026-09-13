@@ -317,6 +317,32 @@ const BRIDGE_CHAIN_NAMES: Record<number, string> = {
   5: 'Solana',
 };
 
+/** The source chains the bridge watches, in the order the bridge page lists them. */
+export const BRIDGE_SOURCE_CHAINS: { id: number; name: string }[] = [
+  { id: 2, name: 'Ethereum' },
+  { id: 3, name: 'BSC' },
+  { id: 5, name: 'Solana' },
+  { id: 4, name: 'Tron' },
+];
+
+/** "Ethereum" for a known bridge chain id, "chain 9" otherwise. */
+export function bridgeChainName(id: number | null | undefined): string {
+  if (id === null || id === undefined) return '—';
+  return BRIDGE_CHAIN_NAMES[id] ?? `chain ${id}`;
+}
+
+/**
+ * An amount in bridge units (8 decimals, whatever the token's own decimals at home), with the
+ * token symbol when the asset is a known one: "1,250.5 USDT", "1,250.5 units".
+ */
+export function formatBridgeUnits(
+  units: string | null | undefined,
+  symbol?: string | null
+): string {
+  if (units === null || units === undefined) return '—';
+  return `${formatUnits(units, BRIDGED_DECIMALS)} ${symbol ?? 'units'}`;
+}
+
 /** "Ethereum (2)" for a known bridge chain id, "chain 9" otherwise. */
 export function formatBridgeChain(id: number | null | undefined): string {
   if (id === null || id === undefined) return '—';

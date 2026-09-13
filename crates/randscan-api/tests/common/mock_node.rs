@@ -217,8 +217,11 @@ impl MockChain {
             }),
             "shrugg_getBridgeState" => json!({
                 "enabled": true, "emitter": "01".repeat(32), "emitters": { "2": "02".repeat(32) },
-                "guardian_set_index": 0, "guardians": ["aa".repeat(20)], "burn_sequence": 1, "next_index": 2,
-                "assets": [{ "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1") }]
+                "guardian_set_index": 0, "guardians": ["aa".repeat(20)], "burn_sequence": 1, "next_index": 3,
+                "assets": [
+                    { "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1") },
+                    { "index": 2, "chain": 2, "token": format!("{}dac17f958d2ee523a2206206994597c13d831ec7", "0".repeat(24)), "asset_id": h("asset-2") }
+                ]
             }),
             "shrugg_getPeers" => json!([]),
             "shrugg_getCallEnvelope" => {

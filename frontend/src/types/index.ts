@@ -234,6 +234,49 @@ export interface BridgeState {
   assets: BridgeAsset[];
 }
 
+/**
+ * A registry row with everything the chain has seen of the asset (`GET /bridge/assets`).
+ * Amounts are decimal strings of bridge units: always 8 decimals, whatever the token's own
+ * decimals on its home chain. `outstanding` is `deposited - burned`, the supply now held in
+ * shielded notes.
+ */
+export interface BridgeAssetActivity extends BridgeAsset {
+  /** set when (chain, token) is on the approved list */
+  symbol: string | null;
+  name: string | null;
+  /** the token's decimals on its home chain */
+  decimals: number | null;
+  deposits: number;
+  deposited: string;
+  burns: number;
+  burned: string;
+  outstanding: string;
+  first_height: number | null;
+  last_height: number | null;
+}
+
+export type TokenStatus = 'allowed' | 'discontinued';
+
+/** A token the bridge accepts, one entry per (token, home chain) (`GET /bridge/tokens`). */
+export interface ApprovedToken {
+  symbol: string;
+  name: string;
+  /** bridge chain id (2 Ethereum, 3 BSC, 4 Tron, 5 Solana) */
+  chain: number;
+  chain_name: string;
+  /** ERC-20, BEP-20, TRC-20, SPL */
+  standard: string;
+  /** the contract address (or mint) as the chain's explorers print it */
+  address: string;
+  /** the same address as the registry stores it: 32 bytes hex */
+  token: string;
+  /** decimals on the home chain; on Rand every bridged amount has 8 */
+  decimals: number;
+  status: TokenStatus;
+  explorer_url: string;
+  note?: string;
+}
+
 /** The node's supply audit; every amount is a unit string. */
 export interface Supply {
   height: number;

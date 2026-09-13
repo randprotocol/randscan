@@ -74,7 +74,7 @@ export default function DashboardPage() {
           </h1>
           <p className="mt-2 text-sm text-soft">
             {stats
-              ? `Chain ${stats.chain_id} · ${stats.symbol} · ${stats.decimals} decimals`
+              ? `Chain ${stats.chain_id}`
               : 'Connecting to the network…'}
           </p>
         </div>

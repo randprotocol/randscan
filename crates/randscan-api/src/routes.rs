@@ -50,6 +50,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/notes/:id", get(handlers::get_note))
         .route("/nullifiers/:nf", get(handlers::get_nullifier))
         .route("/bridge", get(handlers::get_bridge))
+        .route("/bridge/assets", get(handlers::bridge_assets))
+        .route("/bridge/tokens", get(handlers::bridge_tokens))
         .route("/supply", get(handlers::get_supply))
         .route("/validators", get(handlers::list_validators))
         .route("/validators/:address", get(handlers::get_validator))

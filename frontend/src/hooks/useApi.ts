@@ -6,6 +6,8 @@ import type {
   ApiKey,
   BlockDetail,
   BlockSummary,
+  ApprovedToken,
+  BridgeAssetActivity,
   BridgeState,
   Health,
   NetworkStats,
@@ -169,6 +171,22 @@ export function useBridge(config?: SWRConfiguration): SWRResponse<BridgeState> {
   return useSWR<BridgeState>('bridge', api.getBridge, {
     ...defaultConfig,
     refreshInterval: 30_000,
+    ...config,
+  });
+}
+
+export function useBridgeAssets(config?: SWRConfiguration): SWRResponse<BridgeAssetActivity[]> {
+  return useSWR<BridgeAssetActivity[]>('bridge-assets', api.getBridgeAssets, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
+}
+
+export function useBridgeTokens(config?: SWRConfiguration): SWRResponse<ApprovedToken[]> {
+  return useSWR<ApprovedToken[]>('bridge-tokens', api.getBridgeTokens, {
+    ...defaultConfig,
+    revalidateOnFocus: false,
     ...config,
   });
 }

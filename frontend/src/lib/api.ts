@@ -1,4 +1,6 @@
 import type {
+  ApprovedToken,
+  BridgeAssetActivity,
   NoteEnvelopePage,
   TransactionEnvelopes,
   ApiErrorBody,
@@ -206,6 +208,16 @@ export function getEnvelopePage(fromLeaf = 0, limit = 1000): Promise<NoteEnvelop
 
 export function getBridge(): Promise<BridgeState> {
   return request<BridgeState>('/bridge');
+}
+
+/** Every registered bridged asset with its deposits, burns and outstanding supply. */
+export function getBridgeAssets(): Promise<BridgeAssetActivity[]> {
+  return request<BridgeAssetActivity[]>('/bridge/assets');
+}
+
+/** The tokens the bridge accepts; a static list that does not depend on the node. */
+export function getBridgeTokens(): Promise<ApprovedToken[]> {
+  return request<ApprovedToken[]>('/bridge/tokens');
 }
 
 /** 404 on a node that serves no supply audit. */

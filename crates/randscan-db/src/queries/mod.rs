@@ -1,4 +1,5 @@
 mod blocks;
+mod bridge;
 mod indexer;
 mod nodes;
 mod notes;
@@ -9,6 +10,7 @@ mod users;
 mod validators;
 
 pub use blocks::*;
+pub use bridge::*;
 pub use indexer::*;
 pub use nodes::*;
 pub use notes::*;

@@ -109,6 +109,8 @@ for v in validators:
 | `GET /stats` | network statistics |
 | `GET /supply` | the node's supply audit (404 on a node that does not serve it) |
 | `GET /bridge` | the bridge's public state and asset registry |
+| `GET /bridge/assets` | every registered bridged asset with its deposits, burns and outstanding supply |
+| `GET /bridge/tokens` | the tokens the bridge accepts, with their contract addresses on each chain |
 | `GET /nodes` | the explorer node and its peers, with geolocation |
 
 `GET /health`:
@@ -177,6 +179,44 @@ Note values are hidden, but every crossing of the pool boundary is public, so th
 
 `assets[].index` is the `asset_index` a bridged note carries; index 0 is SHRUGG. There are no
 balances: bridged value is notes. A chain without a bridge reports `{ "enabled": false }`.
+
+`GET /bridge/assets` joins that registry with the indexed `bridge_attest` and `bridge_burn`
+transactions, one row per asset in index order (an empty array on a chain without a bridge):
+
+```json
+[{
+  "index": 1, "chain": 2, "token": "000000000000000000000000dac17f…", "asset_id": "…",
+  "symbol": "USDT", "name": "Tether USD", "decimals": 6,
+  "deposits": 12, "deposited": "125000000000", "burns": 3, "burned": "20000000000",
+  "outstanding": "105000000000", "first_height": 1040, "last_height": 19877
+}]
+```
+
+`chain` is the bridge chain id of the token's home: 2 Ethereum, 3 BSC, 4 Tron, 5 Solana. `symbol`,
+`name` and `decimals` are set when `(chain, token)` is on the approved list below and `null`
+otherwise. `deposited`, `burned` and `outstanding` (`deposited - burned`, what is held in shielded
+notes right now) are strings of **bridge units, always 8 decimals** whatever the token's own
+decimals at home; the bridge contracts convert on the way in and out. A guardian-set rotation is a
+`bridge_attest` with no asset and is not counted.
+
+`GET /bridge/tokens` is the allowlist, a static list that does not depend on the node:
+
+```json
+[{
+  "symbol": "USDT", "name": "Tether USD", "chain": 2, "chain_name": "Ethereum", "standard": "ERC-20",
+  "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+  "token": "000000000000000000000000dac17f958d2ee523a2206206994597c13d831ec7",
+  "decimals": 6, "status": "allowed",
+  "explorer_url": "https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7"
+}]
+```
+
+`address` is the contract (or Solana mint) as the chain's explorers print it; `token` is the same
+address as the registry stores it, a 32-byte word (an Ethereum, BSC or Tron address left-padded
+with 12 zero bytes; a Solana mint verbatim), so it can be matched against `assets[].token`.
+`status` is `allowed` or `discontinued`; a discontinued entry carries a `note` saying why and is
+listed so the address is on record, not because deposits are accepted. Today the list is USDT and
+USDC on Ethereum, BSC, Tron and Solana, with USDC on Tron discontinued.
 
 `GET /nodes` returns an array of:
 

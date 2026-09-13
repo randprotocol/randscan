@@ -293,6 +293,39 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, bridge) = call_api(&live.app, "/api/v1/bridge").await;
     assert_eq!(bridge["enabled"], true);
     assert_eq!(bridge["assets"][0]["index"], 1);
+    // Registry rows joined with the indexed flows: index 1 saw one 1000-unit deposit and one
+    // 400-unit burn (the rotation carries no asset and is not counted); index 2 is Ethereum
+    // USDT, registered but never used, so it is named and zero.
+    let (_, _, assets) = call_api(&live.app, "/api/v1/bridge/assets").await;
+    let assets = assets.as_array().expect("array");
+    assert_eq!(assets.len(), 2, "{assets:?}");
+    assert_eq!(assets[0]["index"], 1);
+    assert_eq!(assets[0]["chain"], 2);
+    assert_eq!(assets[0]["deposits"], 1);
+    assert_eq!(assets[0]["deposited"], "1000");
+    assert_eq!(assets[0]["burns"], 1);
+    assert_eq!(assets[0]["burned"], "400");
+    assert_eq!(assets[0]["outstanding"], "600");
+    assert_eq!(assets[0]["symbol"], Value::Null);
+    assert_eq!(assets[0]["first_height"], assets[0]["last_height"]);
+    assert_eq!(assets[1]["index"], 2);
+    assert_eq!(assets[1]["symbol"], "USDT");
+    assert_eq!(assets[1]["name"], "Tether USD");
+    assert_eq!(assets[1]["decimals"], 6);
+    assert_eq!(assets[1]["deposits"], 0);
+    assert_eq!(assets[1]["outstanding"], "0");
+    assert_eq!(assets[1]["last_height"], Value::Null);
+    let (_, _, tokens) = call_api(&live.app, "/api/v1/bridge/tokens").await;
+    let tokens = tokens.as_array().expect("array");
+    assert_eq!(tokens.len(), 8);
+    assert_eq!(tokens[0], json!({
+        "symbol": "USDT", "name": "Tether USD", "chain": 2, "chain_name": "Ethereum", "standard": "ERC-20",
+        "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+        "token": format!("{}dac17f958d2ee523a2206206994597c13d831ec7", "0".repeat(24)),
+        "decimals": 6, "status": "allowed",
+        "explorer_url": "https://etherscan.io/token/0xdac17f958d2ee523a2206206994597c13d831ec7"
+    }));
+    assert_eq!(tokens.iter().filter(|t| t["status"] == "discontinued").count(), 1);
     let (_, _, p) = call_api(&live.app, &format!("/api/v1/programs/{program}")).await;
     assert_eq!(p["call_count"], 1);
     assert!(p.get("deployer").is_none(), "{p}");
