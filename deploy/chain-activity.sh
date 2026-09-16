@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # One unit of activity on the shielded testnet, then a check that randscan.org indexed it.
-# Each run does ONE step and advances a rotation kept in STATE_DIR:
+# Every run: a faucet mint (MINT_RAND, default 10) into wallet 1, ONE proved step from the
+# rotation below, and a supply sanity check (`rand_getSupply` recomputed here, compared with
+# the explorer's copy). One proved step per run because a proof takes ~5 min on E's four cores
+# (transfer/deploy/call each land every third run, ~16 min apart at the 5-minute timer).
+# The rotation kept in STATE_DIR:
 #   transfer  a proved 1.5 RAND send from wallet 1 to wallet 2 (faucet-mints first when
 #             wallet 1 is running low, so the loop never starves)
 #   deploy    a fresh private_payment guest (a new threshold each time gives a new program id)
@@ -20,6 +24,7 @@ RPC=${RPC:-http://127.0.0.1:8545}
 EXPLORER=${EXPLORER:-https://randscan.org/api/v1}
 STATE_DIR=${STATE_DIR:-${TMPDIR:-/tmp}/chain-activity}
 NICE=${NICE:-}
+MINT_RAND=${MINT_RAND:-10}
 mkdir -p "$STATE_DIR"
 W1=${W1:-$WALLETS/shielded-1.key.json}
 W2=${W2:-$WALLETS/shielded-2.key.json}
@@ -37,6 +42,34 @@ explorer_tx() {
     sleep 3
   done
   echo "$body"; return 1
+}
+
+# The supply sanity check (RAND on chain): the node's audit, recomputed here from its own
+# counters — total = pool + register, and total = issued − slashed where issued = genesis
+# deposits + genesis stake + faucet mints + subsidies — then the explorer's copy of the audit
+# must agree. A FAIL line means a consensus bug or a damaged counter, never a normal state.
+field() { grep -o "\"$2\":\"\?[0-9a-z]*" <<<"$1" | head -1 | sed 's/.*://; s/"//g'; }
+supply_check() {
+  local s ex total pool reg gd gs fm sub sl issued
+  s=$(rpc rand_getSupply '[]')
+  [ -n "$s" ] || { log "SUPPLY FAIL: rand_getSupply answered nothing"; return 1; }
+  total=$(field "$s" total_supply); pool=$(field "$s" pool_value); reg=$(field "$s" register_total)
+  gd=$(field "$s" genesis_deposited); gs=$(field "$s" genesis_staked); fm=$(field "$s" faucet_minted)
+  sub=$(field "$s" subsidised); sl=$(field "$s" slashed)
+  issued=$(( gd + gs + fm + sub ))
+  local ok=1
+  [ "$(field "$s" invariant_holds)" = true ] || ok=0
+  [ $(( pool + reg )) -eq "$total" ] || ok=0
+  [ $(( issued - sl )) -eq "$total" ] || ok=0
+  ex=$(curl -s --max-time 10 "$EXPLORER/supply")
+  local ex_total; ex_total=$(field "$ex" total_supply)
+  local agree=agrees; [ "$ex_total" = "$total" ] || agree="DISAGREES ($ex_total)"
+  if [ $ok = 1 ]; then
+    log "supply ok: total $total = pool $pool + register $reg = issued $issued − slashed $sl (deposited $gd, staked $gs, minted $fm, subsidised $sub); explorer $agree"
+  else
+    log "SUPPLY FAIL: total $total, pool $pool + register $reg = $(( pool + reg )), issued $issued − slashed $sl = $(( issued - sl )), invariant_holds $(field "$s" invariant_holds); explorer $agree"
+    return 1
+  fi
 }
 
 if ! mkdir "$STATE_DIR/lock" 2>/dev/null; then
@@ -66,6 +99,10 @@ read -r -a rotation <<<"${ROTATION:-transfer deploy call}"
 step=${1:-${rotation[$(( (n-1) % ${#rotation[@]} ))]}}
 log "step $n $step (chain $chain, head $head)"
 t0=$(date +%s)
+
+# The mint, every run: MINT_RAND into wallet 1 (the faucet caps a call at 100 RAND).
+out=$("$BIN/rand" faucet --key "$W1" --rpc "$RPC" --amount "$MINT_RAND" 2>&1); h=$(submitted "$out" mint)
+if [ -n "$h" ] && explorer_tx "$h" mint >/dev/null; then log "step $n mint ok $h ($MINT_RAND RAND to wallet 1)"; else log "step $n mint FAIL ${h:-nohash}: $(tail -1 <<<"$out")"; fi
 
 case $step in
   transfer)
@@ -99,5 +136,6 @@ case $step in
   *) log "unknown step $step"; exit 2 ;;
 esac
 
+supply_check
 ex=$(curl -s --max-time 10 "$EXPLORER/health")
 log "step $n explorer $(grep -o '"status":"[a-z]*"' <<<"$ex") lag $(grep -o '"lag":[0-9-]*' <<<"$ex" | cut -d: -f2) chain $(curl -s --max-time 10 "$EXPLORER/stats" | grep -o '"chain_id":[0-9]*' | cut -d: -f2)"
