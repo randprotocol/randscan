@@ -26,7 +26,9 @@ balances, no senders and no recipients** anywhere in this API. What the explorer
   and receipt, a validator's bond / unbond / withdraw amounts, a faucet mint's amount, a bridge
   deposit's amount and a bridge burn's destination — these are the only amounts ever public;
 - the commitment tree leaf by leaf, the nullifier set, the validator register (stake, rewards,
-  unbonding queue), the supply audit, and the bridge's public state.
+  unbonding queue), the supply audit, and the bridge's public state;
+- the receiver registry: a short shielded address's published, signed records (spend key and
+  ML-KEM key, versioned) — public by design, since a sender needs them to pay that address.
 
 To see a balance or a transfer's parties you need the owner's viewing key and a wallet; the
 explorer has neither. A future release will let you paste a viewing key to open your own rows.
@@ -445,6 +447,38 @@ entry active.
 
 Programs are content addressed and immutable; `id` never changes. There is no deployer: a deploy
 is paid by a shielded bundle, so the chain does not know who deployed it.
+
+### Receivers
+
+The receiver registry (short shielded address, fullnode spec 2026-09-17): a `rand1…` id resolves
+to a signed, versioned record naming the spend key and the ML-KEM encapsulation key a sender
+needs to pay it. Publishing a new version (`Action::RegisterReceiver`) is how a receiver rotates
+its keys without changing its address. The explorer re-verifies every record
+(`randprotocol_core::ReceiverRecord::verify`) before indexing it; a record the chain accepted but
+that fails to verify here is an indexer bug, not shown.
+
+| method and path | returns |
+|---|---|
+| `GET /receivers/:address` | the current record (highest version) |
+| `GET /receivers/:address/history` | every published version, newest first |
+
+```json
+{
+  "id": "rand1q9fexampleexampleexampleexampleexampleexampleexample",
+  "version": 2,
+  "pk": "1111111111111111111111111111111111111111111111111111111111111111",
+  "kem_ek": "2222…2368 hex chars…2222",
+  "signing_key": "3333…2624 hex chars…3333",
+  "signature": "4444…4840 hex chars…4444",
+  "tx_hash": "dc97d2696981f4e49d822dee06143725444752e13fc42abdce60b72056f7342e",
+  "height": 41
+}
+```
+
+`GET /receivers/:address` is 400 when `address` does not parse as a `rand1…` id (bad prefix, bad
+base58, bad checksum, or the long pre-chain-11 form), and 404 when it parses but nothing has ever
+registered it. `GET /receivers/:address/history` uses the same 400 rule, but a never-registered
+address serves an empty array rather than 404.
 
 ### Search
 

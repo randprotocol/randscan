@@ -16,3 +16,9 @@ reqwest = { workspace = true }
 anyhow = { workspace = true }
 tracing = { workspace = true }
 chrono = { workspace = true }
+hex = { workspace = true }
+# The receiver registry's verifier (spec 2026-09-17 §3): the explorer re-runs
+# `ReceiverRecord::verify` rather than trusting the node. Path dependency into the fullnode
+# checkout beside this repo (`../../../fullnode`), same pattern as randscan-viewing's version
+# pinning against that workspace.
+randprotocol-core = { path = "../../../fullnode/crates/randprotocol-core" }

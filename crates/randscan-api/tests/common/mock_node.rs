@@ -254,6 +254,20 @@ pub fn tx(chain_id: u64, seed: &str, bundle: Option<Value>, action: Value) -> Va
     json!({ "hash": hash, "chain_id": chain_id, "bundle": bundle, "action": action })
 }
 
+/// The node's `register_receiver` action (rpc.rs `record_json`, Task 6's contract): the same
+/// hex fields `randprotocol_core::ReceiverRecord` carries, plus the `kind` tag and the id.
+pub fn register_receiver(rec: &randprotocol_core::ReceiverRecord) -> Value {
+    json!({
+        "kind": "register_receiver",
+        "id": rec.id().to_string(),
+        "version": rec.version,
+        "pk": randprotocol_core::notes::word8_to_hex(&rec.pk),
+        "kem_ek": hex::encode(&rec.kem_ek),
+        "signing_key": rec.signing_key.to_hex(),
+        "signature": hex::encode(rec.signature.as_bytes()),
+    })
+}
+
 pub struct MockNode {
     pub chain: Arc<Mutex<MockChain>>,
     pub url: String,

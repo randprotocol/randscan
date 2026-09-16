@@ -32,6 +32,9 @@ axum-extra = { workspace = true }
 time = { workspace = true }
 chrono = { workspace = true }
 reqwest = { workspace = true }
+# `ReceiverId::parse` for the /receivers/:address handler (same path dependency as
+# randscan-indexer, which re-runs the fuller `ReceiverRecord::verify`).
+randprotocol-core = { path = "../../../fullnode/crates/randprotocol-core" }
 
 [dev-dependencies]
 tempfile = "3"

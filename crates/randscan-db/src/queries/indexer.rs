@@ -57,6 +57,7 @@ pub const CHAIN_TABLES: &[&str] = &[
     "notes",
     "receipts",
     "programs",
+    "receivers",
     "transactions",
     "blocks",
     "validators",
