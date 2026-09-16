@@ -1,4 +1,4 @@
-# RandScan retarget to the SHRUGG full node (chain 4)
+# RandScan retarget to the RAND full node (chain 4)
 
 Date: 2026-09-10. Status: approved for implementation (autonomous session).
 
@@ -15,7 +15,7 @@ JSON-RPC 2.0 over HTTP at `127.0.0.1:8545` (see `fullnode/docs/rpc.md`). Relevan
 `shrugg_getBlockByHash`, `shrugg_getTransaction`, `shrugg_getAccount`, `shrugg_getValidators`,
 `shrugg_getPeers`, `shrugg_getProgram`, `shrugg_getReceipt`.
 
-- One token, SHRUGG, 9 decimals. Amounts are strings of units (u128).
+- One token, RAND, 9 decimals. Amounts are strings of units (u128).
 - Tx kinds: `transfer {to, amount}`, `mint {to, amount}`, `deploy {base_pc, words_len, program}`,
   `call {program, proof_len, recipients[]}`.
 - Blocks: `hash, height, view, parent, proposer, timestamp_ms, tx_root, state_root, justify_view,
@@ -138,7 +138,7 @@ Pages: `/` dashboard (stats cards, latest blocks, latest txs, live dot), `/block
 `/transactions` (kind filter), `/transactions/[hash]` (kind-specific panel + receipt with outputs and
 effect), `/account/[address]`, `/validators`, `/validators/[address]`, `/programs`, `/programs/[id]`,
 `/search?q=`. Header nav: Dashboard, Blocks, Transactions, Validators, Programs. Amounts shown as
-SHRUGG with up to 9 decimals; hashes shortened with copy; timestamps from `timestamp_ms`.
+RAND with up to 9 decimals; hashes shortened with copy; timestamps from `timestamp_ms`.
 Fetching is client-side (SWR) against same-origin `/api/v1` (so `NEXT_PUBLIC_API_URL` may be empty)
 and `NEXT_PUBLIC_WS_URL` (default derived from `window.location`).
 

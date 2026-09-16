@@ -139,7 +139,7 @@ impl MockChain {
         let p = |i: usize| params.get(i).cloned().unwrap_or(Value::Null);
         Ok(match method {
             "shrugg_chainId" => json!(self.chain_id),
-            "shrugg_tokenInfo" => json!({ "symbol": "SHRUGG", "decimals": 9 }),
+            "shrugg_tokenInfo" => json!({ "symbol": "RAND", "decimals": 9 }),
             "shrugg_getHead" => {
                 let head = self.head();
                 json!({ "height": head["height"], "hash": head["hash"], "view": self.view })
@@ -281,7 +281,9 @@ async fn rpc(State(chain): State<Arc<Mutex<MockChain>>>, Json(req): Json<Value>)
 /// Serve `chain` on a random localhost port for the rest of the test.
 pub async fn start_mock_node(chain: MockChain) -> MockNode {
     let chain = Arc::new(Mutex::new(chain));
-    let app = Router::new().route("/", post(rpc)).with_state(chain.clone());
+    let app = Router::new()
+        .route("/", post(rpc))
+        .with_state(chain.clone());
     let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
     let url = format!("http://{}", listener.local_addr().unwrap());
     tokio::spawn(async move {

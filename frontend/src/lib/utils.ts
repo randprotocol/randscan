@@ -1,6 +1,6 @@
 import type { TransactionKind } from '@/types';
 
-export const TOKEN_SYMBOL = 'SHRUGG';
+export const TOKEN_SYMBOL = 'RAND';
 export const TOKEN_DECIMALS = 9;
 
 // ---------------------------------------------------------------------------
@@ -117,8 +117,8 @@ export function formatAmount(
 }
 
 /**
- * Stake is SHRUGG that left the pool into the validator register, so it is units with the
- * token's nine decimals. `suffix` is appended after the symbol ("1,000 SHRUGG total stake").
+ * Stake is RAND that left the pool into the validator register, so it is units with the
+ * token's nine decimals. `suffix` is appended after the symbol ("1,000 RAND total stake").
  */
 export function formatStake(
   value: string | number | bigint | null | undefined,
@@ -130,7 +130,7 @@ export function formatStake(
 
 /**
  * An amount in a bridged asset's own smallest unit (the registry index says which asset; index
- * 0 or null is SHRUGG and gets the usual nine-decimal rendering). Bridged units have no fixed
+ * 0 or null is RAND and gets the usual nine-decimal rendering). Bridged units have no fixed
  * decimals on this chain.
  */
 export function formatAssetAmount(
@@ -293,7 +293,7 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   other: 'badge badge-neutral',
 };
 
-/** Kinds whose `amount` is in a bridged asset's own unit rather than SHRUGG units. */
+/** Kinds whose `amount` is in a bridged asset's own unit rather than RAND units. */
 export function amountIsBridged(kind: string): boolean {
   return kind === 'bridge_attest' || kind === 'bridge_burn';
 }

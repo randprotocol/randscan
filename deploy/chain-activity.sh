@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # One unit of activity on the shielded testnet, then a check that randscan.org indexed it.
 # Each run does ONE step and advances a rotation kept in STATE_DIR:
-#   transfer  a proved 1.5 SHRUGG send from wallet 1 to wallet 2 (faucet-mints first when
+#   transfer  a proved 1.5 RAND send from wallet 1 to wallet 2 (faucet-mints first when
 #             wallet 1 is running low, so the loop never starves)
 #   deploy    a fresh private_payment guest (a new threshold each time gives a new program id)
 #   call      a proved call of the last program this loop deployed (input transcript published)
@@ -72,7 +72,7 @@ case $step in
     bal=$("$BIN/shrugg" balance --key "$W1" --rpc "$RPC" 2>/dev/null | grep -o 'balance: [0-9.]*' | awk '{print $2}')
     if [ -n "$bal" ] && [ "${bal%%.*}" -lt 20 ]; then
       out=$("$BIN/shrugg" faucet --key "$W1" --rpc "$RPC" --amount 100 2>&1); h=$(submitted "$out" mint)
-      if [ -n "$h" ] && explorer_tx "$h" mint >/dev/null; then log "step $n mint ok $h (wallet 1 had $bal SHRUGG)"; else log "step $n mint FAIL ${h:-nohash}: $(tail -1 <<<"$out")"; fi
+      if [ -n "$h" ] && explorer_tx "$h" mint >/dev/null; then log "step $n mint ok $h (wallet 1 had $bal RAND)"; else log "step $n mint FAIL ${h:-nohash}: $(tail -1 <<<"$out")"; fi
     fi
     to=$("$BIN/shrugg" --key "$W2" address | tail -1)
     out=$($NICE "$BIN/shrugg" send "$to" 1.5 --key "$W1" --rpc "$RPC" 2>&1); h=$(submitted "$out" transfer)

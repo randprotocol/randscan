@@ -153,7 +153,7 @@ timestamp precedes its parent's and why proposers emit `max(now, parent.timestam
 | `emitters` | registered emitter per source chain |
 | `guardian_sets`, `current_set` | every set ever seen, and the authoritative index |
 | `assets` | registry `AssetId -> (home chain, token address)`, filled lazily on first mint |
-| `balances` | `(AssetId, Address) -> u128`, a ledger separate from SHRUGG accounts |
+| `balances` | `(AssetId, Address) -> u128`, a ledger separate from RAND accounts |
 | `spent` | consumed attestation digests, the inbound replay guard |
 | `burn_sequence`, `burns` | next outbound sequence and every outbound record |
 
@@ -176,7 +176,7 @@ Two `TxKind` variants, appended after `Call` so earlier tags keep their encoding
 | 4 | `BridgeAttest` | `attestation: Vec<u8>` | `bridge_attest` with `attestation` hex |
 | 5 | `BridgeBurn` | `asset, amount: u128, to_chain: u16, to: [u8; 32], fee: u128` | `bridge_burn` with `asset`, `amount`, `to_chain`, `to`, `fee` |
 
-Both pay only the flat SHRUGG fee. There is no gas metering because the value moved is a bridged
+Both pay only the flat RAND fee. There is no gas metering because the value moved is a bridged
 asset, and there is no receipt.
 
 ### Inbound: `bridge_attest`
@@ -217,7 +217,7 @@ Admission runs cheap checks before expensive ones, in this order:
 
 `apply_attest` records `mu` in `spent` before any effect, registers the asset if unseen, and
 credits `amount - fee` to the recipient and `fee` to the submitting account. The relayer fee is
-in the bridged asset; the transaction fee is in SHRUGG.
+in the bridged asset; the transaction fee is in RAND.
 
 ### Outbound: `bridge_burn`
 
@@ -301,7 +301,7 @@ and is stored as kind `other` with the node's tag kept verbatim, so a node newer
 explorer never stalls indexing.
 
 `TxFields` (`crates/randscan-indexer/src/processor.rs`) maps a burn's foreign destination to
-`bridge_to`, never to `to_address`. The `to` column only ever holds a SHRUGG address, so a
+`bridge_to`, never to `to_address`. The `to` column only ever holds a RAND address, so a
 destination on Ethereum never becomes an account row.
 
 ### Schema (migration 004)
@@ -330,7 +330,7 @@ users, sessions, and API keys survive.
 | `bridge_attest` | null | `attestation` (hex of the signed message) |
 | `bridge_burn` | null | `asset`, `bridge_amount`, `to_chain`, `bridge_to`, `bridge_fee` |
 
-`bridge_amount` and `bridge_fee` are strings of **8-decimal** bridged units, not SHRUGG's 9.
+`bridge_amount` and `bridge_fee` are strings of **8-decimal** bridged units, not RAND's 9.
 `bridge_to` is 32 bytes of hex with EVM and Tron addresses left-padded. See `docs/api.md`.
 
 ### Frontend
@@ -372,7 +372,7 @@ Stated in the node's own code comments and commit messages:
 - `BridgeState.burns` is unbounded and kept whole in memory, and is cloned on every speculative
   block execution. Draining it into storage per block is planned before about 100k burns.
 - No light client or on-chain verification of source-chain state exists or is planned.
-- No bridge-specific rate limiting beyond the flat SHRUGG fee and the 16 KiB attestation cap.
+- No bridge-specific rate limiting beyond the flat RAND fee and the 16 KiB attestation cap.
 
 Explorer-side:
 
@@ -393,7 +393,7 @@ On the planned shielded chain (fullnode spec
 `docs/superpowers/specs/2026-09-11-shielded-pool-design.md`, phase S3) bridged assets become
 notes with `asset = bridge asset id`. `BridgeAttest` deposits a note whose amount is public in
 that one transaction; `BridgeBurn` burns from a bundle in that asset and, because the fee is in
-SHRUGG and a bundle balances one asset, is the only two-bundle transaction. The bridge's own
+RAND and a bundle balances one asset, is the only two-bundle transaction. The bridge's own
 state (emitters, guardian sets, asset registry, spent digests, burn log) stays public; its
 per-account balances are deleted. When that lands, RandScan keeps the attestation and burn
 panels and loses nothing it shows today, since it never showed bridged balances.

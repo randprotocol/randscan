@@ -14,7 +14,7 @@ pub struct PendingStake {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Validator {
     pub address: String,
-    /// Stake weight, units of SHRUGG as a decimal string.
+    /// Stake weight, units of RAND as a decimal string.
     pub stake: String,
     /// Bundle fees credited to this validator as proposer, not yet withdrawn (units).
     pub rewards: String,

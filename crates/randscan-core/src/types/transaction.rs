@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Transaction kinds of the shielded SHRUGG chain (`fullnode/docs/rpc.md`, `shrugg_getTransaction`).
+/// Transaction kinds of the shielded RAND chain (`fullnode/docs/rpc.md`, `shrugg_getTransaction`).
 ///
 /// Every transaction is a shielded bundle plus an *action*; the kind is the action's. The node's
 /// `none` action (a plain shielded transfer) is served as `transfer`. `Other` is any kind the node
@@ -81,7 +81,7 @@ impl TxKind {
         )
     }
 
-    /// Kinds whose `amount` is in a bridged asset's own unit rather than SHRUGG units.
+    /// Kinds whose `amount` is in a bridged asset's own unit rather than RAND units.
     pub fn amount_is_bridged(&self) -> bool {
         matches!(self, TxKind::BridgeAttest | TxKind::BridgeBurn)
     }
@@ -99,11 +99,11 @@ pub struct Bundle {
     pub anchor: String,
     pub nullifiers: [String; 2],
     pub commitments: [String; 2],
-    /// Units of SHRUGG, as a decimal string.
+    /// Units of RAND, as a decimal string.
     pub fee: String,
     /// Units leaving the pool into the action (bond, bridge burn), decimal string.
     pub burn: String,
-    /// 0 = SHRUGG; otherwise the bridge registry index of the balanced asset.
+    /// 0 = RAND; otherwise the bridge registry index of the balanced asset.
     pub asset: i64,
     /// Block height the sender targeted.
     pub time: i64,
@@ -123,7 +123,7 @@ pub struct TransactionSummary {
     pub block_hash: String,
     pub tx_index: i32,
     pub kind: TxKind,
-    /// SHRUGG fee paid by the bundle ("0" for a validator-signed action without one).
+    /// RAND fee paid by the bundle ("0" for a validator-signed action without one).
     pub fee: String,
     pub timestamp_ms: i64,
     /// False for mint / unbond / withdraw, which are signed by a validator instead.
@@ -132,7 +132,7 @@ pub struct TransactionSummary {
     pub program: Option<String>,
     /// bond / unbond / withdraw: the validator address; mint: the minting validator
     pub validator: Option<String>,
-    /// mint, bond, unbond, withdraw: SHRUGG units; bridge_attest, bridge_burn: bridged units
+    /// mint, bond, unbond, withdraw: RAND units; bridge_attest, bridge_burn: bridged units
     pub amount: Option<String>,
     /// bridge_attest / bridge_burn: the bridged asset's registry index
     pub asset_index: Option<i64>,

@@ -1,6 +1,6 @@
 # RandScan API for early users
 
-RandScan indexes the Rand Protocol SHRUGG chain and serves what it has indexed over a plain HTTPS
+RandScan indexes the Rand Protocol RAND chain and serves what it has indexed over a plain HTTPS
 JSON API and a WebSocket feed. This guide is for people who want to read the chain from a script,
 a bot, an exchange backend, or a wallet without running their own `shrugg-node`.
 
@@ -14,7 +14,7 @@ instead of tight polling when you need to react to new blocks.
 
 ## What is public on a shielded chain
 
-SHRUGG is a fully shielded chain (fullnode `docs/shielded.md`). Every balance is a set of notes
+RAND is a fully shielded chain (fullnode `docs/shielded.md`). Every balance is a set of notes
 in a commitment tree, and every transaction is a **bundle** (two spent notes, two created notes,
 a public fee and a STARK proof) plus an optional public **action**. There are **no accounts, no
 balances, no senders and no recipients** anywhere in this API. What the explorer can show is:
@@ -33,9 +33,9 @@ explorer has neither. A future release will let you paste a viewing key to open 
 
 ## Conventions
 
-- **Amounts are strings of units.** 1 SHRUGG = 1,000,000,000 units (9 decimals). Amounts are
+- **Amounts are strings of units.** 1 RAND = 1,000,000,000 units (9 decimals). Amounts are
   unsigned 128-bit integers and are always serialised as decimal strings, never as JSON numbers.
-  `"10000000000"` is 10 SHRUGG. An amount of a **bridged asset** (`asset_index` > 0) is in that
+  `"10000000000"` is 10 RAND. An amount of a **bridged asset** (`asset_index` > 0) is in that
   asset's own smallest unit, which the source chain defines.
 - **Timestamps** are `timestamp_ms`: Unix milliseconds, set by the block proposer.
 - **Hashes, program ids, commitments, nullifiers and anchors** are 64 lowercase hex characters,
@@ -92,11 +92,11 @@ UNITS = 10**9
 page = requests.get(f"{API}/transactions", params={"kind": "mint", "limit": 50}, timeout=10).json()
 for tx in page["data"]:
     # A mint is one of the few actions with a public amount; a transfer has none.
-    print(tx["height"], tx["hash"][:12], int(tx["amount"]) / UNITS, "SHRUGG minted")
+    print(tx["height"], tx["hash"][:12], int(tx["amount"]) / UNITS, "RAND minted")
 
 validators = requests.get(f"{API}/validators", timeout=10).json()
 for v in validators:
-    print(v["address"], int(v["stake"]) / UNITS, "SHRUGG staked", "active" if v["active"] else "inactive")
+    print(v["address"], int(v["stake"]) / UNITS, "RAND staked", "active" if v["active"] else "inactive")
 ```
 
 ## Endpoints
@@ -132,7 +132,7 @@ unreachable. Check `indexer.lag` before trusting "latest" data during an outage.
 
 ```json
 {
-  "chain_id": 7, "symbol": "SHRUGG", "decimals": 9,
+  "chain_id": 7, "symbol": "RAND", "decimals": 9,
   "height": 20147, "view": 23263,
   "total_transactions": 40, "notes": 91, "nullifiers": 62,
   "validator_count": 5, "active_validator_count": 4, "total_stake": "400000000000000",
@@ -177,7 +177,7 @@ Note values are hidden, but every crossing of the pool boundary is public, so th
 }
 ```
 
-`assets[].index` is the `asset_index` a bridged note carries; index 0 is SHRUGG. There are no
+`assets[].index` is the `asset_index` a bridged note carries; index 0 is RAND. There are no
 balances: bridged value is notes. A chain without a bridge reports `{ "enabled": false }`.
 
 `GET /bridge/assets` joins that registry with the indexed `bridge_attest` and `bridge_burn`
@@ -288,12 +288,12 @@ field. `has_bundle` is false for the three validator-signed actions (`mint`, `un
 | kind | what it is | `amount` | other summary fields | detail-only fields |
 |---|---|---|---|---|
 | `transfer` | a plain shielded transfer (the node's `none` action) | null | | `bundle` |
-| `mint` | testnet faucet deposit, signed by a validator | SHRUGG units of the new note | `validator` = the minter | `cm` |
+| `mint` | testnet faucet deposit, signed by a validator | RAND units of the new note | `validator` = the minter | `cm` |
 | `deploy` | a zkVM program deployment, paid by the bundle | null | `program` = the new program id | `words_len` |
 | `call` | a confidential call, paid by the bundle | null | `program` | `call_proof_len`, `input_envelope_len`, `receipt` |
-| `bond` | stake leaving the pool into a validator's register entry | SHRUGG units | `validator` | `registered` (a first-time registration) |
-| `unbond` | stake moved to the unbonding queue (validator-signed) | SHRUGG units | `validator` | `action_nonce` |
-| `withdraw` | released stake and rewards deposited as a new note (validator-signed) | SHRUGG units | `validator` | `action_nonce` |
+| `bond` | stake leaving the pool into a validator's register entry | RAND units | `validator` | `registered` (a first-time registration) |
+| `unbond` | stake moved to the unbonding queue (validator-signed) | RAND units | `validator` | `action_nonce` |
+| `withdraw` | released stake and rewards deposited as a new note (validator-signed) | RAND units | `validator` | `action_nonce` |
 | `bridge_attest` | a guardian-signed inbound message depositing a bridged note | bridged units (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time` |
 | `bridge_burn` | a bridged asset burned to another chain | bridged units | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `asset_bundle` |
 | `other` | a kind newer than this explorer build | null | | none |
@@ -314,7 +314,7 @@ not apply). The bundle is the transaction's public face:
 `anchor` is the tree root the proof was made against; `nullifiers` mark the two spent notes
 (a dummy input still publishes one, so every bundle looks alike); `commitments` are the two notes
 created; `burn` is value leaving the pool into the action (a bond, a bridge burn), `asset` the
-asset the bundle balances (0 = SHRUGG) and `time` the height the sender targeted. The proof and
+asset the bundle balances (0 = RAND) and `time` the height the sender targeted. The proof and
 the two encrypted envelopes are reported by size only; nothing in a bundle names a sender,
 receiver or amount. A `bridge_burn` carries a second bundle in `asset_bundle` (same shape) that
 burns the bridged asset; `bridge_to` is a 32-byte hex address on `to_chain` (1 Rand, 2 Ethereum,
@@ -416,7 +416,7 @@ wallet with your viewing key (`shrugg sync`); to watch stake, read `/validators`
 }
 ```
 
-The register is the one place the chain stores amounts in the clear. `stake` is in SHRUGG units,
+The register is the one place the chain stores amounts in the clear. `stake` is in RAND units,
 `rewards` the bundle fees credited to the validator as proposer and not yet withdrawn, `pending`
 the unbonding queue (oldest first), `payout` the shielded address a withdraw pays to, `nonce`
 what its next signed unbond or withdraw must carry, and `active` whether it is in the set
@@ -548,7 +548,7 @@ ws.onmessage = (ev) => {
   const msg = JSON.parse(ev.data);
   if (msg.type === "new_transaction" && msg.transaction.amount !== null) {
     const t = msg.transaction;
-    console.log(t.height, t.kind, t.validator ?? "", Number(t.amount) / 1e9, "SHRUGG");
+    console.log(t.height, t.kind, t.validator ?? "", Number(t.amount) / 1e9, "RAND");
   }
 };
 ```

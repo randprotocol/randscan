@@ -1,5 +1,5 @@
 [Unit]
-Description=RandScan API and indexer (SHRUGG chain explorer)
+Description=RandScan API and indexer (RAND chain explorer)
 After=network-online.target postgresql.service shrugg-node.service
 Wants=postgresql.service
 

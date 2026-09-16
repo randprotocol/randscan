@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 /// A row of the bridge's asset registry (`shrugg_getAssets`). `index` is the `asset` word a note
-/// of that asset carries; index 0 is SHRUGG and never appears here.
+/// of that asset carries; index 0 is RAND and never appears here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BridgeAsset {
     pub index: i64,

@@ -1,6 +1,6 @@
 //! RandScan Core - wire types shared by the indexer, API, WebSocket server and clients.
 //!
-//! The chain is the Rand Protocol SHRUGG chain served by `shrugg-node` (JSON-RPC `shrugg_*`).
+//! The chain is the Rand Protocol RAND chain served by `shrugg-node` (JSON-RPC `shrugg_*`).
 
 pub mod error;
 pub mod types;
@@ -9,15 +9,15 @@ pub use error::*;
 pub use types::*;
 
 /// Native token symbol.
-pub const TOKEN_SYMBOL: &str = "SHRUGG";
+pub const TOKEN_SYMBOL: &str = "RAND";
 
-/// Native token decimals (1 SHRUGG = 10^9 units).
+/// Native token decimals (1 RAND = 10^9 units).
 pub const TOKEN_DECIMALS: u8 = 9;
 
-/// Units per SHRUGG.
+/// Units per RAND.
 pub const UNITS_PER_TOKEN: u128 = 1_000_000_000;
 
-/// Format an amount in units (decimal string) as a SHRUGG decimal string, trimming zeros.
+/// Format an amount in units (decimal string) as a RAND decimal string, trimming zeros.
 pub fn format_units(units: &str) -> String {
     let value: u128 = units.parse().unwrap_or(0);
     let whole = value / UNITS_PER_TOKEN;

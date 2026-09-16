@@ -491,7 +491,7 @@ export default function BridgePage() {
             <p className="text-xs text-mute">
               The node&apos;s own registry, filled on the first deposit of each
               asset. The index is the asset word a bridged note carries; index 0
-              is SHRUGG and is never in the registry.
+              is RAND and is never in the registry.
             </p>
           </section>
         </>

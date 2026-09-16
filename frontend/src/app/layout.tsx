@@ -27,7 +27,7 @@ export const metadata: Metadata = {
   title: 'RandScan — Rand Protocol Explorer',
   description:
     'Explore blocks, transactions, accounts, validators and confidential programs on the Rand Protocol network.',
-  keywords: ['Rand Protocol', 'SHRUGG', 'blockchain', 'explorer', 'blocks', 'transactions'],
+  keywords: ['Rand Protocol', 'RAND', 'blockchain', 'explorer', 'blocks', 'transactions'],
 };
 
 /**

@@ -1,5 +1,5 @@
 // RandScan API types — mirrors the `/api/v1` contract served by randscan-api.
-// All amounts are decimal strings of smallest units (SHRUGG has 9 decimals).
+// All amounts are decimal strings of smallest units (RAND has 9 decimals).
 // All timestamps are `timestamp_ms`: milliseconds since the Unix epoch.
 
 /** `other` is any kind the node serves that this explorer build does not decode. */
@@ -73,11 +73,11 @@ export interface Bundle {
   anchor: string;
   nullifiers: [string, string];
   commitments: [string, string];
-  /** Units of SHRUGG. */
+  /** Units of RAND. */
   fee: string;
   /** Units leaving the pool into the action (bond, bridge burn). */
   burn: string;
-  /** 0 = SHRUGG; otherwise the bridge registry index of the balanced asset. */
+  /** 0 = RAND; otherwise the bridge registry index of the balanced asset. */
   asset: number;
   /** Block height the sender targeted. */
   time: number;
@@ -95,7 +95,7 @@ export interface TransactionSummary {
   block_hash: string;
   tx_index: number;
   kind: TransactionKind;
-  /** SHRUGG fee paid by the bundle ("0" for a validator-signed action without one). */
+  /** RAND fee paid by the bundle ("0" for a validator-signed action without one). */
   fee: string;
   timestamp_ms: number;
   /** False for mint / unbond / withdraw, which are signed by a validator instead. */
@@ -104,7 +104,7 @@ export interface TransactionSummary {
   program: string | null;
   /** bond / unbond / withdraw: the validator; mint: the minting validator */
   validator: string | null;
-  /** mint, bond, unbond, withdraw: SHRUGG units; bridge_attest, bridge_burn: bridged units */
+  /** mint, bond, unbond, withdraw: RAND units; bridge_attest, bridge_burn: bridged units */
   amount: string | null;
   /** bridge_attest / bridge_burn: the bridged asset's registry index */
   asset_index: number | null;
@@ -304,7 +304,7 @@ export interface PendingStake {
 /** An entry of the public validator register. */
 export interface Validator {
   address: string;
-  /** Units of SHRUGG. */
+  /** Units of RAND. */
   stake: string;
   /** Bundle fees credited as proposer, not yet withdrawn (units). */
   rewards: string;

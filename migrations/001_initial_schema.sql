@@ -1,5 +1,5 @@
--- RandScan schema for the Rand Protocol SHRUGG chain (shrugg-node, JSON-RPC shrugg_*).
--- Amounts (units of SHRUGG, u128) are NUMERIC(40,0); the API serves them as decimal strings.
+-- RandScan schema for the Rand Protocol RAND chain (shrugg-node, JSON-RPC shrugg_*).
+-- Amounts (units of RAND, u128) are NUMERIC(40,0); the API serves them as decimal strings.
 
 CREATE TABLE blocks (
     hash          VARCHAR(64) PRIMARY KEY,
@@ -106,7 +106,7 @@ CREATE INDEX idx_programs_height ON programs(deployed_at_height DESC);
 CREATE TABLE network_stats (
     id                  INTEGER PRIMARY KEY DEFAULT 1 CHECK (id = 1),
     chain_id            BIGINT NOT NULL DEFAULT 0,
-    symbol              VARCHAR(16) NOT NULL DEFAULT 'SHRUGG',
+    symbol              VARCHAR(16) NOT NULL DEFAULT 'RAND',
     decimals            SMALLINT NOT NULL DEFAULT 9,
     height              BIGINT NOT NULL DEFAULT 0,
     view                BIGINT NOT NULL DEFAULT 0,

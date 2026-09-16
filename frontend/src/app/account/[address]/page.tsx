@@ -22,7 +22,7 @@ export default function NoAccountPage() {
       <Panel>
         <div className="space-y-3 py-3 text-sm text-soft">
           <p>
-            SHRUGG is a fully shielded chain. A balance is a set of notes only its owner&apos;s
+            RAND is a fully shielded chain. A balance is a set of notes only its owner&apos;s
             viewing key can open, and a transaction carries no sender, recipient or amount: only
             commitments, nullifiers, sealed envelopes, the fee and a proof.
           </p>

@@ -36,7 +36,7 @@ at most four confidential calls**; transfers are tiny, so a block can be 2000 tr
 calls, not both. Calls that do not fit wait in the mempool for the next block.
 
 The same hardening wave made the node reject cheap-before-expensive everywhere: a call whose fee
-is below `CALL_BASE` (1,000,000 units = 0.001 SHRUGG) is refused before proof verification, and
+is below `CALL_BASE` (1,000,000 units = 0.001 RAND) is refused before proof verification, and
 the mempool checks duplicates, pool capacity and replacement pricing before it clones the ledger
 to validate. The RPC body limit was raised to `2 × MAX_PROOF_BYTES + 256 KiB` so a call with a
 near-maximum proof can be submitted as hex JSON, and `shrugg_estimateFee ["call", tier]` now
@@ -44,8 +44,8 @@ rejects tiers outside 10, 12, …, 20 instead of silently truncating.
 
 RandScan: block pages and `GET /transactions?height=` serve full 2000-transaction blocks (covered
 by the mock-node integration test). Calls per block are naturally few; `proof_len` on the detail
-page shows why. Minimum fees per tier: 0.001 SHRUGG at tier 10, +0.0001 per tier step, so
-0.0015 SHRUGG at tier 20.
+page shows why. Minimum fees per tier: 0.001 RAND at tier 10, +0.0001 per tier step, so
+0.0015 RAND at tier 20.
 
 ## M2 — lock promises are not durable (documented, not fixed)
 
@@ -130,5 +130,5 @@ and re-indexes; users and API keys survive). Node E has run `dbea18c` on chain 5
 Verified against this build on 2026-09-12: the real-node integration test
 (`crates/randscan-api/tests/real_node.rs`) now also deploys the `private_payment` guest, proves
 and submits a call through the wallet CLI, and checks that the explorer's transaction, receipt,
-program `code_hash` and account balance equal the node's. Set `SHRUGG_NODE_BIN` to the node
-binary; the wallet is picked up from the sibling `shrugg` binary or `SHRUGG_CLI`.
+program `code_hash` and account balance equal the node's. Set `RAND_NODE_BIN` to the node
+binary; the wallet is picked up from the sibling `shrugg` binary or `RAND_CLI`.

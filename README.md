@@ -1,6 +1,6 @@
 # RandScan
 
-Block explorer for the Rand Protocol SHRUGG chain (the network served by
+Block explorer for the Rand Protocol RAND chain (the network served by
 [`shrugg-node`](../fullnode)). Live at https://randscan.org.
 
 - **Backend**: Rust — axum REST API + WebSocket, SQLx/PostgreSQL, and an in-process indexer that
@@ -10,7 +10,7 @@ Block explorer for the Rand Protocol SHRUGG chain (the network served by
 
 ## What it indexes
 
-SHRUGG is a fully shielded chain (fullnode shielded-pool phases S1–S3): there are no accounts,
+RAND is a fully shielded chain (fullnode shielded-pool phases S1–S3): there are no accounts,
 and every transaction is a shielded bundle (anchor, two nullifiers, two commitments, fee, burn,
 proof) plus an optional public action. The explorer indexes committed blocks (hash, height,
 HotStuff view, proposer, roots, `justify_view`), every transaction's public bundle fields and its
@@ -47,8 +47,8 @@ indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERV
 shielded node (every action kind, the tree, the register, two hard forks); `tests/real_node.rs`
 spawns a real shielded `shrugg-node` plus the `shrugg` wallet (faucet, a proved transfer, a
 deploy and a confidential call) and compares every public number. Both need `DATABASE_URL`;
-the real-node test also needs `SHRUGG_NODE_BIN` (a build of the fullnode's `shielded-s3` branch
-or later, with `shrugg` beside it or `SHRUGG_CLI` set).
+the real-node test also needs `RAND_NODE_BIN` (a build of the fullnode's `shielded-s3` branch
+or later, with `shrugg` beside it or `RAND_CLI` set).
 
 ### Environment
 
@@ -79,7 +79,7 @@ REST under `/api/v1` (`health`, `stats`, `supply`, `bridge`, `blocks`, `blocks/l
 `nullifiers/:nf`, `transactions/:hash/envelopes`, `envelopes`, `validators`, `validators/:address`,
 `programs`, `programs/:id`, `nodes`,
 `search?q=`; `accounts/*` answers 410) and a WebSocket at `/ws` (channels `blocks`,
-`transactions`, `stats`). Amounts are strings of units (1 SHRUGG = 10^9 units); timestamps are
+`transactions`, `stats`). Amounts are strings of units (1 RAND = 10^9 units); timestamps are
 `timestamp_ms`. Full shapes in `docs/superpowers/specs/2026-09-12-shielded-chain-design.md`; a
 guide for integrators with examples in [docs/api.md](docs/api.md). Two documents from the
 account chain remain for history: how the fullnode review fixes shaped confidential calls

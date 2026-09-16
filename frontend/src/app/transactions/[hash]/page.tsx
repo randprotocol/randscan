@@ -157,7 +157,7 @@ function BundlePanel({ title, bundle, asset }: { title: string; bundle: Bundle; 
       </DetailRow>
       <DetailRow label="Asset">
         <span className="font-mono">
-          {bundle.asset === 0 ? '0 (SHRUGG)' : `#${formatNumber(bundle.asset)} (bridged)`}
+          {bundle.asset === 0 ? '0 (RAND)' : `#${formatNumber(bundle.asset)} (bridged)`}
         </span>
       </DetailRow>
       <DetailRow label="Time (target height)">
@@ -342,7 +342,7 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
           )}
         </DetailRow>
         <p className="px-4 py-3 text-xs text-mute">
-          The one two-bundle transaction: the fee bundle above pays in SHRUGG and the asset bundle
+          The one two-bundle transaction: the fee bundle above pays in RAND and the asset bundle
           below burns the bridged notes. Bridged amounts are in the asset&apos;s own smallest unit.
         </p>
       </Panel>

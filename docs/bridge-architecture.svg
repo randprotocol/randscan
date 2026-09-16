@@ -121,7 +121,7 @@
   <text x="314" y="674" class="t">bridge configured, asset registered,</text>
   <text x="314" y="690" class="t">to_chain = home chain, recipient shape,</text>
   <text x="314" y="706" class="t">fee &lt;= amount, amount != 0, balance</text>
-  <text x="314" y="732" class="box-sub">both kinds pay only the flat SHRUGG fee;</text>
+  <text x="314" y="732" class="box-sub">both kinds pay only the flat RAND fee;</text>
   <text x="314" y="746" class="box-sub">no gas metering, no receipt</text>
 
   <!-- BridgeState -->
@@ -142,7 +142,7 @@
   <text x="600" y="704" class="t">when a bridge exists; burns are</text>
   <text x="600" y="720" class="t">excluded (derivable from history)</text>
   <text x="600" y="742" class="box-sub">bridged balances are a separate ledger,</text>
-  <text x="600" y="756" class="box-sub">never touching SHRUGG accounts</text>
+  <text x="600" y="756" class="box-sub">never touching RAND accounts</text>
 
   <!-- Storage -->
   <rect x="844" y="442" width="240" height="330" class="comp"/>
@@ -200,7 +200,7 @@
   <text x="1168" y="554" class="mono-s">GET /api/v1/transactions/{hash}</text>
   <text x="1168" y="574" class="t">detail carries the six bridge fields;</text>
   <text x="1168" y="590" class="t">amounts are strings of 8-decimal units</text>
-  <text x="1168" y="606" class="box-sub">to / amount stay SHRUGG-only and null here</text>
+  <text x="1168" y="606" class="box-sub">to / amount stay RAND-only and null here</text>
 
   <rect x="1156" y="628" width="288" height="164" class="comp"/>
   <text x="1168" y="648" class="t"><tspan font-weight="700">Frontend</tspan> (Next.js)</text>

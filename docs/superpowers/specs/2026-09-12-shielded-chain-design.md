@@ -13,7 +13,7 @@ are unchanged.
   A transaction has no `from`, `nonce` or signature.
 - **Every transaction is `{ hash, chain_id, bundle, action }`.** `bundle` is the shielded
   2-in-2-out transfer that pays the fee: `anchor`, `nullifiers[2]`, `commitments[2]`, `fee`
-  (units, JSON integer), `burn`, `asset` (0 = SHRUGG, else the bridge registry index), `time`,
+  (units, JSON integer), `burn`, `asset` (0 = RAND, else the bridge registry index), `time`,
   `proof_len`, `envelope_len[2]`. `bundle` is `null` for validator-signed actions (`mint`,
   `unbond`, `withdraw`).
 - **`action.kind`** is one of `none` (plain transfer), `mint`, `deploy`, `call`, `bond`,
@@ -75,7 +75,7 @@ Removed: `GET /accounts/:address` and `/accounts/:address/transactions` answer *
 `TransactionSummary`: `hash, height, block_hash, tx_index, kind, fee, timestamp_ms, has_bundle,
 program, validator, amount, asset_index`. `kind` is `transfer | mint | deploy | call | bond |
 unbond | withdraw | bridge_attest | bridge_burn | other`. `amount` is the public amount of a
-deposit or a staking action (units of SHRUGG, or of the bridged asset for `bridge_attest` /
+deposit or a staking action (units of RAND, or of the bridged asset for `bridge_attest` /
 `bridge_burn`); null for `transfer`, `deploy`, `call`.
 
 `TransactionDetail` adds `chain_id`, `bundle` (object or null: `anchor, nullifiers[2],

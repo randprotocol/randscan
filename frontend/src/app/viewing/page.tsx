@@ -138,7 +138,7 @@ export default function ViewingPage() {
       {info && rows && (
         <>
           <StatsRow columns={4}>
-            <StatsCard title="Spendable balance" value={formatAmount(balance.toString())} subtitle="unspent notes received, SHRUGG only" />
+            <StatsCard title="Spendable balance" value={formatAmount(balance.toString())} subtitle="unspent notes received, RAND only" />
             <StatsCard title="Notes received" value={formatNumber(received.length)} subtitle={`${formatNumber(received.filter((r) => r.spent.state === 'unspent').length)} unspent`} />
             <StatsCard title="Notes sent" value={formatNumber(rows.filter((r) => r.note.role === 'sent').length)} />
             <StatsCard

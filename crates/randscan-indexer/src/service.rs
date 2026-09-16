@@ -371,7 +371,19 @@ impl IndexerService {
         }
         let id = self.rpc.chain_id().await? as i64;
         let token = self.rpc.token_info().await?;
-        let c = (id, token.symbol, token.decimals as i16);
+        // The coin is RAND whatever string the node reports; only the decimals come from it.
+        if token.symbol != randscan_core::TOKEN_SYMBOL {
+            warn!(
+                "node reports token symbol {:?}; the explorer shows {}",
+                token.symbol,
+                randscan_core::TOKEN_SYMBOL
+            );
+        }
+        let c = (
+            id,
+            randscan_core::TOKEN_SYMBOL.to_string(),
+            token.decimals as i16,
+        );
         *self.chain.write().await = Some(c.clone());
         Ok(c)
     }
