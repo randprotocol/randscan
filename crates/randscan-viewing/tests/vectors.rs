@@ -1,5 +1,5 @@
 //! Opens envelopes sealed by the fullnode's own crate (`tests/vectors.json`, produced with
-//! `rand-zkvm` at commit 01dc23d): the only thing that pins this re-implementation to the
+//! `randprotocol-zkvm` at commit e2aae20): the only thing that pins this re-implementation to the
 //! wire format the chain uses.
 
 use randscan_viewing::*;

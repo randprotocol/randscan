@@ -9,7 +9,7 @@ description = "Opens shielded-chain envelopes with a viewing key or a per-transa
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The exact versions the fullnode's vendored zkVM (crates/rand-zkvm, commit 01dc23d) pins:
+# The exact versions the fullnode's vendored zkVM (crates/randprotocol-zkvm, commit e2aae20) pins:
 # the Poseidon2 round constants are drawn from a seeded rand StdRng, so both the field/hash
 # crates and the RNG must match bit for bit.
 p3-goldilocks = "=0.7.0"

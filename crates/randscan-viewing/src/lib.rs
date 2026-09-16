@@ -3,8 +3,8 @@
 //! A shielded transaction publishes, per created note, an envelope: the note plaintext under a
 //! fresh per-transaction key, that key wrapped to the receiver's ML-KEM-768 address and under
 //! the sender's outgoing viewing key. This crate re-implements exactly what the fullnode's
-//! `crates/rand-zkvm/src/{hash,notes,viewing,call_envelope}.rs` do on the *opening* side
-//! (commit `01dc23d`, the build chain 6 runs), with no sealing, no randomness and no ledger, so
+//! `crates/randprotocol-zkvm/src/{hash,notes,viewing,call_envelope}.rs` do on the *opening* side
+//! (commit `e2aae20`, the build chain 10 runs), with no sealing, no randomness and no ledger, so
 //! it compiles to WebAssembly and a key pasted into the explorer never leaves the browser.
 //!
 //! Every ciphertext is ChaCha20-Poly1305 with the on-chain commitment as associated data, so a
