@@ -1,4 +1,4 @@
-//! RandScan Indexer - syncs the RAND chain from a `shrugg-node` JSON-RPC endpoint into PostgreSQL.
+//! RandScan Indexer - syncs the RAND chain from a `rand-node` JSON-RPC endpoint into PostgreSQL.
 
 pub mod broadcast;
 pub mod nodes;

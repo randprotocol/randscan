@@ -1,8 +1,8 @@
 # The guardian bridge: architecture
 
 > **Partly superseded (2026-09-12).** On the shielded chain (phase S3) bridged value is notes, not
-> balances: `bridge_attest` deposits a note of public amount for a `shrugg1…` recipient and
-> `bridge_burn` burns from a second bundle; there is no `shrugg_getAssetBalance` and no per-address
+> balances: `bridge_attest` deposits a note of public amount for a `rand1…` recipient and
+> `bridge_burn` burns from a second bundle; there is no `rand_getAssetBalance` and no per-address
 > balance in the explorer. The trust model, wire format, guardian sets and the burn log below
 > are unchanged; the "what the explorer indexes" section is replaced by
 > `docs/superpowers/specs/2026-09-12-shielded-chain-design.md` and `docs/api.md`.
@@ -32,7 +32,7 @@ client; if the committee lies, Rand believes it.
 
 | Chain | Bridge chain id | Family | Bridge program |
 |---|---|---|---|
-| Rand | 1 | this fullnode | `shrugg-core::bridge` |
+| Rand | 1 | this fullnode | `rand-core::bridge` |
 | Ethereum | 2 | EVM | Solidity contract |
 | BSC | 3 | EVM | Solidity contract |
 | Tron | 4 | EVM-compatible | Solidity contract |
@@ -63,11 +63,11 @@ outbound one. The components, and which repository owns each:
 | Solidity contracts, Solana program | separate bridge repository | lock and release tokens; emit and consume attestations |
 | Guardian committee | off-chain operators | observe events, sign the double-keccak digest of the body |
 | `bridge-codec` | fullnode `crates/bridge-codec` | `no_std`, zero-dependency byte layout for envelope and payloads; hashing and ECDSA are injected by the caller so it ports to every verifier |
-| `shrugg-core::bridge` | fullnode `crates/shrugg-core/src/bridge` | `verify` (signatures), `BridgeState` (state and root), `check_attest` / `check_burn` / `apply_*` |
-| `Ledger` | fullnode `crates/shrugg-core/src/ledger.rs` | admission order for both kinds, fee debit, state root composition |
-| Storage | fullnode `crates/shrugg-node/src/storage.rs` | three RocksDB column families plus a meta blob; replay and integrity check |
-| JSON-RPC | fullnode `crates/shrugg-node/src/rpc.rs` | submission plus five bridge query methods |
-| Wallet | fullnode `crates/shrugg-client` | `bridge-mint`, `bridge-burn`, `asset-balance`, `bridge-status` |
+| `rand-core::bridge` | fullnode `crates/rand-core/src/bridge` | `verify` (signatures), `BridgeState` (state and root), `check_attest` / `check_burn` / `apply_*` |
+| `Ledger` | fullnode `crates/rand-core/src/ledger.rs` | admission order for both kinds, fee debit, state root composition |
+| Storage | fullnode `crates/rand-node/src/storage.rs` | three RocksDB column families plus a meta blob; replay and integrity check |
+| JSON-RPC | fullnode `crates/rand-node/src/rpc.rs` | submission plus five bridge query methods |
+| Wallet | fullnode `crates/rand-client` | `bridge-mint`, `bridge-burn`, `asset-balance`, `bridge-status` |
 | RandScan | this repository | indexes both kinds from blocks, stores the six bridge fields, serves and renders them; never submits, never verifies |
 
 Relayers are not a component with code of their own. Any party holding a signed attestation can
@@ -157,8 +157,8 @@ timestamp precedes its parent's and why proposers emit `max(now, parent.timestam
 | `spent` | consumed attestation digests, the inbound replay guard |
 | `burn_sequence`, `burns` | next outbound sequence and every outbound record |
 
-`AssetId = blake3("shrugg-bridge-asset" || token_chain || token_address)`, a pure function that
-any node can answer even without a bridge (`shrugg_bridgeAssetId`).
+`AssetId = blake3("rand-bridge-asset" || token_chain || token_address)`, a pure function that
+any node can answer even without a bridge (`rand_bridgeAssetId`).
 
 `root()` commits the emitters and guardian sets, a Merkle root of non-zero balances, a Merkle root
 of the asset registry, a Merkle root of the sorted spent digests, and `burn_sequence`. It
@@ -185,21 +185,21 @@ asset, and there is no receipt.
 sequenceDiagram
     participant C as Source-chain contract
     participant G as Guardians
-    participant R as Relayer (shrugg bridge-mint)
+    participant R as Relayer (rand bridge-mint)
     participant L as Rand ledger
     participant S as RocksDB
     participant X as RandScan
     C->>G: lock token, emit Transfer message
     G->>G: sign mu = keccak(keccak(body)), quorum n*2/3+1
     G->>R: signed attestation
-    R->>L: shrugg_sendTransaction {bridge_attest}
+    R->>L: rand_sendTransaction {bridge_attest}
     L->>L: size cap 16 KiB, bridge enabled?
     L->>L: decode envelope, resolve guardian set
     L->>L: replay? emitter bound? payload sane?
     L->>L: signatures: expiry, quorum, low-s, recovery
     L->>L: apply_attest: spent += mu, register asset,<br/>credit amount - fee to recipient, fee to submitter
     L->>S: commit balances, spent, meta
-    X->>L: shrugg_getBlockByHeight
+    X->>L: rand_getBlockByHeight
     X->>X: store kind bridge_attest + attestation hex
 ```
 
@@ -223,7 +223,7 @@ in the bridged asset; the transaction fee is in RAND.
 
 ```mermaid
 sequenceDiagram
-    participant W as Wallet (shrugg bridge-burn)
+    participant W as Wallet (rand bridge-burn)
     participant L as Rand ledger
     participant S as RocksDB
     participant R as Relayer
@@ -231,14 +231,14 @@ sequenceDiagram
     participant D as Destination contract
     participant X as RandScan
     W->>W: check_burn_recipient (same rule as the node)
-    W->>L: shrugg_sendTransaction {bridge_burn}
+    W->>L: rand_sendTransaction {bridge_burn}
     L->>L: bridge enabled, asset registered, to_chain = home chain,<br/>recipient shape, fee <= amount, amount != 0, balance
     L->>L: apply_burn: debit, append BridgeBurnRecord(sequence)
     L->>S: commit balance row, burn row
-    R->>L: shrugg_getBridgeBurn [sequence]
+    R->>L: rand_getBridgeBurn [sequence]
     R->>G: outbound message
     G->>D: signed message; token released
-    X->>L: shrugg_getBlockByHeight
+    X->>L: rand_getBlockByHeight
     X->>X: store asset, bridge_amount, to_chain, bridge_to, bridge_fee
 ```
 
@@ -276,14 +276,14 @@ the replayed one separately from the state root, because the root does not cover
 
 | Method | Params | Result |
 |---|---|---|
-| `shrugg_getAssetBalance` | `[address, asset]` | decimal string of 8-decimal units, `"0"` if unknown |
-| `shrugg_getAssets` | `[address]` | every non-zero bridged asset held |
-| `shrugg_getBridgeState` | `[]` | emitter, emitter table, guardian set, assets, `burn_sequence`; `{"enabled": false}` without a bridge |
-| `shrugg_getBridgeBurn` | `[sequence]` | one outbound record or `null` |
-| `shrugg_bridgeAssetId` | `[token_chain, token_address]` | the asset id; answers on any chain |
+| `rand_getAssetBalance` | `[address, asset]` | decimal string of 8-decimal units, `"0"` if unknown |
+| `rand_getAssets` | `[address]` | every non-zero bridged asset held |
+| `rand_getBridgeState` | `[]` | emitter, emitter table, guardian set, assets, `burn_sequence`; `{"enabled": false}` without a bridge |
+| `rand_getBridgeBurn` | `[sequence]` | one outbound record or `null` |
+| `rand_bridgeAssetId` | `[token_chain, token_address]` | the asset id; answers on any chain |
 
-**Wallet.** `shrugg bridge-mint <attestation>` (hex or `@path`), `shrugg bridge-burn <asset>
-<amount> <to_chain> <to> [--bridge-fee]`, `shrugg asset-balance [address] <asset>`, `shrugg
+**Wallet.** `rand bridge-mint <attestation>` (hex or `@path`), `rand bridge-burn <asset>
+<amount> <to_chain> <to> [--bridge-fee]`, `rand asset-balance [address] <asset>`, `rand
 bridge-status`. `check_burn_recipient` applies the node's recipient rule before signing.
 
 ## 9. What RandScan does with the bridge
@@ -293,7 +293,7 @@ calls the five bridge RPC methods. It indexes both kinds from block bodies and s
 
 ### Indexer
 
-`shrugg_getBlockByHeight` returns each transaction with a tagged `kind`. The indexer decodes
+`rand_getBlockByHeight` returns each transaction with a tagged `kind`. The indexer decodes
 `bridge_attest {attestation}` and `bridge_burn {asset, amount, to_chain, to, fee}` into
 `RpcTxKind::BridgeAttest` and `RpcTxKind::BridgeBurn`
 (`crates/randscan-indexer/src/rpc.rs`). Any tag it does not know becomes `RpcTxKind::Unknown`
@@ -354,7 +354,7 @@ test covers that path on the node side.
 
 ## 10. Test vectors on the node
 
-`crates/shrugg-core/src/bridge/vectors.json` in the fullnode holds 39 vectors generated by the
+`crates/rand-core/src/bridge/vectors.json` in the fullnode holds 39 vectors generated by the
 bridge repository's `tools/vectors` and copied in verbatim. Two tests pin them with exact
 counts: 23 at the signature level (`ok`, `no_quorum`, `index_order`, `high_s`, `wrong_guardian`,
 `set_expired`, `bad_version`, and so on) and 21 at the ledger level through a real
@@ -380,11 +380,11 @@ Explorer-side:
   (guardian set index, signature count, payload type, recipient, amount) would need a port of
   `bridge-codec`'s layout to the API and is not done.
 - Bridged balances per account are not shown. The node serves them through
-  `shrugg_getAssetBalance` and `shrugg_getAssets`, which the explorer does not call.
+  `rand_getAssetBalance` and `rand_getAssets`, which the explorer does not call.
 
 ## 12. Relationship to the confidential layer and the shielded chain
 
-Today, none. Neither `bridge-codec` nor `shrugg-core::bridge` imports anything from the zkVM or
+Today, none. Neither `bridge-codec` nor `rand-core::bridge` imports anything from the zkVM or
 the confidential executor; the two areas share only the ledger, the state root machinery, and the
 gas-limits module where `MAX_ATTESTATION_BYTES` sits next to `MAX_PROOF_BYTES`. Bridged balances
 are plain visible state.
@@ -402,7 +402,7 @@ panels and loses nothing it shows today, since it never showed bridged balances.
 
 - fullnode `docs/bridge.md`, `docs/rpc.md`, `docs/cli.md`
 - fullnode `crates/bridge-codec/src/{lib,envelope,payload}.rs`
-- fullnode `crates/shrugg-core/src/bridge/{mod,state}.rs`, `src/ledger.rs`, `src/gas.rs`
-- fullnode `crates/shrugg-node/src/{rpc,storage}.rs`
+- fullnode `crates/rand-core/src/bridge/{mod,state}.rs`, `src/ledger.rs`, `src/gas.rs`
+- fullnode `crates/rand-node/src/{rpc,storage}.rs`
 - RandScan `crates/randscan-indexer/src/{rpc,processor}.rs`, `migrations/004_bridge_and_chain_id.sql`,
   `docs/api.md`, `frontend/src/lib/utils.ts`, `frontend/src/app/transactions/[hash]/page.tsx`

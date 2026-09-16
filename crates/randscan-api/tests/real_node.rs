@@ -1,10 +1,10 @@
-//! RandScan against a real shielded `shrugg-node` from `../fullnode` (branch `shielded-s3` or
+//! RandScan against a real shielded `rand-node` from `../fullnode` (branch `shielded-s3` or
 //! later): a single-validator chain with the faucet on, a faucet mint and a shielded transfer
 //! submitted through the wallet, then the explorer must agree with the node on every public
 //! number: the bundle's nullifiers and commitments, the mint's note, the tree, the register.
 //!
-//! Needs `DATABASE_URL` and `RAND_NODE_BIN` (path to a built `shrugg-node`); skips when either
-//! is unset. The wallet CLI (`shrugg`) must sit next to the node binary or be named by
+//! Needs `DATABASE_URL` and `RAND_NODE_BIN` (path to a built `rand-node`); skips when either
+//! is unset. The wallet CLI (`rand`) must sit next to the node binary or be named by
 //! `RAND_CLI`; it proves the bundle locally under the chain's `test` FRI profile. With the
 //! wallet the test also deploys a guest, proves and submits one confidential call, and checks
 //! the explorer's receipt (tier, outputs, `h_in`) against the node's — the proof is made under
@@ -78,7 +78,7 @@ fn submitted_hash(out: &str, what: &str) -> String {
         .to_string()
 }
 
-/// keygen + genesis + init + run; returns once the node answers `shrugg_getHead`.
+/// keygen + genesis + init + run; returns once the node answers `rand_getHead`.
 async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     let dir = tempfile::tempdir().unwrap();
     let key = dir.path().join("validator.key.json");
@@ -96,10 +96,10 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
         .trim()
         .to_string();
     assert!(
-        wallet_addr.starts_with("shrugg1"),
+        wallet_addr.starts_with("rand1"),
         "not a shielded address: {wallet_addr}"
     );
-    // Since phase S2 a genesis validator is `<key>,<stake in RAND>,<payout shrugg1…>` at the
+    // Since phase S2 a genesis validator is `<key>,<stake in RAND>,<payout rand1…>` at the
     // staking minimum (1000 RAND); the S3-only builds took the key alone.
     let help = run(bin, &["genesis", "--help"]);
     let validator = if help.contains("KEY,STAKE,PAYOUT") {
@@ -160,7 +160,7 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
         .stdout(Stdio::null())
         .stderr(Stdio::inherit())
         .spawn()
-        .expect("spawn shrugg-node");
+        .expect("spawn rand-node");
     let node = Node {
         child,
         url: url.clone(),
@@ -171,7 +171,7 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     loop {
         if let Ok(r) = client
             .post(&url)
-            .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": "shrugg_getHead", "params": [] }))
+            .json(&json!({ "jsonrpc": "2.0", "id": 1, "method": "rand_getHead", "params": [] }))
             .send()
             .await
         {
@@ -198,7 +198,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let bin = PathBuf::from(bin);
     let cli = std::env::var("RAND_CLI")
         .map(PathBuf::from)
-        .unwrap_or_else(|_| bin.with_file_name("shrugg"));
+        .unwrap_or_else(|_| bin.with_file_name("rand"));
     assert!(
         cli.is_file(),
         "no wallet CLI at {}: set RAND_CLI",
@@ -211,7 +211,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
 
     // The node must be producing blocks on its own before we ask it to do anything.
     let start = std::time::Instant::now();
-    while rpc(&client, &node.url, "shrugg_getHead", json!([])).await["height"]
+    while rpc(&client, &node.url, "rand_getHead", json!([])).await["height"]
         .as_u64()
         .unwrap()
         < 2
@@ -220,7 +220,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
         tokio::time::sleep(Duration::from_millis(200)).await;
     }
     assert_eq!(
-        rpc(&client, &node.url, "shrugg_chainId", json!([])).await,
+        rpc(&client, &node.url, "rand_chainId", json!([])).await,
         json!(CHAIN_ID)
     );
 
@@ -261,7 +261,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let node_transfer = rpc(
         &client,
         &node.url,
-        "shrugg_getTransaction",
+        "rand_getTransaction",
         json!([transfer_hash]),
     )
     .await;
@@ -299,7 +299,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let node_mint = rpc(
         &client,
         &node.url,
-        "shrugg_getTransaction",
+        "rand_getTransaction",
         json!([mint_hash]),
     )
     .await;
@@ -321,7 +321,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(mint["validator"], validator_addr);
 
     // Catch up to the node head, then compare what both sides publish.
-    let head = rpc(&client, &node.url, "shrugg_getHead", json!([])).await["height"]
+    let head = rpc(&client, &node.url, "rand_getHead", json!([])).await["height"]
         .as_i64()
         .unwrap();
     live.wait_for("/api/v1/health", WAIT, |h| {
@@ -329,7 +329,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     })
     .await;
 
-    let node_block = rpc(&client, &node.url, "shrugg_getBlockByHeight", json!([head])).await;
+    let node_block = rpc(&client, &node.url, "rand_getBlockByHeight", json!([head])).await;
     let (_, _, block) = call(
         &live.app,
         json_req("GET", &format!("/api/v1/blocks/{head}"), None, None),
@@ -341,7 +341,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(block["proposer"], validator_addr);
 
     // The tree: one genesis note, one mint note, two transfer outputs; every leaf served.
-    let tree = rpc(&client, &node.url, "shrugg_getTreeInfo", json!([])).await;
+    let tree = rpc(&client, &node.url, "rand_getTreeInfo", json!([])).await;
     assert_eq!(tree["next_index"], 4, "{tree}");
     let notes = live
         .wait_for("/api/v1/notes", WAIT, |n| n["pagination"]["total"] == 4)
@@ -380,7 +380,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
         assert_eq!(n["tx_hash"], transfer_hash);
     }
 
-    let node_status = rpc(&client, &node.url, "shrugg_status", json!([])).await;
+    let node_status = rpc(&client, &node.url, "rand_status", json!([])).await;
     let stats = live
         .wait_for("/api/v1/stats", WAIT, |s| {
             s["chain_id"] == CHAIN_ID && s["notes"] == 4
@@ -391,7 +391,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(stats["validator_count"], 1);
     assert_eq!(stats["faucet"], true);
     assert_eq!(stats["symbol"], "RAND");
-    let node_validators = rpc(&client, &node.url, "shrugg_getValidators", json!([])).await;
+    let node_validators = rpc(&client, &node.url, "rand_getValidators", json!([])).await;
     let (_, _, validators) =
         call(&live.app, json_req("GET", "/api/v1/validators", None, None)).await;
     let list = validators.as_array().unwrap();
@@ -482,7 +482,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     );
     let call_hash = submitted_hash(&out, "call");
 
-    let node_receipt = rpc(&client, &node.url, "shrugg_getReceipt", json!([call_hash])).await;
+    let node_receipt = rpc(&client, &node.url, "rand_getReceipt", json!([call_hash])).await;
     assert!(
         node_receipt.is_object(),
         "node has no receipt for {call_hash}: {node_receipt}"
@@ -522,7 +522,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     .await;
     assert_eq!(deploy["kind"], "deploy");
     assert_eq!(deploy["program"], program_id);
-    let node_program = rpc(&client, &node.url, "shrugg_getProgram", json!([program_id])).await;
+    let node_program = rpc(&client, &node.url, "rand_getProgram", json!([program_id])).await;
     let program = live
         .wait_for(&format!("/api/v1/programs/{program_id}"), WAIT, |p| {
             p["call_count"] == 1
@@ -535,14 +535,14 @@ async fn explorer_agrees_with_a_real_shielded_node() {
 
     // Every leaf the node holds is indexed, including the two bundles that paid for the
     // deploy and the call (self-transfers of zero, four more commitments).
-    let head = rpc(&client, &node.url, "shrugg_getHead", json!([])).await["height"]
+    let head = rpc(&client, &node.url, "rand_getHead", json!([])).await["height"]
         .as_i64()
         .unwrap();
     live.wait_for("/api/v1/health", WAIT, |h| {
         h["indexer"]["current_height"].as_i64().unwrap_or(-1) >= head
     })
     .await;
-    let tree = rpc(&client, &node.url, "shrugg_getTreeInfo", json!([])).await;
+    let tree = rpc(&client, &node.url, "rand_getTreeInfo", json!([])).await;
     let stats = live
         .wait_for("/api/v1/stats", WAIT, |s| s["notes"] == tree["next_index"])
         .await;

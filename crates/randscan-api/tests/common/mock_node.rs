@@ -1,4 +1,4 @@
-//! An in-process stand-in for `shrugg-node`'s JSON-RPC on the shielded chain
+//! An in-process stand-in for `rand-node`'s JSON-RPC on the shielded chain
 //! (`fullnode/docs/rpc.md`), scripted from the test: the chain id, the committed blocks, the
 //! tree leaves and the validator register can be swapped at any time, which is how the tests
 //! simulate a hard fork under a running indexer.
@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex};
 
 pub const VALIDATOR: &str = "2nRdFChBXRmKoe2sQE3ZYDzvdg53QmBZJJ9iweY7hk1v";
 pub const VALIDATOR_B: &str = "ByDkxsEfDCR5DrmDufKftvcRsgvufypnZ4SgDQzJAQ7Z";
-pub const SHIELDED_ADDR: &str = "shrugg1q9fexampleexampleexampleexampleexampleexampleexample";
+pub const SHIELDED_ADDR: &str = "rand1q9fexampleexampleexampleexampleexampleexampleexample";
 
 /// 64 lowercase hex characters derived from `seed`.
 pub fn h(seed: &str) -> String {
@@ -49,7 +49,7 @@ pub struct MockChain {
     pub view: u64,
     pub validators: Vec<MockValidator>,
     /// Serve the register in the S3-branch shape (`{address, stake, rewards: number}`) and
-    /// answer "unknown method" to `shrugg_getEpoch` / `shrugg_getSupply`.
+    /// answer "unknown method" to `rand_getEpoch` / `rand_getSupply`.
     pub pre_s2: bool,
     /// The commitment tree: (cm, height), leaf index = position.
     pub leaves: Vec<(String, u64)>,
@@ -138,13 +138,13 @@ impl MockChain {
         self.calls.push(method.to_string());
         let p = |i: usize| params.get(i).cloned().unwrap_or(Value::Null);
         Ok(match method {
-            "shrugg_chainId" => json!(self.chain_id),
-            "shrugg_tokenInfo" => json!({ "symbol": "RAND", "decimals": 9 }),
-            "shrugg_getHead" => {
+            "rand_chainId" => json!(self.chain_id),
+            "rand_tokenInfo" => json!({ "symbol": "RAND", "decimals": 9 }),
+            "rand_getHead" => {
                 let head = self.head();
                 json!({ "height": head["height"], "hash": head["hash"], "view": self.view })
             }
-            "shrugg_status" | "shrugg_syncStatus" => {
+            "rand_status" | "rand_syncStatus" => {
                 let head = self.head();
                 json!({
                     "height": head["height"], "head_hash": head["hash"], "view": self.view,
@@ -159,11 +159,11 @@ impl MockChain {
                     "peer_id": "12D3KooWmockmockmockmockmockmockmockmockmock"
                 })
             }
-            "shrugg_getBlockByHeight" => {
+            "rand_getBlockByHeight" => {
                 let height = p(0).as_u64().ok_or((-32602, "height".to_string()))? as usize;
                 self.blocks.get(height).cloned().unwrap_or(Value::Null)
             }
-            "shrugg_getBlockByHash" => {
+            "rand_getBlockByHash" => {
                 let hash = p(0).as_str().unwrap_or("").to_ascii_lowercase();
                 self.blocks
                     .iter()
@@ -171,7 +171,7 @@ impl MockChain {
                     .cloned()
                     .unwrap_or(Value::Null)
             }
-            "shrugg_getCommitments" => {
+            "rand_getCommitments" => {
                 let from = p(0).as_u64().ok_or((-32602, "from_index".to_string()))? as usize;
                 let limit = p(1).as_u64().unwrap_or(1000).min(1000) as usize;
                 json!(self
@@ -186,16 +186,16 @@ impl MockChain {
                     }))
                     .collect::<Vec<_>>())
             }
-            "shrugg_getTreeInfo" => json!({
+            "rand_getTreeInfo" => json!({
                 "next_index": self.leaves.len(), "root": h(&format!("root-{}", self.leaves.len())),
                 "nullifiers": self.nullifier_count()
             }),
-            "shrugg_getValidators" if self.pre_s2 => json!(self
+            "rand_getValidators" if self.pre_s2 => json!(self
                 .validators
                 .iter()
                 .map(|v| json!({ "address": v.address, "stake": v.stake, "rewards": v.rewards.parse::<u64>().unwrap_or(0) }))
                 .collect::<Vec<_>>()),
-            "shrugg_getValidators" => json!(self
+            "rand_getValidators" => json!(self
                 .validators
                 .iter()
                 .map(|v| json!({
@@ -204,18 +204,18 @@ impl MockChain {
                     "payout": SHIELDED_ADDR, "nonce": 0, "active": v.active
                 }))
                 .collect::<Vec<_>>()),
-            "shrugg_getEpoch" if !self.pre_s2 => {
+            "rand_getEpoch" if !self.pre_s2 => {
                 let height = self.head()["height"].as_u64().unwrap();
                 json!({ "epoch": height / 1000, "epoch_blocks": 1000,
                         "next_set": self.validators.iter().filter(|v| v.active).map(|v| v.address.clone()).collect::<Vec<_>>() })
             }
-            "shrugg_getSupply" if !self.pre_s2 => json!({
+            "rand_getSupply" if !self.pre_s2 => json!({
                 "height": self.head()["height"], "genesis_deposited": "1000000000000", "genesis_staked": "100000000000000",
                 "faucet_minted": "100000000000", "withdraw_deposited": "0", "fees_paid": "3000000", "burned": "0",
                 "pool_value": "1099997000000", "register_total": "100000003000000", "total_supply": "101100000000000",
                 "invariant_holds": true
             }),
-            "shrugg_getBridgeState" => json!({
+            "rand_getBridgeState" => json!({
                 "enabled": true, "emitter": "01".repeat(32), "emitters": { "2": "02".repeat(32) },
                 "guardian_set_index": 0, "guardians": ["aa".repeat(20)], "burn_sequence": 1, "next_index": 3,
                 "assets": [
@@ -223,15 +223,15 @@ impl MockChain {
                     { "index": 2, "chain": 2, "token": format!("{}dac17f958d2ee523a2206206994597c13d831ec7", "0".repeat(24)), "asset_id": h("asset-2") }
                 ]
             }),
-            "shrugg_getPeers" => json!([]),
-            "shrugg_getCallEnvelope" => {
+            "rand_getPeers" => json!([]),
+            "rand_getCallEnvelope" => {
                 // A transcript for every call the mock knows about, sealed to nobody (opaque bytes).
                 let hash = p(0).as_str().unwrap_or("").to_string();
                 let is_call = self.blocks.iter().flat_map(|b| b["transactions"].as_array().cloned().unwrap_or_default())
                     .any(|t| t["hash"] == hash && t["action"]["kind"] == "call");
                 if is_call { json!({ "tx": hash, "h_in": h("h_in"), "kem_ct": "", "to_sender": "0a".repeat(60), "to_auditor": "", "body": "0b".repeat(60) }) } else { Value::Null }
             }
-            "shrugg_getReceipt" | "shrugg_getProgram" => Value::Null,
+            "rand_getReceipt" | "rand_getProgram" => Value::Null,
             other => return Err((-32601, format!("unknown method {other}"))),
         })
     }

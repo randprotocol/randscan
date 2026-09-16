@@ -1,6 +1,6 @@
 [Unit]
 Description=One proved chain transaction (transfer/deploy/call rotation), checked on randscan.org
-After=shrugg-node.service network-online.target
+After=rand-node.service network-online.target
 
 [Service]
 Type=oneshot

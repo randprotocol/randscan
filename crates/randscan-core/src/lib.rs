@@ -1,6 +1,6 @@
 //! RandScan Core - wire types shared by the indexer, API, WebSocket server and clients.
 //!
-//! The chain is the Rand Protocol RAND chain served by `shrugg-node` (JSON-RPC `shrugg_*`).
+//! The chain is the Rand Protocol RAND chain served by `rand-node` (JSON-RPC `rand_*`).
 
 pub mod error;
 pub mod types;

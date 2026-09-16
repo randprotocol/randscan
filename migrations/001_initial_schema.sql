@@ -1,4 +1,4 @@
--- RandScan schema for the Rand Protocol RAND chain (shrugg-node, JSON-RPC shrugg_*).
+-- RandScan schema for the Rand Protocol RAND chain (rand-node, JSON-RPC rand_*).
 -- Amounts (units of RAND, u128) are NUMERIC(40,0); the API serves them as decimal strings.
 
 CREATE TABLE blocks (

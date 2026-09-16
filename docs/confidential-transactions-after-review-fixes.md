@@ -20,9 +20,9 @@ validator verifies the proof (`Machine::verify`) before voting. The program's ei
 words become the receipt: word 0 is the effect kind, word 1 an index into the recipient list,
 words 2–3 the amount. Inputs, the proof itself and the cycle count never leave the prover.
 
-RandScan indexes a call from `shrugg_getBlockByHeight` (program id, `proof_len`, `recipients`)
-and fetches its receipt with `shrugg_getReceipt` (tier, outputs, effect). Deploys store the
-program's `code_hash` from `shrugg_getProgram`, which since the zkVM fork is the in-circuit
+RandScan indexes a call from `rand_getBlockByHeight` (program id, `proof_len`, `recipients`)
+and fetches its receipt with `rand_getReceipt` (tier, outputs, effect). Deploys store the
+program's `code_hash` from `rand_getProgram`, which since the zkVM fork is the in-circuit
 Poseidon2 digest and no longer equals the content id.
 
 ## M1 — block size and transaction count are consensus rules
@@ -39,7 +39,7 @@ The same hardening wave made the node reject cheap-before-expensive everywhere: 
 is below `CALL_BASE` (1,000,000 units = 0.001 RAND) is refused before proof verification, and
 the mempool checks duplicates, pool capacity and replacement pricing before it clones the ledger
 to validate. The RPC body limit was raised to `2 × MAX_PROOF_BYTES + 256 KiB` so a call with a
-near-maximum proof can be submitted as hex JSON, and `shrugg_estimateFee ["call", tier]` now
+near-maximum proof can be submitted as hex JSON, and `rand_estimateFee ["call", tier]` now
 rejects tiers outside 10, 12, …, 20 instead of silently truncating.
 
 RandScan: block pages and `GET /transactions?height=` serve full 2000-transaction blocks (covered
@@ -56,7 +56,7 @@ exploitable by timing alone, but the safety margin under Byzantine faults is thi
 whitepaper's. A protocol decision is pending.
 
 Effect on confidential transactions: none specific. RandScan only reads **committed** blocks
-(`shrugg_getBlockByHeight` serves nothing else), so what the explorer shows is final under the
+(`rand_getBlockByHeight` serves nothing else), so what the explorer shows is final under the
 same guarantee as every other transaction. If a re-org ever happened, the indexer's
 parent-hash check rewinds and re-indexes.
 
@@ -75,13 +75,13 @@ that peers reject.
 
 RandScan: node E is an observer that syncs from the validators; a proof-heavy history means the
 node, and so the explorer, trails the head for longer during a resync. `GET /health` reports the
-lag; `stats.node_syncing` mirrors `shrugg_status.syncing`. The indexer itself reads over RPC and
+lag; `stats.node_syncing` mirrors `rand_status.syncing`. The indexer itself reads over RPC and
 is unaffected by the sync protocol.
 
 ## M4 — wallet stale-nonce race (not fixed)
 
-`shrugg call` proves locally (seconds to minutes depending on tier), then signs with the
-**committed** account nonce from `shrugg_getAccount`. Two sends in quick succession reuse a nonce;
+`rand call` proves locally (seconds to minutes depending on tier), then signs with the
+**committed** account nonce from `rand_getAccount`. Two sends in quick succession reuse a nonce;
 the mempool rejects or fee-replaces the first, and the user waits 60 s for a transaction that will
 never commit. Confidential calls are the most exposed because proving takes long enough that a
 transfer sent in between is easy. The clean fix is a mempool-aware `next_nonce` RPC, deferred
@@ -116,8 +116,8 @@ cannot be opened in the explorer; see the "Later" section of
 The fullnode re-synced its vendored zkVM to research milestone 4.1 (`f06446a`, merged as
 `dbea18c`): `read_input` is now bound to a salted input commitment `H_IN`, published as eight
 more public values, and `Proof` gained an `input_log_height` field. This changes proof bytes and
-the verifier key, not the RPC surface: no RPC file changed, and `shrugg_getBlockByHeight`,
-`shrugg_getReceipt` and `shrugg_getProgram` return the same shapes as before. `H_IN` is not
+the verifier key, not the RPC surface: no RPC file changed, and `rand_getBlockByHeight`,
+`rand_getReceipt` and `rand_getProgram` return the same shapes as before. `H_IN` is not
 exposed by the node, so the explorer has nothing new to show.
 
 What matters to RandScan is the hard fork: proofs made under constraint set 3 do not verify
@@ -131,4 +131,4 @@ Verified against this build on 2026-09-12: the real-node integration test
 (`crates/randscan-api/tests/real_node.rs`) now also deploys the `private_payment` guest, proves
 and submits a call through the wallet CLI, and checks that the explorer's transaction, receipt,
 program `code_hash` and account balance equal the node's. Set `RAND_NODE_BIN` to the node
-binary; the wallet is picked up from the sibling `shrugg` binary or `RAND_CLI`.
+binary; the wallet is picked up from the sibling `rand` binary or `RAND_CLI`.

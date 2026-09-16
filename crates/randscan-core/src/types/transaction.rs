@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// Transaction kinds of the shielded RAND chain (`fullnode/docs/rpc.md`, `shrugg_getTransaction`).
+/// Transaction kinds of the shielded RAND chain (`fullnode/docs/rpc.md`, `rand_getTransaction`).
 ///
 /// Every transaction is a shielded bundle plus an *action*; the kind is the action's. The node's
 /// `none` action (a plain shielded transfer) is served as `transfer`. `Other` is any kind the node
@@ -174,7 +174,7 @@ pub struct TransactionDetail {
     pub action_nonce: Option<i64>,
     /// bridge_attest: size of the guardian-signed message
     pub attestation_len: Option<i64>,
-    /// bridge_attest: the depositor's shielded address (`shrugg1…`)
+    /// bridge_attest: the depositor's shielded address (`rand1…`)
     pub recipient: Option<String>,
     /// bridge_attest: the deposit note's `time` word
     pub note_time: Option<i64>,

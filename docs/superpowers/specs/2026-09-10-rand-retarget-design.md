@@ -4,16 +4,16 @@ Date: 2026-09-10. Status: approved for implementation (autonomous session).
 
 ## Goal
 
-Make RandScan index and display the real Rand Protocol chain served by `shrugg-node`
+Make RandScan index and display the real Rand Protocol chain served by `rand-node`
 (`../fullnode`), deploy it on observer node E (188.166.235.187) next to the node, and serve it at
 https://randscan.org (with randscan.com and www.* redirecting there).
 
 ## What the chain actually exposes
 
 JSON-RPC 2.0 over HTTP at `127.0.0.1:8545` (see `fullnode/docs/rpc.md`). Relevant methods:
-`shrugg_chainId`, `shrugg_tokenInfo`, `shrugg_getHead`, `shrugg_status`, `shrugg_getBlockByHeight`,
-`shrugg_getBlockByHash`, `shrugg_getTransaction`, `shrugg_getAccount`, `shrugg_getValidators`,
-`shrugg_getPeers`, `shrugg_getProgram`, `shrugg_getReceipt`.
+`rand_chainId`, `rand_tokenInfo`, `rand_getHead`, `rand_status`, `rand_getBlockByHeight`,
+`rand_getBlockByHash`, `rand_getTransaction`, `rand_getAccount`, `rand_getValidators`,
+`rand_getPeers`, `rand_getProgram`, `rand_getReceipt`.
 
 - One token, RAND, 9 decimals. Amounts are strings of units (u128).
 - Tx kinds: `transfer {to, amount}`, `mint {to, amount}`, `deploy {base_pc, words_len, program}`,
@@ -28,7 +28,7 @@ JSON-RPC 2.0 over HTTP at `127.0.0.1:8545` (see `fullnode/docs/rpc.md`). Relevan
 ```
 crates/randscan-core     API/WS wire types (serde), helpers
 crates/randscan-db       schema (migrations/001_initial_schema.sql), row models, queries
-crates/randscan-indexer  RPC client (shrugg_*), block processor, sync service, broadcaster
+crates/randscan-indexer  RPC client (rand_*), block processor, sync service, broadcaster
 crates/randscan-api      axum REST + /ws, binary randscan-api (runs indexer in-process)
 crates/randscan-ws       websocket manager/handler (channels: blocks, transactions, stats)
 frontend/                Next.js 14 app (client-side SWR against /api/v1, WS at /ws)
@@ -60,14 +60,14 @@ and read back with `::text`.
 
 ## Indexer
 
-Loop every `POLL_INTERVAL_MS` (default 1000): `shrugg_getHead`; for `h in next_height..=head` (at
+Loop every `POLL_INTERVAL_MS` (default 1000): `rand_getHead`; for `h in next_height..=head` (at
 most `BATCH_SIZE` per pass) fetch the block, verify `parent == stored hash at h-1` (on mismatch delete
 blocks `>= h-1`, set `next_height = h-1`, continue), then in one DB transaction insert block, txs,
-programs (deploy), receipts (call, via `shrugg_getReceipt`), account_transactions; commit;
+programs (deploy), receipts (call, via `rand_getReceipt`), account_transactions; commit;
 then refresh every touched address (sender, to, recipients, effect.to, proposer) via
-`shrugg_getAccount`; advance `next_height`; broadcast NewBlock/NewTransaction.
-When caught up (and at startup) refresh validators (`shrugg_getValidators`, also seeding their
-accounts) and stats (`shrugg_status`, `shrugg_chainId`, `shrugg_tokenInfo`, DB counts, avg block time
+`rand_getAccount`; advance `next_height`; broadcast NewBlock/NewTransaction.
+When caught up (and at startup) refresh validators (`rand_getValidators`, also seeding their
+accounts) and stats (`rand_status`, `rand_chainId`, `rand_tokenInfo`, DB counts, avg block time
 over the last 100 blocks). Stats refresh at most every 5 s and broadcast StatsUpdate.
 
 ## REST API (`/api/v1`)
@@ -122,7 +122,7 @@ Error { error, message, code? }   // 404 -> {"error":"not_found",...}
 ```
 
 Search: decimal → block by height; 64 hex (optional 0x) → block hash, tx hash, program id;
-base58 32–44 chars → account (DB, else live `shrugg_getAccount` with nonzero balance/nonce) and
+base58 32–44 chars → account (DB, else live `rand_getAccount` with nonzero balance/nonce) and
 validator.
 
 ## WebSocket (`/ws`)
@@ -159,4 +159,4 @@ created unproxied (the API token cannot set Cloudflare's SSL mode).
 - Local end-to-end: SSH tunnel to node E's RPC, local Postgres, run `randscan-api`, curl each route.
 - `npm run build` + `npm run lint` for the frontend.
 - After deploy: curl https://randscan.org/api/v1/health and the home page; compare `/stats.height`
-  with `shrugg status` on the node.
+  with `rand status` on the node.

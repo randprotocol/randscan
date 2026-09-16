@@ -5,7 +5,7 @@ or a per-transaction key pasted into randscan.org is used in the visitor's brows
 sent anywhere.
 
 It re-implements, byte for byte, what the fullnode's vendored zkVM does when a wallet opens an
-envelope (`crates/shrugg-zkvm/src/{hash,notes,viewing,call_envelope}.rs` at commit `01dc23d`):
+envelope (`crates/rand-zkvm/src/{hash,notes,viewing,call_envelope}.rs` at commit `01dc23d`):
 the Poseidon2 sponge with the node's seeded round constants, `nk -> pk / ovk / ML-KEM seed`,
 the note layout and commitment, ChaCha20-Poly1305 with the commitment as associated data, and
 the three openings (receiver through ML-KEM-768, sender through `ovk`, or the transaction key),

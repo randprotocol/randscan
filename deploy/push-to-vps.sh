@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Run locally: push-to-vps.sh <ip> [domain]  — rsyncs the repo to /root/randscan and runs vps-setup.sh there.
-# The server must already run a shrugg-node with RPC on 127.0.0.1:8545 (see ../fullnode/deploy).
+# The server must already run a rand-node with RPC on 127.0.0.1:8545 (see ../fullnode/deploy).
 set -euo pipefail
 IP=$1; DOMAIN=${2:-randscan.org}
 cd "$(dirname "$0")/.."

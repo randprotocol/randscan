@@ -19,7 +19,7 @@ pub struct NetworkStats {
     pub active_validator_count: i64,
     /// Sum of the active set's stake, units.
     pub total_stake: String,
-    /// The supply audit's `total_supply` (units), or "0" on a node without `shrugg_getSupply`.
+    /// The supply audit's `total_supply` (units), or "0" on a node without `rand_getSupply`.
     pub total_supply: String,
     /// The supply audit's `pool_value`: what the notes in the tree are worth in total.
     pub pool_value: Option<String>,
@@ -40,7 +40,7 @@ pub struct NetworkStats {
     pub updated_at: String,
 }
 
-/// The node's supply audit (`shrugg_getSupply`, phase S2): every crossing of the pool boundary is
+/// The node's supply audit (`rand_getSupply`, phase S2): every crossing of the pool boundary is
 /// public, so these are exact. All amounts are unit strings.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Supply {

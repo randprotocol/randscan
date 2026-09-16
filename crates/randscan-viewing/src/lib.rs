@@ -3,7 +3,7 @@
 //! A shielded transaction publishes, per created note, an envelope: the note plaintext under a
 //! fresh per-transaction key, that key wrapped to the receiver's ML-KEM-768 address and under
 //! the sender's outgoing viewing key. This crate re-implements exactly what the fullnode's
-//! `crates/shrugg-zkvm/src/{hash,notes,viewing,call_envelope}.rs` do on the *opening* side
+//! `crates/rand-zkvm/src/{hash,notes,viewing,call_envelope}.rs` do on the *opening* side
 //! (commit `01dc23d`, the build chain 6 runs), with no sealing, no randomness and no ledger, so
 //! it compiles to WebAssembly and a key pasted into the explorer never leaves the browser.
 //!
@@ -172,13 +172,13 @@ impl ViewingKey {
         use ml_kem::kem::FromSeed;
         ml_kem::MlKem768::from_seed(&ml_kem::Seed::from(self.kem_seed()))
     }
-    /// `shrugg1` + base58(pk bytes || ML-KEM-768 encapsulation key).
+    /// `rand1` + base58(pk bytes || ML-KEM-768 encapsulation key).
     pub fn address(&self) -> String {
         use ml_kem::KeyExport;
         let (_, ek) = self.kem_keys();
         let mut raw = words_to_bytes(&self.pk());
         raw.extend_from_slice(&ek.to_bytes());
-        format!("shrugg1{}", bs58::encode(raw).into_string())
+        format!("rand1{}", bs58::encode(raw).into_string())
     }
 }
 
@@ -247,7 +247,7 @@ fn decapsulate(vk: &ViewingKey, kem_ct: &[u8]) -> Option<[u8; 32]> {
     Some(dk.decapsulate(&ct).into())
 }
 
-/// A note envelope as the node serves it (`shrugg_getCommitments`), hex fields.
+/// A note envelope as the node serves it (`rand_getCommitments`), hex fields.
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct EnvelopeHex {
     pub kem_ct: String,
@@ -296,7 +296,7 @@ impl Envelope {
     }
 }
 
-/// A call's sealed input transcript as the node serves it (`shrugg_getCallEnvelope`).
+/// A call's sealed input transcript as the node serves it (`rand_getCallEnvelope`).
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CallEnvelopeHex {
     pub kem_ct: String,
@@ -319,14 +319,14 @@ pub fn open_call_with_key(e: &CallEnvelopeHex, h_in: &Word8, key: &[u8; 32]) -> 
 }
 
 pub fn open_call_as_sender(e: &CallEnvelopeHex, h_in: &Word8, vk: &ViewingKey) -> Option<([u8; 32], [u32; 4], Vec<u32>)> {
-    let key: [u8; 32] = aead_open(&vk.ovk(), b"shrugg-call-sender", &hex::decode(&e.to_sender).ok()?)?.try_into().ok()?;
+    let key: [u8; 32] = aead_open(&vk.ovk(), b"rand-call-sender", &hex::decode(&e.to_sender).ok()?)?.try_into().ok()?;
     let (salt, inputs) = open_call_with_key(e, h_in, &key)?;
     Some((key, salt, inputs))
 }
 
 pub fn open_call_as_auditor(e: &CallEnvelopeHex, h_in: &Word8, vk: &ViewingKey) -> Option<([u8; 32], [u32; 4], Vec<u32>)> {
     let ss = decapsulate(vk, &hex::decode(&e.kem_ct).ok()?)?;
-    let key: [u8; 32] = aead_open(&ss, b"shrugg-call-auditor", &hex::decode(&e.to_auditor).ok()?)?.try_into().ok()?;
+    let key: [u8; 32] = aead_open(&ss, b"rand-call-auditor", &hex::decode(&e.to_auditor).ok()?)?.try_into().ok()?;
     let (salt, inputs) = open_call_with_key(e, h_in, &key)?;
     Some((key, salt, inputs))
 }

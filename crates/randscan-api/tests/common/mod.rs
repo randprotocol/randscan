@@ -124,7 +124,7 @@ pub fn session_cookie_from(headers: &HeaderMap) -> String {
 }
 
 /// The API wired to a live indexer that follows the node at `rpc_url` (a mock or a real
-/// `shrugg-node`). `run()` is not started; call `start()` when the test is ready.
+/// `rand-node`). `run()` is not started; call `start()` when the test is ready.
 pub struct LiveApp {
     pub app: Router,
     pub pool: PgPool,

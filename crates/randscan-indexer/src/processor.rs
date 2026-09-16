@@ -28,7 +28,7 @@ struct PreparedReceipt {
     h_in: String,
 }
 
-/// What `shrugg_getProgram` adds to a deploy action: the code hash and the base pc.
+/// What `rand_getProgram` adds to a deploy action: the code hash and the base pc.
 struct ProgramMeta {
     base_pc: i64,
     code_hash: String,

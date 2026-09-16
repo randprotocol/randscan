@@ -67,9 +67,9 @@
   <!-- ============ Row 1: relayer / wallet ============ -->
   <rect x="780" y="95" width="320" height="250" class="region"/>
   <text x="796" y="120" class="box-title">Relayer / wallet</text>
-  <text x="796" y="138" class="box-sub">crates/shrugg-client (shrugg CLI)</text>
+  <text x="796" y="138" class="box-sub">crates/rand-client (rand CLI)</text>
   <rect x="796" y="150" width="288" height="182" class="comp"/>
-  <text x="808" y="170" class="mono">shrugg bridge-mint &lt;attestation&gt;</text>
+  <text x="808" y="170" class="mono">rand bridge-mint &lt;attestation&gt;</text>
   <text x="808" y="186" class="t">submit a signed envelope; its fee pays the submitter</text>
   <text x="808" y="208" class="mono">bridge-burn &lt;asset&gt; &lt;amount&gt; &lt;chain&gt; &lt;to&gt;</text>
   <text x="808" y="224" class="t">check_burn_recipient runs the on-chain rule first</text>
@@ -82,20 +82,20 @@
   <!-- ============ Row 2: Rand fullnode ============ -->
   <rect x="40" y="385" width="1060" height="420" class="region"/>
   <text x="56" y="410" class="box-title">Rand fullnode</text>
-  <text x="56" y="428" class="box-sub">shrugg-node, shrugg-core::bridge</text>
+  <text x="56" y="428" class="box-sub">rand-node, rand-core::bridge</text>
 
   <!-- RPC -->
   <rect x="56" y="442" width="230" height="330" class="comp"/>
   <text x="68" y="462" class="t"><tspan font-weight="700">JSON-RPC</tspan> (rpc.rs)</text>
-  <text x="68" y="484" class="mono-s">shrugg_sendTransaction</text>
+  <text x="68" y="484" class="mono-s">rand_sendTransaction</text>
   <text x="68" y="500" class="box-sub">bridge_attest / bridge_burn in</text>
-  <text x="68" y="526" class="mono-s">shrugg_getBridgeState</text>
-  <text x="68" y="542" class="mono-s">shrugg_getBridgeBurn [seq]</text>
-  <text x="68" y="558" class="mono-s">shrugg_getAssetBalance</text>
-  <text x="68" y="574" class="mono-s">shrugg_getAssets</text>
-  <text x="68" y="590" class="mono-s">shrugg_bridgeAssetId</text>
-  <text x="68" y="616" class="mono-s">shrugg_getBlockByHeight</text>
-  <text x="68" y="632" class="mono-s">shrugg_getTransaction</text>
+  <text x="68" y="526" class="mono-s">rand_getBridgeState</text>
+  <text x="68" y="542" class="mono-s">rand_getBridgeBurn [seq]</text>
+  <text x="68" y="558" class="mono-s">rand_getAssetBalance</text>
+  <text x="68" y="574" class="mono-s">rand_getAssets</text>
+  <text x="68" y="590" class="mono-s">rand_bridgeAssetId</text>
+  <text x="68" y="616" class="mono-s">rand_getBlockByHeight</text>
+  <text x="68" y="632" class="mono-s">rand_getTransaction</text>
   <text x="68" y="648" class="box-sub">what RandScan reads; tx JSON</text>
   <text x="68" y="662" class="box-sub">carries type bridge_attest with</text>
   <text x="68" y="676" class="box-sub">attestation hex, or bridge_burn</text>
@@ -175,7 +175,7 @@
 
   <rect x="1156" y="150" width="288" height="150" class="comp"/>
   <text x="1168" y="170" class="t"><tspan font-weight="700">Indexer</tspan> (randscan-indexer)</text>
-  <text x="1168" y="190" class="t">polls shrugg_getBlockByHeight, decodes</text>
+  <text x="1168" y="190" class="t">polls rand_getBlockByHeight, decodes</text>
   <text x="1168" y="206" class="mono-s">RpcTxKind::BridgeAttest {attestation}</text>
   <text x="1168" y="222" class="mono-s">RpcTxKind::BridgeBurn {asset, amount,</text>
   <text x="1168" y="238" class="mono-s">  to_chain, to, fee}</text>
@@ -259,5 +259,5 @@
   <path d="M56,938 L116,938" class="out"/>
   <text x="126" y="942" class="lbl-out">Outbound (bridge_burn, "Bridge out")</text>
   <text x="126" y="960" class="t">A the wallet pre-checks the recipient and submits bridge-burn.  B check_burn, then apply_burn debits the balance and appends a BridgeBurnRecord under the next sequence number.</text>
-  <text x="126" y="976" class="t">C a relayer reads it back with shrugg_getBridgeBurn and hands it to the guardians.  D they sign, and the destination chain releases the token.  Grey dotted: RandScan reads over the same RPC and only displays.</text>
+  <text x="126" y="976" class="t">C a relayer reads it back with rand_getBridgeBurn and hands it to the guardians.  D they sign, and the destination chain releases the token.  Grey dotted: RandScan reads over the same RPC and only displays.</text>
 </svg>

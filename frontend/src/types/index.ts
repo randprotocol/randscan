@@ -140,7 +140,7 @@ export interface TransactionDetail extends TransactionSummary {
   action_nonce: number | null;
   /** bridge_attest: size of the guardian-signed message */
   attestation_len: number | null;
-  /** bridge_attest: the depositor's shielded address (shrugg1…) */
+  /** bridge_attest: the depositor's shielded address (rand1…) */
   recipient: string | null;
   /** bridge_attest: the deposit note's time word */
   note_time: number | null;
@@ -181,7 +181,7 @@ export interface EnvelopeHex {
   body: string;
 }
 
-/** A call's sealed input transcript (`shrugg_getCallEnvelope`), hex fields. */
+/** A call's sealed input transcript (`rand_getCallEnvelope`), hex fields. */
 export interface CallEnvelopeHex {
   kem_ct: string;
   to_sender: string;

@@ -4,12 +4,12 @@ Date: 2026-09-12. Status: implemented with this spec. Adapts the explorer to the
 shielded-pool plan (phases S1–S3, `fullnode/docs/superpowers/specs/2026-09-11-shielded-pool-design.md`,
 branches `shielded-s1/s2/s3`) and to the zkVM milestone line (M4.1 on `main`, M4.2 / constraint
 set 5 on `revendor-cs5`). Supersedes the account-chain parts of
-`2026-09-10-shrugg-retarget-design.md`; accounts/API keys (`2026-09-10-accounts-and-api-keys-design.md`)
+`2026-09-10-rand-retarget-design.md`; accounts/API keys (`2026-09-10-accounts-and-api-keys-design.md`)
 are unchanged.
 
 ## 1. What changed on the node
 
-- **No accounts.** `shrugg_getBalance`, `shrugg_getAccount`, `shrugg_getAssetBalance` are gone.
+- **No accounts.** `rand_getBalance`, `rand_getAccount`, `rand_getAssetBalance` are gone.
   A transaction has no `from`, `nonce` or signature.
 - **Every transaction is `{ hash, chain_id, bundle, action }`.** `bundle` is the shielded
   2-in-2-out transfer that pays the fee: `anchor`, `nullifiers[2]`, `commitments[2]`, `fee`
@@ -18,17 +18,17 @@ are unchanged.
   `unbond`, `withdraw`).
 - **`action.kind`** is one of `none` (plain transfer), `mint`, `deploy`, `call`, `bond`,
   `unbond`, `withdraw`, `bridge_attest`, `bridge_burn`; the fields are in
-  `fullnode/docs/rpc.md` (`shrugg_getTransaction`). `bridge_burn` carries a second bundle
+  `fullnode/docs/rpc.md` (`rand_getTransaction`). `bridge_burn` carries a second bundle
   (`asset_bundle`).
 - **Receipts** lose `effect` and gain `h_in`. Programs lose `deployer`.
-  `shrugg_getCallEnvelope` serves a call's sealed input transcript.
-- **New reads**: `shrugg_getCommitments(from_index, limit)`, `shrugg_getNullifiers(from_height,
-  limit)`, `shrugg_getAnchor`, `shrugg_getWitness`, `shrugg_getTreeInfo`, `shrugg_getBridgeState`,
-  `shrugg_getAssets`, `shrugg_getBridgeBurn`; on S2 also `shrugg_getEpoch` and `shrugg_getSupply`.
-- **Validators** (`shrugg_getValidators`) are the register: `address`, `stake` (decimal string),
+  `rand_getCallEnvelope` serves a call's sealed input transcript.
+- **New reads**: `rand_getCommitments(from_index, limit)`, `rand_getNullifiers(from_height,
+  limit)`, `rand_getAnchor`, `rand_getWitness`, `rand_getTreeInfo`, `rand_getBridgeState`,
+  `rand_getAssets`, `rand_getBridgeBurn`; on S2 also `rand_getEpoch` and `rand_getSupply`.
+- **Validators** (`rand_getValidators`) are the register: `address`, `stake` (decimal string),
   and on S2 `pending[]`, `rewards`, `payout`, `nonce`, `active`. On the S3 branch alone the row
   is `{ address, stake, rewards: number }`. The explorer accepts both.
-- **`shrugg_status`** gains `notes`, `nullifiers`, `tree_root`, `hc_bundle` (and on S2
+- **`rand_status`** gains `notes`, `nullifiers`, `tree_root`, `hc_bundle` (and on S2
   `active_validator`).
 - **Plan M** (zkVM 4.1/4.2): only proof bytes change. Constraint set 5 raises a call proof to
   about 1.2 MB and `MAX_PROOF_BYTES` to 2 MiB; a bundle proof is ~300 KB under the test profile.
@@ -56,7 +56,7 @@ kinds keep the node's tag verbatim (served as `other`), as before.
 
 `nullifiers (nullifier PK, tx_hash, height, tx_index)`: both nullifiers of every bundle,
 including a burn's asset bundle. `notes (leaf_index PK, cm UNIQUE, height, tx_hash NULL)`: the
-commitment tree, paged from `shrugg_getCommitments` (cursor `indexer_state.next_leaf`); `tx_hash`
+commitment tree, paged from `rand_getCommitments` (cursor `indexer_state.next_leaf`); `tx_hash`
 is filled when the commitment appears in an indexed transaction (bundle outputs, mint). Genesis
 deposit notes, withdraw and bridge deposit notes stay unlinked (their commitment is not on the
 wire).
@@ -64,7 +64,7 @@ wire).
 `receipts`: `tx_hash, program, tier, outputs, height, tx_index, h_in`. `programs`: no
 `deployer`. `validators`: `address, stake, rewards, pending JSONB, payout, nonce, active,
 sort_index`. `network_stats`: `total_accounts` becomes `notes` and `nullifiers`; adds
-`tree_root, hc_bundle, epoch, epoch_blocks, pool_value` (nullable; from `shrugg_getSupply`
+`tree_root, hc_bundle, epoch, epoch_blocks, pool_value` (nullable; from `rand_getSupply`
 when served). `indexer_state` adds `next_leaf`.
 
 ## 3. API contract (`/api/v1`)
@@ -88,8 +88,8 @@ Filters: `GET /transactions?kind&height&validator&program`. `sender` is gone.
 
 New: `GET /notes?page&limit` (`{ leaf_index, cm, height, tx_hash }`, newest first),
 `GET /notes/:cm`, `GET /nullifiers/:nf` (`{ nullifier, tx_hash, height, tx_index }`),
-`GET /bridge` (the node's `shrugg_getBridgeState`, cached by the indexer),
-`GET /supply` (the node's `shrugg_getSupply`, or 404 on a node without it).
+`GET /bridge` (the node's `rand_getBridgeState`, cached by the indexer),
+`GET /supply` (the node's `rand_getSupply`, or 404 on a node without it).
 
 `Validator`: `address, stake, rewards, pending[], payout, nonce, active, share_percent,
 blocks_proposed, last_proposed_height, last_proposed_timestamp_ms, sort_index`. `share_percent`
@@ -97,7 +97,7 @@ is over the active set's stake. `ProgramSummary` loses `deployer`.
 
 `NetworkStats`: `total_accounts` is gone; adds `notes, nullifiers, tree_root, hc_bundle, epoch,
 epoch_blocks, pool_value`; `total_supply` is the supply audit's total (or `"0"` when the node
-has no `shrugg_getSupply`). `current_leader` is `active validators[view mod n]`.
+has no `rand_getSupply`). `current_leader` is `active validators[view mod n]`.
 
 Search: a 64-hex query also matches a note commitment and a nullifier; a base58 query matches a
 validator only.

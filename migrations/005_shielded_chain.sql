@@ -98,7 +98,7 @@ CREATE TABLE nullifiers (
 
 CREATE INDEX idx_nullifiers_height ON nullifiers(height DESC);
 
--- The commitment tree, leaf by leaf, from shrugg_getCommitments. tx_hash is set when the
+-- The commitment tree, leaf by leaf, from rand_getCommitments. tx_hash is set when the
 -- commitment was on the wire of an indexed transaction (bundle outputs, mints).
 CREATE TABLE notes (
     leaf_index  BIGINT PRIMARY KEY,

@@ -2,7 +2,7 @@
 
 RandScan indexes the Rand Protocol RAND chain and serves what it has indexed over a plain HTTPS
 JSON API and a WebSocket feed. This guide is for people who want to read the chain from a script,
-a bot, an exchange backend, or a wallet without running their own `shrugg-node`.
+a bot, an exchange backend, or a wallet without running their own `rand-node`.
 
 Base URL: `https://randscan.org/api/v1`
 WebSocket: `wss://randscan.org/ws`
@@ -41,7 +41,7 @@ explorer has neither. A future release will let you paste a viewing key to open 
 - **Hashes, program ids, commitments, nullifiers and anchors** are 64 lowercase hex characters,
   no `0x` prefix. Inputs accept an optional `0x` and uppercase.
 - **Validator addresses** are base58 strings of 32 to 44 characters (for example
-  `2nRdFChBXRmKoe2sQE3ZYDzvdg53QmBZJJ9iweY7hk1v`). **Shielded addresses** (`shrugg1…`, about
+  `2nRdFChBXRmKoe2sQE3ZYDzvdg53QmBZJJ9iweY7hk1v`). **Shielded addresses** (`rand1…`, about
   1,700 characters) appear only as a bridge deposit's recipient and a validator's payout address.
 - **Heights** are decimal integers starting at 0. Only committed blocks are indexed; there is no
   finality window to wait for. A block that appears in the API is final.
@@ -336,7 +336,7 @@ effect kind 1 is gone with the accounts). `h_in` is the proof's salted commitmen
 private inputs; `input_envelope_len` says whether the caller published a sealed transcript of
 those inputs (null when not). The transcript opens only for the caller's viewing key, the
 per-call key, or the auditor the caller named; the node serves the bytes
-(`shrugg_getCallEnvelope`), the explorer only their size. Proof sizes depend on the zkVM
+(`rand_getCallEnvelope`), the explorer only their size. Proof sizes depend on the zkVM
 constraint set the chain runs (about 1.2 MB per call proof at constraint set 5); the explorer
 reports what the node reports.
 
@@ -395,7 +395,7 @@ indexer pass.
 
 `GET /accounts/:address` and `GET /accounts/:address/transactions` answer **410**
 `{ "error": "no_accounts" }`. There are no accounts on this chain. For deposit detection, run a
-wallet with your viewing key (`shrugg sync`); to watch stake, read `/validators`.
+wallet with your viewing key (`rand sync`); to watch stake, read `/validators`.
 
 ### Validators
 
@@ -409,7 +409,7 @@ wallet with your viewing key (`shrugg sync`); to watch stake, read `/validators`
   "address": "2nRdFChBXRmKoe2sQE3ZYDzvdg53QmBZJJ9iweY7hk1v",
   "stake": "100000000000000", "rewards": "4000000",
   "pending": [{ "release_epoch": 41, "amount": "5000000000" }],
-  "payout": "shrugg1…", "nonce": 3, "active": true,
+  "payout": "rand1…", "nonce": 3, "active": true,
   "share_percent": 25.0, "blocks_proposed": 5372,
   "last_proposed_height": 20151, "last_proposed_timestamp_ms": 1789017639030,
   "sort_index": 0
@@ -569,5 +569,5 @@ feed has no replay.
 ## Running your own
 
 Everything in this document is served by the open-source explorer in this repository. To run it
-against your own `shrugg-node`, see the README. The indexer needs only the node's JSON-RPC
-endpoint (`shrugg_*` methods) and a PostgreSQL database.
+against your own `rand-node`, see the README. The indexer needs only the node's JSON-RPC
+endpoint (`rand_*` methods) and a PostgreSQL database.

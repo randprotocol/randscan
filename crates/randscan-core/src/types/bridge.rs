@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
 
-/// A row of the bridge's asset registry (`shrugg_getAssets`). `index` is the `asset` word a note
+/// A row of the bridge's asset registry (`rand_getAssets`). `index` is the `asset` word a note
 /// of that asset carries; index 0 is RAND and never appears here.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BridgeAsset {
@@ -10,7 +10,7 @@ pub struct BridgeAsset {
     pub asset_id: String,
 }
 
-/// The bridge's public state (`shrugg_getBridgeState`). Bridged value is notes, so there are no
+/// The bridge's public state (`rand_getBridgeState`). Bridged value is notes, so there are no
 /// balances here; a chain without a bridge section reports `enabled: false` and nothing else.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BridgeState {

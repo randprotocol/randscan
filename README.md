@@ -1,10 +1,10 @@
 # RandScan
 
 Block explorer for the Rand Protocol RAND chain (the network served by
-[`shrugg-node`](../fullnode)). Live at https://randscan.org.
+[`rand-node`](../fullnode)). Live at https://randscan.org.
 
 - **Backend**: Rust — axum REST API + WebSocket, SQLx/PostgreSQL, and an in-process indexer that
-  follows a `shrugg-node` JSON-RPC endpoint (`shrugg_*` methods).
+  follows a `rand-node` JSON-RPC endpoint (`rand_*` methods).
 - **Frontend**: Next.js 14, TypeScript, Tailwind, SWR; Leaflet for the nodes map.
 - **Database**: PostgreSQL 16.
 
@@ -23,7 +23,7 @@ which the explorer does not hold. Design: `docs/superpowers/specs/2026-09-12-shi
 
 ## Run locally
 
-Requirements: Rust 1.75+, Node 20+, PostgreSQL, and a reachable `shrugg-node` RPC
+Requirements: Rust 1.75+, Node 20+, PostgreSQL, and a reachable `rand-node` RPC
 (e.g. `ssh -N -L 8545:127.0.0.1:8545 root@<node>` to tunnel a remote node).
 
 ```bash
@@ -39,23 +39,23 @@ NEXT_PUBLIC_API_URL=http://localhost:3000 NEXT_PUBLIC_WS_URL=ws://localhost:3000
 Set `COOKIE_SECURE=false` in `.env` for local http so sign-in works.
 
 The schema (`migrations/001_initial_schema.sql`) is created automatically on first start. The
-indexer catches up from height 0, then polls `shrugg_getHead` every `POLL_INTERVAL_MS`.
+indexer catches up from height 0, then polls `rand_getHead` every `POLL_INTERVAL_MS`.
 
 ### Integration tests
 
 `crates/randscan-api/tests/mock_node.rs` runs the indexer, API and broadcast against a scripted
 shielded node (every action kind, the tree, the register, two hard forks); `tests/real_node.rs`
-spawns a real shielded `shrugg-node` plus the `shrugg` wallet (faucet, a proved transfer, a
+spawns a real shielded `rand-node` plus the `rand` wallet (faucet, a proved transfer, a
 deploy and a confidential call) and compares every public number. Both need `DATABASE_URL`;
 the real-node test also needs `RAND_NODE_BIN` (a build of the fullnode's `shielded-s3` branch
-or later, with `shrugg` beside it or `RAND_CLI` set).
+or later, with `rand` beside it or `RAND_CLI` set).
 
 ### Environment
 
 | Variable | Default | Description |
 |---|---|---|
 | `DATABASE_URL` | `postgres://randscan:randscan@localhost:5432/randscan` | PostgreSQL connection |
-| `RPC_URL` | `http://127.0.0.1:8545` | `shrugg-node` JSON-RPC endpoint |
+| `RPC_URL` | `http://127.0.0.1:8545` | `rand-node` JSON-RPC endpoint |
 | `API_HOST` / `API_PORT` | `0.0.0.0` / `3000` | API bind address |
 | `POLL_INTERVAL_MS` | `1000` | head polling interval when caught up |
 | `BATCH_SIZE` | `200` | blocks per pass while catching up |
@@ -124,7 +124,7 @@ and API keys.
 
 The switch to the shielded chain is also a schema change: migration `005_shielded_chain.sql`
 drops and recreates the chain tables (users and keys untouched) the first time this build
-starts. This build reads only the shielded node's RPC (bundles, actions, `shrugg_getCommitments`,
+starts. This build reads only the shielded node's RPC (bundles, actions, `rand_getCommitments`,
 the register); pointed at an account-chain node it will not index. Deploy it together with the
 shielded node.
 
@@ -133,7 +133,7 @@ Transaction kinds the node serves that this build does not decode are indexed as
 
 ## Deploy on a node
 
-The explorer runs on the same machine as a synced `shrugg-node` (its RPC is bound to localhost):
+The explorer runs on the same machine as a synced `rand-node` (its RPC is bound to localhost):
 
 ```bash
 deploy/push-to-vps.sh <ip> [domain]     # rsync, build, Postgres + Node 20 + Caddy, systemd units

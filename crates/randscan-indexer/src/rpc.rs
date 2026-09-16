@@ -1,4 +1,4 @@
-//! JSON-RPC client for `shrugg-node` on the shielded chain (see fullnode/docs/rpc.md).
+//! JSON-RPC client for `rand-node` on the shielded chain (see fullnode/docs/rpc.md).
 
 use anyhow::{anyhow, Result};
 use reqwest::Client;
@@ -123,90 +123,90 @@ impl RpcClient {
     }
 
     pub async fn chain_id(&self) -> Result<u64> {
-        self.call_required("shrugg_chainId", serde_json::json!([]))
+        self.call_required("rand_chainId", serde_json::json!([]))
             .await
     }
 
     pub async fn token_info(&self) -> Result<TokenInfo> {
-        self.call_required("shrugg_tokenInfo", serde_json::json!([]))
+        self.call_required("rand_tokenInfo", serde_json::json!([]))
             .await
     }
 
     pub async fn head(&self) -> Result<Head> {
-        self.call_required("shrugg_getHead", serde_json::json!([]))
+        self.call_required("rand_getHead", serde_json::json!([]))
             .await
     }
 
     pub async fn status(&self) -> Result<NodeStatus> {
-        self.call_required("shrugg_status", serde_json::json!([]))
+        self.call_required("rand_status", serde_json::json!([]))
             .await
     }
 
     pub async fn block_by_height(&self, height: u64) -> Result<Option<RpcBlock>> {
-        self.call("shrugg_getBlockByHeight", serde_json::json!([height]))
+        self.call("rand_getBlockByHeight", serde_json::json!([height]))
             .await
     }
 
     pub async fn block_by_hash(&self, hash: &str) -> Result<Option<RpcBlock>> {
-        self.call("shrugg_getBlockByHash", serde_json::json!([hash]))
+        self.call("rand_getBlockByHash", serde_json::json!([hash]))
             .await
     }
 
     /// The validator register (every entry, active or not).
     pub async fn validators(&self) -> Result<Vec<RpcValidator>> {
-        self.call_required("shrugg_getValidators", serde_json::json!([]))
+        self.call_required("rand_getValidators", serde_json::json!([]))
             .await
     }
 
     /// Phase S2: the epoch schedule. `None` on a node without the method.
     pub async fn epoch(&self) -> Result<Option<RpcEpoch>> {
-        self.call_optional_method("shrugg_getEpoch", serde_json::json!([]))
+        self.call_optional_method("rand_getEpoch", serde_json::json!([]))
             .await
     }
 
     /// Phase S2: the supply audit. `None` on a node without the method.
     pub async fn supply(&self) -> Result<Option<randscan_core::Supply>> {
-        self.call_optional_method("shrugg_getSupply", serde_json::json!([]))
+        self.call_optional_method("rand_getSupply", serde_json::json!([]))
             .await
     }
 
     pub async fn peers(&self) -> Result<Vec<RpcPeer>> {
-        self.call_required("shrugg_getPeers", serde_json::json!([]))
+        self.call_required("rand_getPeers", serde_json::json!([]))
             .await
     }
 
     pub async fn receipt(&self, tx_hash: &str) -> Result<Option<RpcReceipt>> {
-        self.call("shrugg_getReceipt", serde_json::json!([tx_hash]))
+        self.call("rand_getReceipt", serde_json::json!([tx_hash]))
             .await
     }
 
     pub async fn program(&self, id: &str) -> Result<Option<RpcProgram>> {
-        self.call("shrugg_getProgram", serde_json::json!([id]))
+        self.call("rand_getProgram", serde_json::json!([id]))
             .await
     }
 
     /// A page of commitment-tree leaves from `from_index`, at most 1000 rows.
     pub async fn commitments(&self, from_index: u64, limit: u64) -> Result<Vec<RpcCommitment>> {
         self.call_required(
-            "shrugg_getCommitments",
+            "rand_getCommitments",
             serde_json::json!([from_index, limit]),
         )
         .await
     }
 
     pub async fn tree_info(&self) -> Result<RpcTreeInfo> {
-        self.call_required("shrugg_getTreeInfo", serde_json::json!([]))
+        self.call_required("rand_getTreeInfo", serde_json::json!([]))
             .await
     }
 
     /// A call's sealed input transcript (`null` when the call published none).
     pub async fn call_envelope(&self, tx_hash: &str) -> Result<Option<serde_json::Value>> {
-        self.call("shrugg_getCallEnvelope", serde_json::json!([tx_hash]))
+        self.call("rand_getCallEnvelope", serde_json::json!([tx_hash]))
             .await
     }
 
     pub async fn bridge_state(&self) -> Result<randscan_core::BridgeState> {
-        self.call_required("shrugg_getBridgeState", serde_json::json!([]))
+        self.call_required("rand_getBridgeState", serde_json::json!([]))
             .await
     }
 
@@ -323,7 +323,7 @@ pub struct RpcBlock {
     pub transactions: Vec<RpcTx>,
 }
 
-/// A transaction as the node serialises it inside a block (`shrugg_getTransaction.tx`).
+/// A transaction as the node serialises it inside a block (`rand_getTransaction.tx`).
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcTx {
     pub hash: String,
@@ -676,7 +676,7 @@ mod tests {
                 { "hash": "t4", "chain_id": 7, "bundle": b, "action": { "kind": "bond", "validator": "2nRd", "amount": 500, "registered": false } },
                 { "hash": "t5", "chain_id": 7, "bundle": null, "action": { "kind": "unbond", "validator": "2nRd", "amount": 7, "nonce": 2 } },
                 { "hash": "t6", "chain_id": 7, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": 9, "nonce": 3 } },
-                { "hash": "t7", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "shrugg1abc", "asset_index": 1, "amount": 1000, "time": 41 } },
+                { "hash": "t7", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "rand1abc", "asset_index": 1, "amount": 1000, "time": 41 } },
                 { "hash": "t8", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_burn", "asset": 2, "amount": 400, "relayer_fee": 100, "to_chain": 5, "to": "abab", "asset_bundle": b } }
             ]
         });
@@ -728,7 +728,7 @@ mod tests {
 
     #[test]
     fn a_rotation_attestation_has_no_deposit() {
-        let json = r#"{"kind":"bridge_attest","attestation_len":700,"recipient":"shrugg1x","asset_index":null,"amount":null,"time":3}"#;
+        let json = r#"{"kind":"bridge_attest","attestation_len":700,"recipient":"rand1x","asset_index":null,"amount":null,"time":3}"#;
         let a: RpcAction = serde_json::from_str(json).unwrap();
         assert!(matches!(
             a,
@@ -774,9 +774,9 @@ mod tests {
         assert_eq!(s3[0].rewards.0, "4000000");
         assert_eq!(s3[0].active, None);
         assert!(s3[0].pending.is_empty());
-        let s2: Vec<RpcValidator> = serde_json::from_str(r#"[{"address":"2nRd","stake":"1000000000000","pending":[{"release_epoch":41,"amount":"5000000000"}],"rewards":"4000000","payout":"shrugg1x","nonce":3,"active":true}]"#).unwrap();
+        let s2: Vec<RpcValidator> = serde_json::from_str(r#"[{"address":"2nRd","stake":"1000000000000","pending":[{"release_epoch":41,"amount":"5000000000"}],"rewards":"4000000","payout":"rand1x","nonce":3,"active":true}]"#).unwrap();
         assert_eq!(s2[0].pending[0].release_epoch, 41);
-        assert_eq!(s2[0].payout.as_deref(), Some("shrugg1x"));
+        assert_eq!(s2[0].payout.as_deref(), Some("rand1x"));
         assert_eq!(s2[0].active, Some(true));
     }
 

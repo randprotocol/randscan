@@ -361,7 +361,7 @@ pub struct IndexerStateRow {
     pub is_syncing: bool,
     /// Chain id of the indexed data; `None` before the indexer first reached a node.
     pub chain_id: Option<i64>,
-    /// Next commitment-tree leaf to fetch from `shrugg_getCommitments`.
+    /// Next commitment-tree leaf to fetch from `rand_getCommitments`.
     pub next_leaf: i64,
 }
 

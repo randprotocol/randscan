@@ -243,7 +243,7 @@ with a one-line `randscan-api hash-password` subcommand to produce the PHC strin
 
 ## Later: viewing keys (blocked on chain support)
 
-Once `shrugg-node` serves note envelopes, commitments and nullifiers (circuits milestones M2–M4,
+Once `rand-node` serves note envelopes, commitments and nullifiers (circuits milestones M2–M4,
 `circuits/research/docs/05-roadmap.md`), the explorer adds, behind a session or API key:
 
 - `POST /accounts/:address/shielded` with `{ viewing_key }`: server-side `scan` under a
