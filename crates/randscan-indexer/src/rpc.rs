@@ -404,17 +404,6 @@ pub enum RpcAction {
         to: String,
         asset_bundle: Box<RpcBundle>,
     },
-    /// The receiver registry (short shielded address, fullnode spec 2026-09-17): a new version
-    /// of `id`'s record. Fields are carried as the node serialises them (hex strings); the
-    /// processor re-verifies with `randprotocol_core::ReceiverRecord::verify` before indexing.
-    RegisterReceiver {
-        id: String,
-        version: u32,
-        pk: String,
-        kem_ek: String,
-        signing_key: String,
-        signature: String,
-    },
     /// A kind this build does not decode; `kind` is the node's tag.
     Unknown {
         kind: String,
@@ -477,14 +466,6 @@ enum KnownAction {
         to: String,
         asset_bundle: Box<RpcBundle>,
     },
-    RegisterReceiver {
-        id: String,
-        version: u32,
-        pk: String,
-        kem_ek: String,
-        signing_key: String,
-        signature: String,
-    },
 }
 
 const KNOWN_TAGS: &[&str] = &[
@@ -497,7 +478,6 @@ const KNOWN_TAGS: &[&str] = &[
     "withdraw",
     "bridge_attest",
     "bridge_burn",
-    "register_receiver",
 ];
 
 impl<'de> Deserialize<'de> for RpcAction {
@@ -576,21 +556,6 @@ impl<'de> Deserialize<'de> for RpcAction {
                     to_chain,
                     to,
                     asset_bundle,
-                },
-                KnownAction::RegisterReceiver {
-                    id,
-                    version,
-                    pk,
-                    kem_ek,
-                    signing_key,
-                    signature,
-                } => RpcAction::RegisterReceiver {
-                    id,
-                    version,
-                    pk,
-                    kem_ek,
-                    signing_key,
-                    signature,
                 },
             }),
             // A known tag with a malformed body is a real error; an unknown tag is tolerated.
@@ -799,24 +764,6 @@ mod tests {
         );
         assert!(serde_json::from_str::<Units>(r#""1.5""#).is_err());
         assert!(serde_json::from_str::<Units>("true").is_err());
-    }
-
-    #[test]
-    fn parses_register_receiver() {
-        let json = serde_json::json!({
-            "kind": "register_receiver", "id": "rand1exampleexampleexampleexampleexampleexampleexampl",
-            "version": 1, "pk": "11".repeat(32), "kem_ek": "22".repeat(1184),
-            "signing_key": "33".repeat(1312), "signature": "44".repeat(2420)
-        });
-        let a: RpcAction = serde_json::from_value(json).unwrap();
-        match a {
-            RpcAction::RegisterReceiver { id, version, kem_ek, .. } => {
-                assert_eq!(id, "rand1exampleexampleexampleexampleexampleexampleexampl");
-                assert_eq!(version, 1);
-                assert_eq!(kem_ek.len(), 1184 * 2);
-            }
-            other => panic!("{other:?}"),
-        }
     }
 
     #[test]

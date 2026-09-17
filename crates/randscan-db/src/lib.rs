@@ -78,7 +78,6 @@ const MIGRATIONS: &[(i32, &str)] = &[
         include_str!("../../../migrations/006_note_envelopes.sql"),
     ),
     (7, include_str!("../../../migrations/007_rand_symbol.sql")),
-    (8, include_str!("../../../migrations/008_receivers.sql")),
 ];
 
 /// Advisory lock key used to serialize migration runs across concurrent callers. The

@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use randscan_core::{
     BlockSummary, Bundle, GeoInfo, NetworkStats, Note, Nullifier, PendingStake, ProgramSummary,
-    Receipt, ReceiverRecordView, TransactionDetail, TransactionSummary, TxKind, Validator,
+    Receipt, TransactionDetail, TransactionSummary, TxKind, Validator,
 };
 use sqlx::FromRow;
 
@@ -287,34 +287,6 @@ impl From<ProgramRow> for ProgramSummary {
             code_hash: p.code_hash,
             call_count: p.call_count,
             last_called_height: p.last_called_height,
-        }
-    }
-}
-
-/// One published version of a receiver registry entry (migration 008).
-#[derive(Debug, Clone, FromRow)]
-pub struct ReceiverRow {
-    pub id: String,
-    pub version: i32,
-    pub pk: String,
-    pub kem_ek: String,
-    pub signing_key: String,
-    pub signature: String,
-    pub tx_hash: String,
-    pub height: i64,
-}
-
-impl From<ReceiverRow> for ReceiverRecordView {
-    fn from(r: ReceiverRow) -> Self {
-        ReceiverRecordView {
-            id: r.id,
-            version: r.version,
-            pk: r.pk,
-            kem_ek: r.kem_ek,
-            signing_key: r.signing_key,
-            signature: r.signature,
-            tx_hash: r.tx_hash,
-            height: r.height,
         }
     }
 }

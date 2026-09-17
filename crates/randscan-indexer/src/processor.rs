@@ -2,11 +2,9 @@
 //! call receipts and deployed programs. There are no accounts to refresh on this chain.
 
 use crate::rpc::{RpcAction, RpcBlock, RpcBundle, RpcClient};
-use anyhow::{anyhow, Context, Result};
-use randprotocol_core::notes::word8_from_hex;
-use randprotocol_core::{PublicKey, ReceiverId, ReceiverRecord, Signature};
+use anyhow::{Context, Result};
 use randscan_core::{BlockSummary, TransactionSummary, TxKind};
-use randscan_db::{self as db, DbPool, NewBlock, NewBundle, NewTx, ReceiverRow};
+use randscan_db::{self as db, DbPool, NewBlock, NewBundle, NewTx};
 use std::collections::HashMap;
 use tracing::{debug, warn};
 
@@ -169,48 +167,6 @@ impl BlockProcessor {
                 .await?;
             }
 
-            if let RpcAction::RegisterReceiver {
-                id,
-                version,
-                pk,
-                kem_ek,
-                signing_key,
-                signature,
-            } = &tx.action
-            {
-                match parse_receiver_record(id, *version, pk, kem_ek, signing_key, signature) {
-                    Ok((receiver_id, record)) => match record.verify(&receiver_id, tx.chain_id) {
-                        Ok(()) => {
-                            db::insert_receiver(
-                                &mut dbtx,
-                                &ReceiverRow {
-                                    id: receiver_id.to_string(),
-                                    version: *version as i32,
-                                    pk: pk.clone(),
-                                    kem_ek: kem_ek.clone(),
-                                    signing_key: signing_key.clone(),
-                                    signature: signature.clone(),
-                                    tx_hash: tx.hash.clone(),
-                                    height,
-                                },
-                            )
-                            .await?;
-                        }
-                        // The chain already refused a record that fails to verify; seeing one
-                        // here is an indexer bug (a decode mismatch), not a chain fault. Log and
-                        // skip the row rather than fail the whole block.
-                        Err(e) => warn!(
-                            "receiver record in tx {} failed to verify ({}); skipping, this is an indexer bug",
-                            tx.hash, e
-                        ),
-                    },
-                    Err(e) => warn!(
-                        "malformed register_receiver action in tx {}: {}",
-                        tx.hash, e
-                    ),
-                }
-            }
-
             summaries.push(TransactionSummary {
                 hash: tx.hash.clone(),
                 height,
@@ -320,37 +276,6 @@ impl BlockProcessor {
         );
         Ok(())
     }
-}
-
-/// Decode the node's `register_receiver` hex fields into the types `ReceiverRecord::verify`
-/// takes. A decode failure here (bad hex, wrong lengths) is distinct from a verify failure: it
-/// means the node sent something this build cannot even parse.
-fn parse_receiver_record(
-    id: &str,
-    version: u32,
-    pk: &str,
-    kem_ek: &str,
-    signing_key: &str,
-    signature: &str,
-) -> anyhow::Result<(ReceiverId, ReceiverRecord)> {
-    let receiver_id = ReceiverId::parse(id).map_err(|e| anyhow!("receiver id: {e}"))?;
-    let pk = word8_from_hex(pk).ok_or_else(|| anyhow!("receiver pk is not 32 bytes of hex"))?;
-    let kem_ek = hex::decode(kem_ek).map_err(|e| anyhow!("receiver kem_ek: {e}"))?;
-    let signing_key =
-        PublicKey::from_hex(signing_key).map_err(|e| anyhow!("receiver signing_key: {e}"))?;
-    let signature_bytes = hex::decode(signature).map_err(|e| anyhow!("receiver signature: {e}"))?;
-    let signature =
-        Signature::from_bytes(&signature_bytes).map_err(|e| anyhow!("receiver signature: {e}"))?;
-    Ok((
-        receiver_id,
-        ReceiverRecord {
-            version,
-            pk,
-            kem_ek,
-            signing_key,
-            signature,
-        },
-    ))
 }
 
 fn new_bundle(b: &RpcBundle) -> NewBundle {
@@ -499,12 +424,6 @@ impl<'a> TxFields<'a> {
                 bridge_to: Some(to),
                 asset_bundle: Some(asset_bundle),
                 ..Self::empty(TxKind::BridgeBurn)
-            },
-            // The receiver registry has no columns of its own on `transactions`; its data lives
-            // in the `receivers` table, inserted above alongside this row.
-            RpcAction::RegisterReceiver { .. } => TxFields {
-                kind_tag: "register_receiver",
-                ..Self::empty(TxKind::Other)
             },
             RpcAction::Unknown { kind: tag } => TxFields {
                 // The column is VARCHAR(32); a longer tag is stored truncated on a char boundary.
