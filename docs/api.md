@@ -381,8 +381,10 @@ ChaCha20-Poly1305 with the commitment as associated data. Only a key opens it, a
 holds none: the transaction page and the History page do the opening in your browser with a
 WebAssembly build of the node's own code (`crates/randscan-viewing`). A **viewing key** (`nk`,
 64 hex) opens every note that party sent or received; a **transaction key** (32 bytes hex) opens
-one transaction; a **call key** opens one call's inputs. The wallet key file is accepted too and
-only its derived viewing key is kept. An opened note is verified by recomputing its commitment,
+one transaction; a **call key** opens one call's inputs. The transaction page takes only a
+viewing key or a transaction key (tried as the call key too on a call); it never asks for a
+spend key or the wallet key file. The History page also accepts the wallet key file and keeps
+only its derived viewing key. An opened note is verified by recomputing its commitment,
 so what the page shows is what the chain committed to, not what a ciphertext claims. To build
 your own tool, fetch these endpoints and use the crate; nothing about a key ever goes over the
 network.

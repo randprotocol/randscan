@@ -119,9 +119,9 @@ export function detectKeyKind(input: string, chosen: KeyKind): KeyKind {
   return chosen;
 }
 
-export function looksLikeKey(input: string): boolean {
+export function looksLikeKey(input: string, acceptsFile = true): boolean {
   const s = input.trim();
-  if (s.startsWith('{')) return /"spend_key"\s*:\s*"[0-9a-fA-F]{64}"/.test(s);
+  if (s.startsWith('{')) return acceptsFile && /"spend_key"\s*:\s*"[0-9a-fA-F]{64}"/.test(s);
   return /^(0x)?[0-9a-fA-F]{64}$/.test(s);
 }
 

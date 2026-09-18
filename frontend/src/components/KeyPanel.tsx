@@ -28,7 +28,8 @@ const LABELS: Record<Exclude<KeyKind, 'file'>, string> = {
 
 /**
  * A key pasted here is handed to WebAssembly in this page and nowhere else: no request carries
- * it, and a spend key is reduced to its viewing key locally before anything is opened.
+ * it, and a spend key is reduced to its viewing key locally before anything is opened. The
+ * wallet key file is accepted only where `kinds` offers the spend key.
  */
 export function KeyPanel({
   kinds = ['viewing', 'spend', 'tx'],
@@ -41,25 +42,31 @@ export function KeyPanel({
   const [chosen, setChosen] = useState<Exclude<KeyKind, 'file'>>(kinds[0]);
   const [remember, setRemember] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const acceptsFile = kinds.includes('spend');
 
   useEffect(() => {
     const saved = recallKey();
-    if (saved) {
+    // A key remembered on another page is prefilled only if this panel accepts its kind.
+    if (saved && (saved.kind === 'file' ? acceptsFile : kinds.includes(saved.kind))) {
       setInput(saved.key);
-      if (saved.kind !== 'file' && kinds.includes(saved.kind)) setChosen(saved.kind);
+      if (saved.kind !== 'file') setChosen(saved.kind);
       setRemember(true);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const kind = detectKeyKind(input, chosen);
+  const kind = acceptsFile ? detectKeyKind(input, chosen) : chosen;
   const secret = kind === 'spend' || kind === 'file';
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     const key = input.trim();
-    if (!looksLikeKey(key)) {
-      setError('A key is 64 hex characters, or the contents of a wallet key file (wallet.key.json).');
+    if (!looksLikeKey(key, acceptsFile)) {
+      setError(
+        acceptsFile
+          ? 'A key is 64 hex characters, or the contents of a wallet key file (wallet.key.json).'
+          : `A ${kinds.map((k) => LABELS[k].toLowerCase()).join(' or ')} is 64 hex characters.`
+      );
       return;
     }
     setError(null);
@@ -70,21 +77,14 @@ export function KeyPanel({
 
   return (
     <Panel title={title}>
-      <p className="py-3 text-sm text-soft">
-        Decryption runs in your browser with WebAssembly; the key never leaves this page. A
-        viewing key opens every note you sent or received, a transaction key opens one
-        transaction, a call key opens one call&apos;s inputs. The wallet key file
-        (<code className="font-mono text-xs">wallet.key.json</code>) is accepted too and only its
-        derived viewing key is used.
-      </p>
-      <form onSubmit={submit} className="space-y-3 pb-3">
+      <form onSubmit={submit} className="space-y-3 py-3">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           rows={3}
           spellCheck={false}
           autoComplete="off"
-          placeholder="64 hex characters, or paste wallet.key.json"
+          placeholder={acceptsFile ? '64 hex characters, or paste wallet.key.json' : '64 hex characters'}
           className="w-full rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-strong focus:border-accent focus:outline-none"
         />
         <div className="flex flex-wrap items-center gap-4 text-sm">

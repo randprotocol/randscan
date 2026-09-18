@@ -61,10 +61,10 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
     }
   };
 
-  const kinds: SubmittedKey['kind'][] = kind === 'call' ? ['viewing', 'spend', 'tx', 'call'] : ['viewing', 'spend', 'tx'];
-
+  // A transaction page takes only keys that open this transaction's own data: never a spend
+  // key or the wallet key file. A transaction key is also tried as the call key (above).
   return (
-    <KeyPanel kinds={kinds.filter((k) => k !== 'file') as ('viewing' | 'spend' | 'tx' | 'call')[]} onOpen={run} busy={busy}>
+    <KeyPanel kinds={['viewing', 'tx']} onOpen={run} busy={busy}>
       {error && <p className="border-t border-border-soft py-3 text-sm text-accent-3">{error}</p>}
       {rows && rows.length === 0 && (
         <p className="border-t border-border-soft py-3 text-sm text-mute">
