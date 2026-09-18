@@ -125,7 +125,7 @@ export default function ViewingPage() {
         subtitle="Scan the commitment tree with your viewing key. The explorer never sees the key; every envelope is opened in your browser."
       />
 
-      <KeyPanel kinds={['viewing', 'spend']} onOpen={run} busy={busy} title="Scan with a viewing key">
+      <KeyPanel kinds={['viewing']} onOpen={run} busy={busy} title="Scan with a viewing key">
         {progress && (
           <p className="border-t border-border-soft py-3 text-sm text-mute">
             scanned {formatNumber(progress.scanned)} of {formatNumber(progress.total)} leaves

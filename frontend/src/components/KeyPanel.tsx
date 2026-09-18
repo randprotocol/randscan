@@ -32,7 +32,7 @@ const LABELS: Record<Exclude<KeyKind, 'file'>, string> = {
  * wallet key file is accepted only where `kinds` offers the spend key.
  */
 export function KeyPanel({
-  kinds = ['viewing', 'spend', 'tx'],
+  kinds = ['viewing', 'tx'],
   onOpen,
   busy,
   children,
@@ -87,22 +87,24 @@ export function KeyPanel({
           placeholder={acceptsFile ? '64 hex characters, or paste wallet.key.json' : '64 hex characters'}
           className="w-full rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-strong focus:border-accent focus:outline-none"
         />
-        <div className="flex flex-wrap items-center gap-4 text-sm">
-          {kinds.map((k) => (
-            <label key={k} className="inline-flex items-center gap-1.5 text-soft">
-              <input
-                type="radio"
-                name="key-kind"
-                value={k}
-                checked={chosen === k}
-                disabled={kind === 'file'}
-                onChange={() => setChosen(k)}
-              />
-              {LABELS[k]}
-            </label>
-          ))}
-          {kind === 'file' && <span className="text-mute">key file detected</span>}
-        </div>
+        {(kinds.length > 1 || kind === 'file') && (
+          <div className="flex flex-wrap items-center gap-4 text-sm">
+            {kinds.map((k) => (
+              <label key={k} className="inline-flex items-center gap-1.5 text-soft">
+                <input
+                  type="radio"
+                  name="key-kind"
+                  value={k}
+                  checked={chosen === k}
+                  disabled={kind === 'file'}
+                  onChange={() => setChosen(k)}
+                />
+                {LABELS[k]}
+              </label>
+            ))}
+            {kind === 'file' && <span className="text-mute">key file detected</span>}
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-4">
           <button type="submit" disabled={busy || input.trim() === ''} className="btn-primary">
             {busy ? 'Opening…' : 'Open'}
