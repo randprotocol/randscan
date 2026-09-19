@@ -3,7 +3,7 @@
 
 use crate::{BlockProcessor, Broadcaster, IndexerConfig, NodeTracker, RpcClient};
 use anyhow::Result;
-use randscan_core::{BridgeState, NetworkStats, NodeInfo, Supply};
+use randscan_core::{BridgeState, NetworkStats, NodeInfo, Supply, TokenList};
 use randscan_db::{self as db, DbPool, NewValidator, StatsUpdate};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
@@ -40,6 +40,11 @@ pub struct IndexerService {
     /// The node's public bridge state and supply audit, refreshed with the stats.
     bridge: RwLock<Option<BridgeState>>,
     supply: RwLock<Option<Supply>>,
+    /// The RPL token registry (`rand_getTokens`, paged to completion), refreshed with the stats.
+    /// Cached rather than looked up per request: a token page tells the node nothing about which
+    /// token any one caller cares about (unlike `rand_getToken`), and a token list page is what
+    /// a wallet's own `resolve_asset` reads through.
+    tokens: RwLock<Option<TokenList>>,
     nodes: Arc<NodeTracker>,
 }
 
@@ -68,12 +73,19 @@ impl IndexerService {
             last_stats: RwLock::new(None),
             bridge: RwLock::new(None),
             supply: RwLock::new(None),
+            tokens: RwLock::new(None),
             nodes,
         }
     }
 
     pub fn rpc(&self) -> &RpcClient {
         &self.rpc
+    }
+
+    /// The RPL token registry as last read from the node (`None` before the first refresh, or on
+    /// a node without the method).
+    pub async fn tokens(&self) -> Option<TokenList> {
+        self.tokens.read().await.clone()
     }
 
     /// Current view of this node and its peers (nodes map).
@@ -182,6 +194,7 @@ impl IndexerService {
         *self.chain.write().await = None; // symbol/decimals may differ too
         *self.bridge.write().await = None;
         *self.supply.write().await = None;
+        *self.tokens.write().await = None;
         self.state.write().await.current_height = -1;
         Ok(true)
     }
@@ -331,6 +344,10 @@ impl IndexerService {
         match self.rpc.supply().await {
             Ok(s) => *self.supply.write().await = s,
             Err(e) => warn!("supply refresh failed: {:#}", e),
+        }
+        match self.rpc.tokens_all().await {
+            Ok(t) => *self.tokens.write().await = Some(t),
+            Err(e) => warn!("token registry refresh failed: {:#}", e),
         }
         match self.refresh_stats().await {
             Ok(stats) => self.broadcaster.stats(stats),

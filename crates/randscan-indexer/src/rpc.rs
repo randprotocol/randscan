@@ -210,6 +210,52 @@ impl RpcClient {
             .await
     }
 
+    /// One page of the RPL token registry, `[from_index, limit]`. `None` on a node without the
+    /// method (a chain older than the token RPC task).
+    pub async fn tokens_page(&self, from_index: u64, limit: u64) -> Result<Option<randscan_core::TokenList>> {
+        self.call_optional_method("rand_getTokens", serde_json::json!([from_index, limit]))
+            .await
+    }
+
+    /// The whole RPL token registry, paged until a short page ends it. `enabled: false, tokens:
+    /// []` on a chain without one (or a node predating the method) — indistinguishable, which is
+    /// the right answer for a caller that only wants to know what to show.
+    pub async fn tokens_all(&self) -> Result<randscan_core::TokenList> {
+        const PAGE: u64 = 1000;
+        let mut out = randscan_core::TokenList::default();
+        let mut from = 0u64;
+        loop {
+            let Some(page) = self.tokens_page(from, PAGE).await? else {
+                return Ok(out);
+            };
+            out.enabled = page.enabled;
+            out.registration_fee = page.registration_fee;
+            out.next_index = page.next_index;
+            let got = page.tokens.len() as u64;
+            out.tokens.extend(page.tokens);
+            if got < PAGE {
+                return Ok(out);
+            }
+            from += got;
+        }
+    }
+
+    /// One token by registry index, 64-hex id or `rpl1…` text form. `None` when there is no such
+    /// token (or on a chain without any). PRIVACY: a per-token lookup tells the node which token
+    /// the caller cares about — used for a token detail page read, never for resolving a wallet's
+    /// send (`tokens_all` instead).
+    pub async fn token(&self, key: &str) -> Result<Option<randscan_core::TokenInfo>> {
+        self.call_optional_method("rand_getToken", serde_json::json!([key]))
+            .await
+    }
+
+    /// A token's supply and each backing's locked amount. Same key forms and privacy note as
+    /// [`token`](Self::token).
+    pub async fn token_supply(&self, key: &str) -> Result<Option<randscan_core::TokenSupply>> {
+        self.call_optional_method("rand_getTokenSupply", serde_json::json!([key]))
+            .await
+    }
+
     pub async fn is_connected(&self) -> bool {
         self.head().await.is_ok()
     }
@@ -334,23 +380,31 @@ pub struct RpcTx {
     pub action: RpcAction,
 }
 
-/// The public fields of a bundle. The proof and the envelopes come by length only.
+/// The public fields of the chain-14 hidden-asset bundle: four input and four output slots
+/// (dummies included), and no `asset` field at all — slots 0-1 carry a private asset, slots 2-3
+/// always RAND, and nothing public says which asset slots 0-1 moved. The proof and the envelopes
+/// come by length only.
 #[derive(Debug, Clone, Deserialize)]
 pub struct RpcBundle {
     pub anchor: String,
-    pub nullifiers: [String; 2],
-    pub commitments: [String; 2],
+    pub nullifiers: [String; 4],
+    pub commitments: [String; 4],
     pub fee: Units,
+    /// The private asset burned (a `token_burn` or a `bridge_burn`), units of that asset.
     #[serde(default)]
-    pub burn: Units,
+    pub burn_a: Units,
+    /// RAND burned (a `bond` or a `register_aggregator`).
     #[serde(default)]
-    pub asset: u32,
+    pub burn_r: Units,
+    /// 0 when nothing was burned; otherwise the registry index `burn_a` names.
+    #[serde(default)]
+    pub burn_asset: u32,
     #[serde(default)]
     pub time: u64,
     #[serde(default)]
     pub proof_len: u64,
     #[serde(default)]
-    pub envelope_len: [u64; 2],
+    pub envelope_len: [u64; 4],
 }
 
 /// Actions as the node serialises them. Kinds this client does not know become
@@ -392,22 +446,100 @@ pub enum RpcAction {
     BridgeAttest {
         attestation_len: u64,
         recipient: String,
+        /// The index the *action* names (never `null` on a committed attest); `asset_index`
+        /// (the registry's own resolution) is `null` on a rotation, which deposits nothing.
+        asset: Option<u32>,
         asset_index: Option<u32>,
         amount: Option<Units>,
         time: Option<u64>,
+        /// The deposit note's blinding — public, a field of the action.
+        r: Option<String>,
+        /// The leaf the chain appended for the deposit; `null` for a rotation.
+        commitment: Option<String>,
+        /// B3: the PQ guardians who co-signed, by index.
+        pq_signers: Vec<i64>,
     },
     BridgeBurn {
         asset: u32,
         amount: Units,
         relayer_fee: Units,
         to_chain: u16,
+        /// The backing being redeemed: a source-chain token address, 32 bytes hex.
+        token: String,
         to: String,
-        asset_bundle: Box<RpcBundle>,
+    },
+    /// RPL (spec §4/§6): a token's registration and mints are public by design, as a bridge
+    /// deposit is — only a later *transfer* of the token's notes is shielded.
+    /// RPL (spec §4/§6): a token's registration and mints are public by design, as a bridge
+    /// deposit is — only a later *transfer* of the token's notes is shielded.
+    RegisterToken {
+        name: String,
+        symbol: String,
+        decimals: u8,
+        /// `"none"` | `"key"` | `"bridge"` | `"program"`.
+        authority: String,
+        index: u32,
+        initial_amount: Option<Units>,
+        initial: Option<RpcInitialMint>,
+    },
+    TokenMint {
+        asset: u32,
+        amount: Units,
+        recipient: String,
+        time: u64,
+        r: String,
+        nonce: u64,
+    },
+    SetAuthority {
+        asset: u32,
+        nonce: u64,
+        new_authority: Option<String>,
+    },
+    /// A holder burn: public by design (it audits `total_supply`); a transfer of the same token
+    /// is a plain `none` bundle, its asset private.
+    TokenBurn {
+        asset: u32,
+        amount: Units,
+    },
+    /// Bridge hardening B1: the genesis pause key's own signature, no PQ quorum.
+    PauseMints { nonce: u64 },
+    /// Bridge hardening B1: lifting the pause needs the PQ guardian quorum.
+    UnpauseMints { nonce: u64, pq_signers: Vec<i64> },
+    /// Bridge hardening B4: a new `Bridge`-authority token, registered after genesis by the PQ
+    /// guardian quorum.
+    RegisterBridgedToken {
+        name: String,
+        symbol: String,
+        salt: String,
+        chain: i32,
+        token: String,
+        decimals: u8,
+        nonce: u64,
+        asset_id: String,
+        pq_signers: Vec<i64>,
+    },
+    /// Bridge hardening B4: another backing added to an already-listed bridged token.
+    ListBacking {
+        token_index: u32,
+        chain: i32,
+        token: String,
+        decimals: u8,
+        nonce: u64,
+        pq_signers: Vec<i64>,
     },
     /// A kind this build does not decode; `kind` is the node's tag.
     Unknown {
         kind: String,
     },
+}
+
+/// `register_token`'s optional `initial` mint: every word of the note the chain computes for it.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcInitialMint {
+    pub amount: Units,
+    pub recipient: String,
+    pub time: u64,
+    pub r: String,
 }
 
 #[derive(Deserialize)]
@@ -451,11 +583,19 @@ enum KnownAction {
         attestation_len: u64,
         recipient: String,
         #[serde(default)]
+        asset: Option<u32>,
+        #[serde(default)]
         asset_index: Option<u32>,
         #[serde(default)]
         amount: Option<Units>,
         #[serde(default)]
         time: Option<u64>,
+        #[serde(default)]
+        r: Option<String>,
+        #[serde(default)]
+        commitment: Option<String>,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
     },
     BridgeBurn {
         asset: u32,
@@ -463,8 +603,69 @@ enum KnownAction {
         #[serde(default)]
         relayer_fee: Units,
         to_chain: u16,
+        #[serde(default)]
+        token: String,
         to: String,
-        asset_bundle: Box<RpcBundle>,
+    },
+    RegisterToken {
+        name: String,
+        symbol: String,
+        decimals: u8,
+        authority: String,
+        index: u32,
+        #[serde(default)]
+        initial_amount: Option<Units>,
+        #[serde(default)]
+        initial: Option<RpcInitialMint>,
+    },
+    TokenMint {
+        asset: u32,
+        amount: Units,
+        recipient: String,
+        time: u64,
+        r: String,
+        #[serde(default)]
+        nonce: u64,
+    },
+    SetAuthority {
+        asset: u32,
+        #[serde(default)]
+        nonce: u64,
+        #[serde(default)]
+        new_authority: Option<String>,
+    },
+    TokenBurn {
+        asset: u32,
+        amount: Units,
+    },
+    PauseMints {
+        nonce: u64,
+    },
+    UnpauseMints {
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    RegisterBridgedToken {
+        name: String,
+        symbol: String,
+        salt: String,
+        chain: i32,
+        token: String,
+        decimals: u8,
+        nonce: u64,
+        asset_id: String,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    ListBacking {
+        token_index: u32,
+        chain: i32,
+        token: String,
+        decimals: u8,
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
     },
 }
 
@@ -478,6 +679,14 @@ const KNOWN_TAGS: &[&str] = &[
     "withdraw",
     "bridge_attest",
     "bridge_burn",
+    "register_token",
+    "token_mint",
+    "set_authority",
+    "token_burn",
+    "pause_mints",
+    "unpause_mints",
+    "register_bridged_token",
+    "list_backing",
 ];
 
 impl<'de> Deserialize<'de> for RpcAction {
@@ -532,31 +741,91 @@ impl<'de> Deserialize<'de> for RpcAction {
                 KnownAction::BridgeAttest {
                     attestation_len,
                     recipient,
+                    asset,
                     asset_index,
                     amount,
                     time,
+                    r,
+                    commitment,
+                    pq_signers,
                 } => RpcAction::BridgeAttest {
                     attestation_len,
                     recipient,
+                    asset,
                     asset_index,
                     amount,
                     time,
+                    r,
+                    commitment,
+                    pq_signers,
                 },
                 KnownAction::BridgeBurn {
                     asset,
                     amount,
                     relayer_fee,
                     to_chain,
+                    token,
                     to,
-                    asset_bundle,
                 } => RpcAction::BridgeBurn {
                     asset,
                     amount,
                     relayer_fee,
                     to_chain,
+                    token,
                     to,
-                    asset_bundle,
                 },
+                KnownAction::RegisterToken {
+                    name,
+                    symbol,
+                    decimals,
+                    authority,
+                    index,
+                    initial_amount,
+                    initial,
+                } => RpcAction::RegisterToken {
+                    name,
+                    symbol,
+                    decimals,
+                    authority,
+                    index,
+                    initial_amount,
+                    initial,
+                },
+                KnownAction::TokenMint { asset, amount, recipient, time, r, nonce } => {
+                    RpcAction::TokenMint { asset, amount, recipient, time, r, nonce }
+                }
+                KnownAction::SetAuthority { asset, nonce, new_authority } => {
+                    RpcAction::SetAuthority { asset, nonce, new_authority }
+                }
+                KnownAction::TokenBurn { asset, amount } => RpcAction::TokenBurn { asset, amount },
+                KnownAction::PauseMints { nonce } => RpcAction::PauseMints { nonce },
+                KnownAction::UnpauseMints { nonce, pq_signers } => {
+                    RpcAction::UnpauseMints { nonce, pq_signers }
+                }
+                KnownAction::RegisterBridgedToken {
+                    name,
+                    symbol,
+                    salt,
+                    chain,
+                    token,
+                    decimals,
+                    nonce,
+                    asset_id,
+                    pq_signers,
+                } => RpcAction::RegisterBridgedToken {
+                    name,
+                    symbol,
+                    salt,
+                    chain,
+                    token,
+                    decimals,
+                    nonce,
+                    asset_id,
+                    pq_signers,
+                },
+                KnownAction::ListBacking { token_index, chain, token, decimals, nonce, pq_signers } => {
+                    RpcAction::ListBacking { token_index, chain, token, decimals, nonce, pq_signers }
+                }
             }),
             // A known tag with a malformed body is a real error; an unknown tag is tolerated.
             Err(e) => {
@@ -657,8 +926,10 @@ mod tests {
 
     fn bundle_json() -> serde_json::Value {
         serde_json::json!({
-            "anchor": "6b1d", "nullifiers": ["8c04", "5e77"], "commitments": ["2a9f", "b310"],
-            "fee": 1000000, "burn": 0, "asset": 0, "time": 5, "proof_len": 302857, "envelope_len": [1348, 1348]
+            "anchor": "6b1d", "nullifiers": ["8c04", "5e77", "03aa", "e19b"],
+            "commitments": ["2a9f", "b310", "77c1", "5d20"],
+            "fee": 1000000, "burn_a": 0, "burn_r": 0, "burn_asset": 0, "time": 5, "proof_len": 302857,
+            "envelope_len": [1348, 1348, 1348, 1348]
         })
     }
 
@@ -667,22 +938,32 @@ mod tests {
         let b = bundle_json();
         let json = serde_json::json!({
             "hash": "a9c8", "height": 10, "view": 32, "parent": "a070", "proposer": "2nRd", "timestamp_ms": 1,
-            "tx_root": "dc97", "state_root": "b364", "justify_view": 31, "tx_count": 9,
+            "tx_root": "dc97", "state_root": "b364", "justify_view": 31, "tx_count": 17,
             "transactions": [
-                { "hash": "t0", "chain_id": 7, "bundle": b, "action": { "kind": "none" } },
-                { "hash": "t1", "chain_id": 7, "bundle": null, "action": { "kind": "mint", "cm": "2a9f", "amount": 100000000000u64, "minter": "2nRd" } },
-                { "hash": "t2", "chain_id": 7, "bundle": b, "action": { "kind": "deploy", "program": "675a", "words": 412 } },
-                { "hash": "t3", "chain_id": 7, "bundle": b, "action": { "kind": "call", "program": "675a", "proof_len": 268123, "input_envelope_len": 1280 } },
-                { "hash": "t4", "chain_id": 7, "bundle": b, "action": { "kind": "bond", "validator": "2nRd", "amount": 500, "registered": false } },
-                { "hash": "t5", "chain_id": 7, "bundle": null, "action": { "kind": "unbond", "validator": "2nRd", "amount": 7, "nonce": 2 } },
-                { "hash": "t6", "chain_id": 7, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": 9, "nonce": 3 } },
-                { "hash": "t7", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "rand1abc", "asset_index": 1, "amount": 1000, "time": 41 } },
-                { "hash": "t8", "chain_id": 7, "bundle": b, "action": { "kind": "bridge_burn", "asset": 2, "amount": 400, "relayer_fee": 100, "to_chain": 5, "to": "abab", "asset_bundle": b } }
+                { "hash": "t0", "chain_id": 14, "bundle": b, "action": { "kind": "none" } },
+                { "hash": "t1", "chain_id": 14, "bundle": null, "action": { "kind": "mint", "cm": "2a9f", "amount": 100000000000u64, "minter": "2nRd" } },
+                { "hash": "t2", "chain_id": 14, "bundle": b, "action": { "kind": "deploy", "program": "675a", "words": 412 } },
+                { "hash": "t3", "chain_id": 14, "bundle": b, "action": { "kind": "call", "program": "675a", "proof_len": 268123, "input_envelope_len": 1280 } },
+                { "hash": "t4", "chain_id": 14, "bundle": b, "action": { "kind": "bond", "validator": "2nRd", "amount": 500, "registered": false } },
+                { "hash": "t5", "chain_id": 14, "bundle": null, "action": { "kind": "unbond", "validator": "2nRd", "amount": 7, "nonce": 2 } },
+                { "hash": "t6", "chain_id": 14, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": 9, "nonce": 3 } },
+                { "hash": "t7", "chain_id": 14, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "rand1abc", "asset": 1, "asset_index": 1, "amount": 1000, "time": 41, "r": "aa", "commitment": "cc", "pq_signers": [0, 1] } },
+                { "hash": "t8", "chain_id": 14, "bundle": b, "action": { "kind": "bridge_burn", "asset": 2, "amount": 400, "relayer_fee": 100, "to_chain": 5, "token": "cdcd", "to": "abab" } },
+                { "hash": "t9", "chain_id": 14, "bundle": b, "action": { "kind": "register_token", "name": "zUSD", "symbol": "zUSD", "decimals": 6, "authority": "bridge", "index": 3, "initial_amount": 5000, "initial": { "amount": 5000, "recipient": "rand1abc", "time": 40, "r": "bb" } } },
+                { "hash": "t10", "chain_id": 14, "bundle": b, "action": { "kind": "token_mint", "asset": 3, "amount": 700, "recipient": "rand1abc", "time": 41, "r": "cc", "nonce": 0 } },
+                { "hash": "t11", "chain_id": 14, "bundle": b, "action": { "kind": "set_authority", "asset": 3, "nonce": 1, "new_authority": "2nRd" } },
+                { "hash": "t12", "chain_id": 14, "bundle": b, "action": { "kind": "token_burn", "asset": 3, "amount": 400 } },
+                { "hash": "t13", "chain_id": 14, "bundle": null, "action": { "kind": "pause_mints", "nonce": 4 } },
+                { "hash": "t14", "chain_id": 14, "bundle": null, "action": { "kind": "unpause_mints", "nonce": 5, "pq_signers": [0, 2] } },
+                { "hash": "t15", "chain_id": 14, "bundle": b, "action": { "kind": "register_bridged_token", "name": "zUSD", "symbol": "zUSD", "salt": "ee", "chain": 3, "token": "ff", "decimals": 6, "nonce": 6, "asset_id": "aa", "pq_signers": [1] } },
+                { "hash": "t16", "chain_id": 14, "bundle": b, "action": { "kind": "list_backing", "token_index": 3, "chain": 4, "token": "11", "decimals": 6, "nonce": 7, "pq_signers": [2] } }
             ]
         });
         let b: RpcBlock = serde_json::from_value(json).unwrap();
-        assert_eq!(b.transactions.len(), 9);
+        assert_eq!(b.transactions.len(), 17);
         assert!(matches!(b.transactions[0].action, RpcAction::None));
+        assert_eq!(b.transactions[0].bundle.as_ref().unwrap().nullifiers.len(), 4);
+        assert_eq!(b.transactions[0].bundle.as_ref().unwrap().commitments.len(), 4);
         assert!(b.transactions[1].bundle.is_none());
         match &b.transactions[1].action {
             RpcAction::Mint { amount, .. } => assert_eq!(amount.0, "100000000000"),
@@ -704,22 +985,73 @@ mod tests {
                 asset_index,
                 amount,
                 time,
+                r,
+                commitment,
+                pq_signers,
                 ..
             } => {
                 assert_eq!(*asset_index, Some(1));
                 assert_eq!(amount.as_ref().unwrap().0, "1000");
                 assert_eq!(*time, Some(41));
+                assert_eq!(r.as_deref(), Some("aa"));
+                assert_eq!(commitment.as_deref(), Some("cc"));
+                assert_eq!(pq_signers, &vec![0, 1]);
             }
             other => panic!("{other:?}"),
         }
         match &b.transactions[8].action {
-            RpcAction::BridgeBurn {
-                asset_bundle,
-                relayer_fee,
-                ..
-            } => {
-                assert_eq!(asset_bundle.nullifiers[1], "5e77");
+            RpcAction::BridgeBurn { token, relayer_fee, .. } => {
+                assert_eq!(token, "cdcd");
                 assert_eq!(relayer_fee.0, "100");
+            }
+            other => panic!("{other:?}"),
+        }
+        match &b.transactions[9].action {
+            RpcAction::RegisterToken { name, index, initial, .. } => {
+                assert_eq!(name, "zUSD");
+                assert_eq!(*index, 3);
+                assert_eq!(initial.as_ref().unwrap().amount.0, "5000");
+            }
+            other => panic!("{other:?}"),
+        }
+        match &b.transactions[10].action {
+            RpcAction::TokenMint { asset, amount, recipient, .. } => {
+                assert_eq!(*asset, 3);
+                assert_eq!(amount.0, "700");
+                assert_eq!(recipient, "rand1abc");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(matches!(&b.transactions[11].action, RpcAction::SetAuthority { asset: 3, nonce: 1, .. }));
+        match &b.transactions[12].action {
+            RpcAction::TokenBurn { asset, amount } => {
+                assert_eq!(*asset, 3);
+                assert_eq!(amount.0, "400");
+            }
+            other => panic!("{other:?}"),
+        }
+        assert!(matches!(&b.transactions[13].action, RpcAction::PauseMints { nonce: 4 }));
+        assert!(b.transactions[13].bundle.is_none());
+        match &b.transactions[14].action {
+            RpcAction::UnpauseMints { nonce, pq_signers } => {
+                assert_eq!(*nonce, 5);
+                assert_eq!(pq_signers, &vec![0, 2]);
+            }
+            other => panic!("{other:?}"),
+        }
+        match &b.transactions[15].action {
+            RpcAction::RegisterBridgedToken { name, chain, pq_signers, .. } => {
+                assert_eq!(name, "zUSD");
+                assert_eq!(*chain, 3);
+                assert_eq!(pq_signers, &vec![1]);
+            }
+            other => panic!("{other:?}"),
+        }
+        match &b.transactions[16].action {
+            RpcAction::ListBacking { token_index, chain, pq_signers, .. } => {
+                assert_eq!(*token_index, 3);
+                assert_eq!(*chain, 4);
+                assert_eq!(pq_signers, &vec![2]);
             }
             other => panic!("{other:?}"),
         }
@@ -728,21 +1060,30 @@ mod tests {
 
     #[test]
     fn a_rotation_attestation_has_no_deposit() {
-        let json = r#"{"kind":"bridge_attest","attestation_len":700,"recipient":"rand1x","asset_index":null,"amount":null,"time":3}"#;
+        let json = r#"{"kind":"bridge_attest","attestation_len":700,"recipient":"rand1x","asset":null,"asset_index":null,"amount":null,"time":3,"r":"00","commitment":null}"#;
         let a: RpcAction = serde_json::from_str(json).unwrap();
         assert!(matches!(
             a,
             RpcAction::BridgeAttest {
                 asset_index: None,
                 amount: None,
+                commitment: None,
                 ..
             }
         ));
     }
 
     #[test]
+    fn there_is_no_token_transfer_kind_a_transfer_is_none() {
+        let json = r#"{"kind":"none"}"#;
+        assert!(matches!(serde_json::from_str::<RpcAction>(json).unwrap(), RpcAction::None));
+        // A node tag this build has never heard of (e.g. a future kind) is tolerated, not fatal.
+        assert!(serde_json::from_str::<RpcAction>(r#"{"kind":"token_transfer"}"#).is_ok());
+    }
+
+    #[test]
     fn unknown_kind_does_not_fail_the_block() {
-        let json = serde_json::json!({ "hash": "t", "chain_id": 7, "bundle": bundle_json(), "action": { "kind": "slash", "evidence": "…" } });
+        let json = serde_json::json!({ "hash": "t", "chain_id": 14, "bundle": bundle_json(), "action": { "kind": "slash", "evidence": "…" } });
         let t: RpcTx = serde_json::from_value(json).unwrap();
         assert!(matches!(&t.action, RpcAction::Unknown { kind } if kind == "slash"));
     }

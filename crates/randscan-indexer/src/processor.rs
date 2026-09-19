@@ -147,7 +147,12 @@ impl BlockProcessor {
                     relayer_fee: f.relayer_fee.clone(),
                     to_chain: f.to_chain,
                     bridge_to: f.bridge_to,
-                    asset_bundle: f.asset_bundle.map(new_bundle),
+                    bridge_token: f.bridge_token,
+                    deposit_r: f.deposit_r,
+                    derived_cm: f.derived_cm.clone(),
+                    pq_signers: f.pq_signers.clone(),
+                    token_action: f.token_action.clone(),
+                    bridge_governance: f.bridge_governance.clone(),
                 },
             )
             .await
@@ -278,21 +283,29 @@ impl BlockProcessor {
     }
 }
 
+/// The chain-14 hidden-asset bundle: four slots, no public `asset` field (see `NewBundle`'s doc).
 fn new_bundle(b: &RpcBundle) -> NewBundle {
     NewBundle {
         anchor: b.anchor.clone(),
         nullifiers: b.nullifiers.clone(),
         commitments: b.commitments.clone(),
         fee: b.fee.0.clone(),
-        burn: b.burn.0.clone(),
-        asset: b.asset as i64,
+        burn_a: b.burn_a.0.clone(),
+        burn_r: b.burn_r.0.clone(),
+        burn_asset: b.burn_asset as i64,
         time: b.time as i64,
         proof_len: b.proof_len as i64,
-        envelope_len: [b.envelope_len[0] as i64, b.envelope_len[1] as i64],
+        envelope_len: [
+            b.envelope_len[0] as i64,
+            b.envelope_len[1] as i64,
+            b.envelope_len[2] as i64,
+            b.envelope_len[3] as i64,
+        ],
     }
 }
 
-/// The action columns one RPC action fills. Borrowed from the RPC value.
+/// The action columns one RPC action fills. Borrowed from the RPC value where practical;
+/// `derived_cm`/`token_action`/`bridge_governance` are computed/serialised, so owned.
 struct TxFields<'a> {
     kind: TxKind,
     /// What goes in the `kind` column: the explorer kind, or the node's own tag for unknown kinds.
@@ -313,7 +326,17 @@ struct TxFields<'a> {
     relayer_fee: Option<String>,
     to_chain: Option<i32>,
     bridge_to: Option<&'a str>,
-    asset_bundle: Option<&'a RpcBundle>,
+    bridge_token: Option<&'a str>,
+    deposit_r: Option<&'a str>,
+    /// The chain-computed note's commitment, for linking its leaf back to this transaction (see
+    /// `NewTx::derived_cm`'s doc comment). `None` when this action creates none, or when a
+    /// `token_mint`/`register_token`'s recipient does not parse as a shielded address (should
+    /// never happen for a transaction the chain admitted; the indexer degrades to an unlinked
+    /// leaf rather than failing the whole block).
+    derived_cm: Option<String>,
+    pq_signers: Option<Vec<i32>>,
+    token_action: Option<serde_json::Value>,
+    bridge_governance: Option<serde_json::Value>,
 }
 
 impl<'a> TxFields<'a> {
@@ -337,7 +360,12 @@ impl<'a> TxFields<'a> {
             relayer_fee: None,
             to_chain: None,
             bridge_to: None,
-            asset_bundle: None,
+            bridge_token: None,
+            deposit_r: None,
+            derived_cm: None,
+            pq_signers: None,
+            token_action: None,
+            bridge_governance: None,
         }
     }
 
@@ -401,12 +429,20 @@ impl<'a> TxFields<'a> {
                 asset_index,
                 amount,
                 time,
+                r,
+                commitment,
+                pq_signers,
+                ..
             } => TxFields {
                 attestation_len: Some(*attestation_len as i64),
                 recipient: Some(recipient),
                 asset_index: asset_index.map(|a| a as i64),
                 amount: amount.as_ref().map(|a| a.0.clone()),
                 note_time: time.map(|t| t as i64),
+                deposit_r: r.as_deref(),
+                // The node computes this itself and reports it directly — no hashing needed.
+                derived_cm: commitment.clone(),
+                pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
                 ..Self::empty(TxKind::BridgeAttest)
             },
             RpcAction::BridgeBurn {
@@ -414,17 +450,181 @@ impl<'a> TxFields<'a> {
                 amount,
                 relayer_fee,
                 to_chain,
+                token,
                 to,
-                asset_bundle,
             } => TxFields {
                 asset_index: Some(*asset as i64),
                 amount: Some(amount.0.clone()),
                 relayer_fee: Some(relayer_fee.0.clone()),
                 to_chain: Some(i32::from(*to_chain)),
                 bridge_to: Some(to),
-                asset_bundle: Some(asset_bundle),
+                bridge_token: Some(token),
                 ..Self::empty(TxKind::BridgeBurn)
             },
+            RpcAction::RegisterToken {
+                name,
+                symbol,
+                decimals,
+                authority,
+                index,
+                initial_amount,
+                initial,
+            } => {
+                let action = randscan_core::TokenAction::RegisterToken {
+                    name: name.clone(),
+                    symbol: symbol.clone(),
+                    decimals: *decimals as i32,
+                    authority: authority.clone(),
+                    index: *index as i64,
+                    initial_amount: initial_amount.as_ref().map(|a| a.0.clone()),
+                    initial: initial.as_ref().map(|m| randscan_core::InitialMint {
+                        amount: m.amount.0.clone(),
+                        recipient: m.recipient.clone(),
+                        time: m.time as i64,
+                        r: m.r.clone(),
+                    }),
+                };
+                // The registration's initial mint is the one derived note register_token appends
+                // (register_token itself creates no other leaf).
+                let derived_cm = initial.as_ref().and_then(|m| {
+                    randscan_core::notecommit::mint_commitment_hex(&m.recipient, m.amount.0.parse().unwrap_or(0), *index, m.time as u32, &m.r)
+                });
+                TxFields {
+                    asset_index: Some(*index as i64),
+                    amount: initial_amount.as_ref().map(|a| a.0.clone()),
+                    recipient: initial.as_ref().map(|m| m.recipient.as_str()),
+                    note_time: initial.as_ref().map(|m| m.time as i64),
+                    deposit_r: initial.as_ref().map(|m| m.r.as_str()),
+                    derived_cm,
+                    token_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::RegisterToken)
+                }
+            }
+            RpcAction::TokenMint {
+                asset,
+                amount,
+                recipient,
+                time,
+                r,
+                nonce,
+            } => {
+                let action = randscan_core::TokenAction::TokenMint {
+                    asset: *asset as i64,
+                    amount: amount.0.clone(),
+                    recipient: recipient.clone(),
+                    time: *time as i64,
+                    r: r.clone(),
+                    nonce: *nonce as i64,
+                };
+                let derived_cm =
+                    randscan_core::notecommit::mint_commitment_hex(recipient, amount.0.parse().unwrap_or(0), *asset, *time as u32, r);
+                TxFields {
+                    asset_index: Some(*asset as i64),
+                    amount: Some(amount.0.clone()),
+                    recipient: Some(recipient),
+                    note_time: Some(*time as i64),
+                    action_nonce: Some(*nonce as i64),
+                    deposit_r: Some(r),
+                    derived_cm,
+                    token_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::TokenMint)
+                }
+            }
+            RpcAction::SetAuthority { asset, nonce, new_authority } => {
+                let action = randscan_core::TokenAction::SetAuthority {
+                    asset: *asset as i64,
+                    nonce: *nonce as i64,
+                    new_authority: new_authority.clone(),
+                };
+                TxFields {
+                    asset_index: Some(*asset as i64),
+                    action_nonce: Some(*nonce as i64),
+                    token_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::SetAuthority)
+                }
+            }
+            RpcAction::TokenBurn { asset, amount } => {
+                let action = randscan_core::TokenAction::TokenBurn { asset: *asset as i64, amount: amount.0.clone() };
+                TxFields {
+                    asset_index: Some(*asset as i64),
+                    amount: Some(amount.0.clone()),
+                    token_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::TokenBurn)
+                }
+            }
+            RpcAction::PauseMints { nonce } => {
+                let action = randscan_core::BridgeGovernanceAction::PauseMints { nonce: *nonce as i64 };
+                TxFields {
+                    action_nonce: Some(*nonce as i64),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::PauseMints)
+                }
+            }
+            RpcAction::UnpauseMints { nonce, pq_signers } => {
+                let action = randscan_core::BridgeGovernanceAction::UnpauseMints {
+                    nonce: *nonce as i64,
+                    pq_signers: pq_signers.clone(),
+                };
+                TxFields {
+                    action_nonce: Some(*nonce as i64),
+                    pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::UnpauseMints)
+                }
+            }
+            RpcAction::RegisterBridgedToken {
+                name,
+                symbol,
+                salt,
+                chain,
+                token,
+                decimals,
+                nonce,
+                asset_id,
+                pq_signers,
+            } => {
+                let action = randscan_core::BridgeGovernanceAction::RegisterBridgedToken {
+                    name: name.clone(),
+                    symbol: symbol.clone(),
+                    salt: salt.clone(),
+                    chain: *chain,
+                    token: token.clone(),
+                    decimals: *decimals as i32,
+                    nonce: *nonce as i64,
+                    asset_id: asset_id.clone(),
+                    pq_signers: pq_signers.clone(),
+                };
+                TxFields {
+                    action_nonce: Some(*nonce as i64),
+                    pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::RegisterBridgedToken)
+                }
+            }
+            RpcAction::ListBacking {
+                token_index,
+                chain,
+                token,
+                decimals,
+                nonce,
+                pq_signers,
+            } => {
+                let action = randscan_core::BridgeGovernanceAction::ListBacking {
+                    token_index: *token_index as i64,
+                    chain: *chain,
+                    token: token.clone(),
+                    decimals: *decimals as i32,
+                    nonce: *nonce as i64,
+                    pq_signers: pq_signers.clone(),
+                };
+                TxFields {
+                    asset_index: Some(*token_index as i64),
+                    action_nonce: Some(*nonce as i64),
+                    pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::ListBacking)
+                }
+            }
             RpcAction::Unknown { kind: tag } => TxFields {
                 // The column is VARCHAR(32); a longer tag is stored truncated on a char boundary.
                 kind_tag: truncate_chars(tag, 32),
@@ -444,7 +644,7 @@ fn truncate_chars(s: &str, max: usize) -> &str {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rpc::Units;
+    use crate::rpc::{RpcInitialMint, Units};
 
     #[test]
     fn a_plain_transfer_is_kind_transfer_with_no_action_fields() {
@@ -456,24 +656,13 @@ mod tests {
 
     #[test]
     fn a_burn_keeps_the_foreign_address_and_asset_index() {
-        let asset_bundle = RpcBundle {
-            anchor: "a".into(),
-            nullifiers: ["n1".into(), "n2".into()],
-            commitments: ["c1".into(), "c2".into()],
-            fee: Units("0".into()),
-            burn: Units("500".into()),
-            asset: 2,
-            time: 9,
-            proof_len: 1,
-            envelope_len: [1, 1],
-        };
         let k = RpcAction::BridgeBurn {
             asset: 2,
             amount: Units("400".into()),
             relayer_fee: Units("100".into()),
             to_chain: 5,
+            token: "cd".repeat(32),
             to: "00".repeat(32),
-            asset_bundle: Box::new(asset_bundle),
         };
         let f = TxFields::from_action(&k);
         assert_eq!(f.kind, TxKind::BridgeBurn);
@@ -482,7 +671,131 @@ mod tests {
         assert_eq!(f.relayer_fee.as_deref(), Some("100"));
         assert_eq!(f.to_chain, Some(5));
         assert_eq!(f.bridge_to.map(str::len), Some(64));
-        assert_eq!(f.asset_bundle.unwrap().burn.0, "500");
+        assert_eq!(f.bridge_token.map(str::len), Some(64));
+    }
+
+    fn bundle4() -> RpcBundle {
+        RpcBundle {
+            anchor: "a".into(),
+            nullifiers: ["n1".into(), "n2".into(), "n3".into(), "n4".into()],
+            commitments: ["c1".into(), "c2".into(), "c3".into(), "c4".into()],
+            fee: Units("1000000".into()),
+            burn_a: Units("0".into()),
+            burn_r: Units("0".into()),
+            burn_asset: 0,
+            time: 9,
+            proof_len: 1,
+            envelope_len: [1, 1, 1, 1],
+        }
+    }
+
+    #[test]
+    fn a_transfer_bundle_has_four_slots_and_no_public_asset() {
+        let nb = new_bundle(&bundle4());
+        assert_eq!(nb.nullifiers.len(), 4);
+        assert_eq!(nb.commitments.len(), 4);
+        assert_eq!(nb.envelope_len.len(), 4);
+        assert_eq!(nb.burn_a, "0");
+        assert_eq!(nb.burn_r, "0");
+        assert_eq!(nb.burn_asset, 0);
+    }
+
+    /// A zUSD-style bridged mint: the derived note's commitment must be computed (not left
+    /// `None`), since the node never publishes it directly for a `token_mint`.
+    #[test]
+    fn a_token_mint_gets_a_derived_commitment_for_note_linking() {
+        let mut raw = vec![1u8; 32];
+        raw.extend_from_slice(&[2u8; 8]);
+        let recipient = format!("rand1{}", bs58::encode(&raw).into_string());
+        let k = RpcAction::TokenMint {
+            asset: 3,
+            amount: Units("700".into()),
+            recipient: recipient.clone(),
+            time: 41,
+            r: "aa".repeat(32),
+            nonce: 0,
+        };
+        let f = TxFields::from_action(&k);
+        assert_eq!(f.kind, TxKind::TokenMint);
+        assert_eq!(f.asset_index, Some(3));
+        assert_eq!(f.amount.as_deref(), Some("700"));
+        assert_eq!(f.recipient, Some(recipient.as_str()));
+        let cm = f.derived_cm.expect("a token_mint's note commitment must be computed");
+        assert_eq!(cm.len(), 64);
+        // Deterministic: recomputing from the same fields gives the same commitment.
+        let f2 = TxFields::from_action(&k);
+        assert_eq!(f2.derived_cm, Some(cm));
+        let action = f.token_action.expect("token_action carries the full payload");
+        assert_eq!(action["kind"], "token_mint");
+        assert_eq!(action["asset"], 3);
+    }
+
+    /// `register_token` with an initial mint gets the same treatment; without one, no leaf.
+    #[test]
+    fn register_token_derives_a_commitment_only_when_it_carries_an_initial_mint() {
+        let mut raw = vec![1u8; 32];
+        raw.extend_from_slice(&[2u8; 8]);
+        let recipient = format!("rand1{}", bs58::encode(&raw).into_string());
+        let with_initial = RpcAction::RegisterToken {
+            name: "zUSD".into(),
+            symbol: "zUSD".into(),
+            decimals: 6,
+            authority: "bridge".into(),
+            index: 3,
+            initial_amount: Some(Units("5000".into())),
+            initial: Some(RpcInitialMint { amount: Units("5000".into()), recipient: recipient.clone(), time: 40, r: "bb".repeat(32) }),
+        };
+        let f = TxFields::from_action(&with_initial);
+        assert_eq!(f.kind, TxKind::RegisterToken);
+        assert_eq!(f.asset_index, Some(3));
+        assert!(f.derived_cm.is_some());
+        assert_eq!(f.token_action.unwrap()["kind"], "register_token");
+
+        let without_initial = RpcAction::RegisterToken {
+            name: "FIX".into(),
+            symbol: "FIX".into(),
+            decimals: 0,
+            authority: "none".into(),
+            index: 4,
+            initial_amount: None,
+            initial: None,
+        };
+        let f2 = TxFields::from_action(&without_initial);
+        assert!(f2.derived_cm.is_none());
+        assert_eq!(f2.asset_index, Some(4));
+    }
+
+    #[test]
+    fn bridge_attest_copies_the_nodes_own_commitment_rather_than_hashing() {
+        let k = RpcAction::BridgeAttest {
+            attestation_len: 520,
+            recipient: "rand1abc".into(),
+            asset: Some(1),
+            asset_index: Some(1),
+            amount: Some(Units("1000".into())),
+            time: Some(41),
+            r: Some("aa".repeat(32)),
+            commitment: Some("cc".repeat(32)),
+            pq_signers: vec![0, 1],
+        };
+        let f = TxFields::from_action(&k);
+        assert_eq!(f.kind, TxKind::BridgeAttest);
+        assert_eq!(f.derived_cm.as_deref(), Some("cc".repeat(32).as_str()));
+        assert_eq!(f.pq_signers, Some(vec![0, 1]));
+    }
+
+    #[test]
+    fn pause_and_unpause_are_bundle_less_governance_actions() {
+        let f = TxFields::from_action(&RpcAction::PauseMints { nonce: 4 });
+        assert_eq!(f.kind, TxKind::PauseMints);
+        assert_eq!(f.action_nonce, Some(4));
+        assert_eq!(f.bridge_governance.unwrap()["kind"], "pause_mints");
+
+        let unpause = RpcAction::UnpauseMints { nonce: 5, pq_signers: vec![0, 2] };
+        let f = TxFields::from_action(&unpause);
+        assert_eq!(f.kind, TxKind::UnpauseMints);
+        assert_eq!(f.pq_signers, Some(vec![0, 2]));
+        assert_eq!(f.bridge_governance.unwrap()["pq_signers"], serde_json::json!([0, 2]));
     }
 
     #[test]
