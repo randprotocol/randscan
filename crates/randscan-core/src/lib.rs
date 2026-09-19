@@ -3,6 +3,7 @@
 //! The chain is the Rand Protocol RAND chain served by `rand-node` (JSON-RPC `rand_*`).
 
 pub mod error;
+pub mod notecommit;
 pub mod types;
 
 pub use error::*;
@@ -26,6 +27,25 @@ pub fn format_units(units: &str) -> String {
         return whole.to_string();
     }
     let frac = format!("{:09}", frac);
+    format!("{}.{}", whole, frac.trim_end_matches('0'))
+}
+
+/// Format an amount in a token's own smallest unit (decimal string) as a decimal string with
+/// that token's `decimals`, trimming trailing zeros — the general form of [`format_units`], which
+/// is fixed to RAND's 9. Used for RPL token amounts (`register_token`/`token_mint`/`token_burn`'s
+/// public amount, and a disclosed note's), whose unit is never RAND's.
+pub fn format_token_units(units: &str, decimals: u32) -> String {
+    let value: u128 = units.parse().unwrap_or(0);
+    if decimals == 0 {
+        return value.to_string();
+    }
+    let scale = 10u128.pow(decimals);
+    let whole = value / scale;
+    let frac = value % scale;
+    if frac == 0 {
+        return whole.to_string();
+    }
+    let frac = format!("{:0width$}", frac, width = decimals as usize);
     format!("{}.{}", whole, frac.trim_end_matches('0'))
 }
 
@@ -72,6 +92,16 @@ mod tests {
         assert_eq!(format_units("1500000000"), "1.5");
         assert_eq!(format_units("100000000225"), "100.000000225");
         assert_eq!(format_units("25"), "0.000000025");
+    }
+
+    #[test]
+    fn formats_token_units_at_arbitrary_decimals() {
+        // zUSD-shaped: 6 decimals.
+        assert_eq!(format_token_units("1250000", 6), "1.25");
+        assert_eq!(format_token_units("0", 6), "0");
+        assert_eq!(format_token_units("1000000", 6), "1");
+        assert_eq!(format_token_units("700", 0), "700");
+        assert_eq!(format_token_units("5", 8), "0.00000005");
     }
 
     #[test]

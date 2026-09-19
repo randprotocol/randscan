@@ -11,3 +11,20 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 chrono = { workspace = true }
 uuid = { workspace = true }
+
+# Chain 14 (the hidden-asset bundle): a native (non-wasm) Poseidon2 note-commitment hash, so the
+# indexer can recompute the ONE commitment a `token_mint` / a `register_token` initial mint does
+# not publish directly (unlike a `bridge_attest`'s deposit, whose `commitment` field the node
+# already serves) and link that leaf to its transaction. Pinned to the *exact* versions
+# `crates/randscan-viewing` uses (fullnode's vendored zkVM, commit e2aae20): the Poseidon2 round
+# constants are drawn from a seeded `rand` `StdRng`, so a different `rand` version can silently
+# produce different constants and a wrong hash. Deliberately not a dependency on
+# `crates/randscan-viewing` itself, which is wasm32-only (`getrandom`'s `wasm_js` backend) and
+# excluded from this workspace.
+p3-goldilocks = "=0.7.0"
+p3-poseidon2 = "=0.7.0"
+p3-field = "=0.7.0"
+p3-symmetric = "=0.7.0"
+rand = { version = "=0.10.2", features = ["std_rng"] }
+bs58 = "0.5"
+hex = "0.4"
