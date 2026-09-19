@@ -48,10 +48,17 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // The RPL token standard (spec §4/§6) and bridge hardening's governance actions (B1/B4): a
     // token registered with an initial mint, a later mint, an authority change, a holder burn,
     // the mint pause and its lifting, and a second bridged token listed after genesis.
+    // The token RPC's own `backing_json` (crates/randprotocol-node/src/rpc.rs) sends
+    // `locked`/`minted_today` as decimal strings but `mint_cap_per_day` as a JSON number — the
+    // literal pinned by its test `the_token_listing_serves_every_row_paged`
+    // (`"locked": "600", "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": "1000"`).
     chain.push_token(json!({
         "index": 3, "id": h("zusd-id"), "id_text": "rpl1zusdexampleexampleexampleexampleexampleexampleexampleeez",
         "name": "zUSD", "symbol": "zUSD", "decimals": 6,
-        "authority": { "kind": "bridge", "backings": [{ "chain": 2, "token": "bb".repeat(32), "decimals": 6, "locked": "600", "minted_today": "700", "mint_day": 20345, "mint_cap_per_day": "10000000000" }] },
+        "authority": { "kind": "bridge", "backings": [{
+            "chain": 2, "token": "bb".repeat(32), "decimals": 6, "locked": "600",
+            "minted_today": "700", "mint_day": 20345, "mint_cap_per_day": 100_000u64 * 100_000_000,
+        }] },
         "mint_nonce": 1, "total_supply": "5700", "registered_at": 3
     }));
     let zusd_register_recipient = shielded_address("zusd-register-recipient");
@@ -420,8 +427,15 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(bridge["list_nonce"], 0);
     assert_eq!(bridge["registration_fee"], 1_000_000_000u64);
     assert!(bridge["pause_key"].as_str().is_some());
-    assert_eq!(bridge["assets"][0]["decimals"], 6);
+    // decimals 8 / locked 600 / mint_cap_per_day 1e13 / minted_today 1000 are the node's own
+    // pinned test's literal values (rpc.rs's `bridge_state_reports_guardians_emitters_and_the_
+    // registry`), sent as JSON numbers on the wire — this API's own `/bridge` output still
+    // normalises `locked` to a decimal string, its established convention regardless of how the
+    // node encoded it (`randscan_core::amount`'s tolerant deserializer).
+    assert_eq!(bridge["assets"][0]["decimals"], 8);
     assert_eq!(bridge["assets"][0]["locked"], "600");
+    assert_eq!(bridge["assets"][0]["mint_cap_per_day"], (100_000u64 * 100_000_000).to_string());
+    assert_eq!(bridge["assets"][0]["minted_today"], "1000");
     // Registry rows joined with the indexed flows: index 1 saw one 1000-unit deposit and one
     // 400-unit burn (the rotation carries no asset and is not counted); index 2 is Ethereum
     // USDT, registered but never used, so it is named and zero.
@@ -438,6 +452,8 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(assets[0]["symbol"], Value::Null);
     assert_eq!(assets[0]["first_height"], assets[0]["last_height"]);
     assert_eq!(assets[0]["locked"], "600", "the registry's own figure, alongside the indexed flows");
+    assert_eq!(assets[0]["minted_today"], "1000");
+    assert_eq!(assets[0]["mint_cap_per_day"], (100_000u64 * 100_000_000).to_string());
     assert_eq!(assets[1]["index"], 2);
     assert_eq!(assets[1]["symbol"], "USDT");
     assert_eq!(assets[1]["name"], "Tether USD");
@@ -457,6 +473,12 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(tokens_list["tokens"][0]["authority"]["kind"], "bridge");
     assert_eq!(tokens_list["tokens"][0]["authority"]["backings"][0]["locked"], "600");
     assert_eq!(tokens_list["tokens"][0]["authority"]["backings"][0]["minted_today"], "700");
+    // The node sent this one as a bare number (unlike locked/minted_today, strings, on the same
+    // backing row) — this API's output still normalises it to a decimal string regardless.
+    assert_eq!(
+        tokens_list["tokens"][0]["authority"]["backings"][0]["mint_cap_per_day"],
+        (100_000u64 * 100_000_000).to_string()
+    );
 
     for key in ["3", &h("zusd-id"), "rpl1zusdexampleexampleexampleexampleexampleexampleexampleeez"] {
         let (status, _, d) = call_api(&live.app, &format!("/api/v1/tokens/{key}")).await;

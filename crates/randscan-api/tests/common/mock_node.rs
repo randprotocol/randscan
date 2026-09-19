@@ -281,18 +281,27 @@ impl MockChain {
                 "pool_value": "1099997000000", "register_total": "100000003000000", "total_supply": "101100000000000",
                 "invariant_holds": true
             }),
+            // The shape (and, critically, the *encoding*) is copied verbatim from the node's own
+            // pinned test, `bridge_state_reports_guardians_emitters_and_the_registry`
+            // (crates/randprotocol-node/src/rpc.rs): `asset_json` sends `locked`/
+            // `minted_today`/`mint_cap_per_day` as JSON **numbers**, not decimal strings (unlike
+            // the token RPC's `backing_json` for the same conceptual fields — see
+            // `push_token`'s zUSD fixture in the test itself). `next_index` is gone from
+            // `rand_getBridgeState` since the bridge's own registry no longer predicts an index.
             "rand_getBridgeState" => json!({
                 "enabled": true, "emitter": "01".repeat(32), "emitters": { "2": "02".repeat(32) },
                 "guardian_set_index": 0, "guardians": ["aa".repeat(20)],
                 "pq_guardians": self.pq_guardians, "mint_paused": self.mint_paused,
                 "pause_nonce": self.pause_nonce, "list_nonce": self.list_nonce,
                 "pause_key": "dd".repeat(1312), "registration_fee": self.registration_fee,
-                "burn_sequence": 1, "next_index": 3,
+                "burn_sequence": 1,
                 "assets": [
                     { "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1"),
-                      "decimals": 6, "locked": "600", "minted_today": "0", "mint_day": 0 },
+                      "decimals": 8, "locked": 600,
+                      "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 1_000, "mint_day": 0 },
                     { "index": 2, "chain": 2, "token": format!("{}dac17f958d2ee523a2206206994597c13d831ec7", "0".repeat(24)), "asset_id": h("asset-2"),
-                      "decimals": 6, "locked": "0", "minted_today": "0", "mint_day": 0 }
+                      "decimals": 6, "locked": 0,
+                      "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 0, "mint_day": 0 }
                 ]
             }),
             "rand_getTokens" => {
