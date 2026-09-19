@@ -2,6 +2,7 @@
 //!
 //! The chain is the Rand Protocol RAND chain served by `rand-node` (JSON-RPC `rand_*`).
 
+pub mod amount;
 pub mod error;
 pub mod notecommit;
 pub mod types;

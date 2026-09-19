@@ -4,6 +4,7 @@
 //! (`TokenAction` on `TransactionDetail`, in `transaction.rs`, is the per-transaction half of this
 //! same public registry).
 
+use crate::amount;
 use serde::{Deserialize, Serialize};
 
 /// A source-chain coin behind a bridged token (`rand_getTokens`' `authority.backings`,
@@ -11,17 +12,23 @@ use serde::{Deserialize, Serialize};
 /// decimals (the token itself is always eight decimals on Rand) and what this backing has locked
 /// for/minted through it. `minted_today`/`mint_day`/`mint_cap_per_day` are bridge hardening B1 —
 /// `None` on a node or a token predating it.
+///
+/// The node's `backing_json` sends `locked`/`minted_today` as decimal **strings** but
+/// `mint_cap_per_day` as a **number** — and `rand_getBridgeState`/`rand_getAssets`' `asset_json`
+/// sends all three of the *same* conceptual fields as numbers (`BridgeAsset`'s doc comment).
+/// `amount::amount`/`amount::amount_opt` accept either encoding.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct TokenBacking {
     pub chain: i64,
     pub token: String,
     pub decimals: i32,
+    #[serde(deserialize_with = "amount::amount")]
     pub locked: String,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "amount::amount_opt")]
     pub minted_today: Option<String>,
     #[serde(default)]
     pub mint_day: Option<i64>,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "amount::amount_opt")]
     pub mint_cap_per_day: Option<String>,
 }
 
@@ -61,6 +68,7 @@ pub struct TokenInfo {
     pub decimals: i32,
     pub authority: TokenAuthority,
     pub mint_nonce: i64,
+    #[serde(deserialize_with = "amount::amount")]
     pub total_supply: String,
     pub registered_at: i64,
 }
@@ -82,8 +90,10 @@ impl TokenInfo {
 pub struct TokenList {
     pub enabled: bool,
     /// A number, like `rand_getBridgeState`'s (`docs/rpc.md`: "`registration_fee` and
-    /// `next_index` are numbers").
-    #[serde(default)]
+    /// `next_index` are numbers") — parsed tolerantly (`amount::int_opt`) all the same, since
+    /// this node already renders the conceptually identical `TokenBacking`/`BridgeAsset` amount
+    /// fields inconsistently between its own RPC methods.
+    #[serde(default, deserialize_with = "amount::int_opt")]
     pub registration_fee: Option<i64>,
     #[serde(default)]
     pub next_index: Option<i64>,
@@ -94,6 +104,7 @@ pub struct TokenList {
 /// backing's locked amount (the `locked` amounts sum to `total_supply`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TokenSupply {
+    #[serde(deserialize_with = "amount::amount")]
     pub total_supply: String,
     #[serde(default)]
     pub backings: Vec<TokenBacking>,
@@ -193,5 +204,40 @@ mod tests {
         assert!(!v.enabled);
         assert!(v.tokens.is_empty());
         assert_eq!(v.registration_fee, None);
+    }
+
+    /// The exact JSON the node's own pinned test emits for a bridged token's backing
+    /// (`the_token_listing_serves_every_row_paged`, `crates/randprotocol-node/src/rpc.rs`'s
+    /// `backing_json`): `locked`/`minted_today` are decimal **strings** but `mint_cap_per_day`
+    /// is a bare **number** — three amount fields, two encodings, on the very same object. Before
+    /// the tolerant `amount` deserializers this failed closed on `mint_cap_per_day` alone.
+    #[test]
+    fn a_backing_with_mixed_string_and_numeric_amounts_parses_like_the_nodes_own_fixture() {
+        let v = serde_json::json!({
+            "chain": 2, "token": "aa".repeat(32), "decimals": 8, "locked": "600",
+            "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": "1000", "mint_day": 0,
+        });
+        let backing: TokenBacking = serde_json::from_value(v).expect("the node's own mixed encoding must parse");
+        assert_eq!(backing.locked, "600");
+        assert_eq!(backing.minted_today.as_deref(), Some("1000"));
+        assert_eq!(backing.mint_cap_per_day.as_deref(), Some("10000000000000"));
+    }
+
+    /// `rand_getTokens`' `total_supply` and `registration_fee` in the node's own pinned shape:
+    /// `total_supply` a decimal string, `registration_fee` a bare number.
+    #[test]
+    fn token_list_parses_the_nodes_own_pinned_shape() {
+        let v = serde_json::json!({
+            "enabled": true, "registration_fee": 1_000_000_000u64, "next_index": 3,
+            "tokens": [{
+                "index": 2, "id": "aa".repeat(32), "id_text": "rpl1x",
+                "name": "Test Coin", "symbol": "TST", "decimals": 6,
+                "authority": { "kind": "key", "key": "bb".repeat(1312), "address": "2nRd" },
+                "mint_nonce": 1, "total_supply": "5700", "registered_at": 3,
+            }],
+        });
+        let list: TokenList = serde_json::from_value(v).expect("must parse the node's own pinned shape");
+        assert_eq!(list.registration_fee, Some(1_000_000_000));
+        assert_eq!(list.tokens[0].total_supply, "5700");
     }
 }
