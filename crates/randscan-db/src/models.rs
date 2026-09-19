@@ -2,8 +2,9 @@
 
 use chrono::{DateTime, Utc};
 use randscan_core::{
-    BlockSummary, Bundle, GeoInfo, NetworkStats, Note, Nullifier, PendingStake, ProgramSummary,
-    Receipt, TransactionDetail, TransactionSummary, TxKind, Validator,
+    BlockSummary, BridgeGovernanceAction, Bundle, GeoInfo, NetworkStats, Note, Nullifier,
+    PendingStake, ProgramSummary, Receipt, TokenAction, TransactionDetail, TransactionSummary,
+    TxKind, Validator,
 };
 use sqlx::FromRow;
 
@@ -81,14 +82,21 @@ pub struct TxDetailRow {
     pub anchor: Option<String>,
     pub nullifier_1: Option<String>,
     pub nullifier_2: Option<String>,
+    pub nullifier_3: Option<String>,
+    pub nullifier_4: Option<String>,
     pub commitment_1: Option<String>,
     pub commitment_2: Option<String>,
-    pub burn: Option<String>,
-    pub asset: Option<i64>,
+    pub commitment_3: Option<String>,
+    pub commitment_4: Option<String>,
+    pub burn_a: Option<String>,
+    pub burn_r: Option<String>,
+    pub burn_asset: Option<i64>,
     pub bundle_time: Option<i64>,
     pub proof_len: Option<i64>,
     pub envelope_len_1: Option<i64>,
     pub envelope_len_2: Option<i64>,
+    pub envelope_len_3: Option<i64>,
+    pub envelope_len_4: Option<i64>,
     pub words_len: Option<i64>,
     pub call_proof_len: Option<i64>,
     pub input_envelope_len: Option<i64>,
@@ -101,7 +109,12 @@ pub struct TxDetailRow {
     pub relayer_fee: Option<String>,
     pub to_chain: Option<i32>,
     pub bridge_to: Option<String>,
-    pub asset_bundle: Option<serde_json::Value>,
+    pub bridge_token: Option<String>,
+    pub deposit_r: Option<String>,
+    pub derived_cm: Option<String>,
+    pub pq_signers: Option<Vec<i32>>,
+    pub token_action: Option<serde_json::Value>,
+    pub bridge_governance: Option<serde_json::Value>,
 }
 
 impl TxDetailRow {
@@ -115,28 +128,52 @@ impl TxDetailRow {
             nullifiers: [
                 self.nullifier_1.clone().unwrap_or_default(),
                 self.nullifier_2.clone().unwrap_or_default(),
+                self.nullifier_3.clone().unwrap_or_default(),
+                self.nullifier_4.clone().unwrap_or_default(),
             ],
             commitments: [
                 self.commitment_1.clone().unwrap_or_default(),
                 self.commitment_2.clone().unwrap_or_default(),
+                self.commitment_3.clone().unwrap_or_default(),
+                self.commitment_4.clone().unwrap_or_default(),
             ],
             fee: self.tx.fee.clone(),
-            burn: self.burn.clone().unwrap_or_else(|| "0".into()),
-            asset: self.asset.unwrap_or(0),
+            burn_a: self.burn_a.clone().unwrap_or_else(|| "0".into()),
+            burn_r: self.burn_r.clone().unwrap_or_else(|| "0".into()),
+            burn_asset: self.burn_asset.unwrap_or(0),
             time: self.bundle_time.unwrap_or(0),
             proof_len: self.proof_len.unwrap_or(0),
             envelope_len: [
                 self.envelope_len_1.unwrap_or(0),
                 self.envelope_len_2.unwrap_or(0),
+                self.envelope_len_3.unwrap_or(0),
+                self.envelope_len_4.unwrap_or(0),
             ],
         })
     }
 
+    /// bridge_attest: the deposit's commitment, from the RPC's `commitment` field. token_mint /
+    /// register_token (initial mint): this indexer's own recomputation (`derived_cm`, see the
+    /// migration's doc comment). `None` for every other kind.
+    pub fn commitment(&self) -> Option<String> {
+        match self.tx.kind.as_str() {
+            "bridge_attest" => self.derived_cm.clone(),
+            _ => None,
+        }
+    }
+
     pub fn into_detail(self, receipt: Option<Receipt>) -> TransactionDetail {
         let bundle = self.bundle();
-        let asset_bundle = self
-            .asset_bundle
+        let commitment = self.commitment();
+        let token_action: Option<TokenAction> = self
+            .token_action
             .and_then(|v| serde_json::from_value(v).ok());
+        let bridge_governance: Option<BridgeGovernanceAction> = self
+            .bridge_governance
+            .and_then(|v| serde_json::from_value(v).ok());
+        let pq_signers = self
+            .pq_signers
+            .map(|v| v.into_iter().map(i64::from).collect());
         TransactionDetail {
             chain_id: self.chain_id,
             bundle,
@@ -153,7 +190,12 @@ impl TxDetailRow {
             relayer_fee: self.relayer_fee,
             to_chain: self.to_chain,
             bridge_to: self.bridge_to,
-            asset_bundle,
+            bridge_token: self.bridge_token,
+            deposit_r: self.deposit_r,
+            commitment,
+            pq_signers,
+            token_action,
+            bridge_governance,
             summary: self.tx.into(),
         }
     }

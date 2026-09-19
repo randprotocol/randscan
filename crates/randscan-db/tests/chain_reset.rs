@@ -17,8 +17,8 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     run_migrations(&pool).await.unwrap();
     let mut conn = pool.acquire().await.unwrap();
 
-    // One block with a bridge_burn (two bundles, four nullifiers), one tree leaf, and a user
-    // that must survive.
+    // One block with a bridge_burn (the chain-14 single hidden-asset bundle: four slots, its
+    // `burn_a`/`burn_asset` carrying the redemption), one tree leaf, and a user that must survive.
     for t in CHAIN_TABLES {
         sqlx::query(&format!("TRUNCATE {t} CASCADE")).execute(&mut *conn).await.unwrap();
     }
@@ -41,19 +41,16 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     .unwrap();
     let bundle = |tag: &str| NewBundle {
         anchor: "aa".repeat(32),
-        nullifiers: [format!("{tag}1").repeat(32), format!("{tag}2").repeat(32)],
-        commitments: [format!("{tag}3").repeat(32), format!("{tag}4").repeat(32)],
+        nullifiers: [format!("{tag}1").repeat(32), format!("{tag}2").repeat(32), format!("{tag}3").repeat(32), format!("{tag}4").repeat(32)],
+        commitments: [format!("{tag}5").repeat(32), format!("{tag}6").repeat(32), format!("{tag}7").repeat(32), format!("{tag}8").repeat(32)],
         fee: "2000000".into(),
-        burn: "0".into(),
-        asset: 0,
+        burn_a: "500".into(),
+        burn_r: "0".into(),
+        burn_asset: 2,
         time: 0,
         proof_len: 302857,
-        envelope_len: [1380, 1380],
+        envelope_len: [1380, 1380, 1380, 1380],
     };
-    let mut asset_bundle = bundle("e");
-    asset_bundle.fee = "0".into();
-    asset_bundle.burn = "500".into();
-    asset_bundle.asset = 2;
     insert_transaction(
         &mut conn,
         &NewTx {
@@ -70,13 +67,13 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
             relayer_fee: Some("100".into()),
             to_chain: Some(2),
             bridge_to: Some(&"00".repeat(32)),
-            asset_bundle: Some(asset_bundle),
+            bridge_token: Some(&"ee".repeat(32)),
             ..Default::default()
         },
     )
     .await
     .unwrap();
-    insert_notes(&mut conn, &[NewNote { leaf_index: 0, cm: "d3".repeat(32), height: 0, envelope: None }]).await.unwrap();
+    insert_notes(&mut conn, &[NewNote { leaf_index: 0, cm: "d5".repeat(32), height: 0, envelope: None }]).await.unwrap();
     set_next_leaf(&mut conn, 1).await.unwrap();
     set_next_height(&mut conn, 1, Some(&"ab".repeat(32))).await.unwrap();
     set_chain_id(&mut conn, 4).await.unwrap();
@@ -97,14 +94,14 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
     .unwrap();
     assert_eq!(stored, ("bridge_burn".into(), Some("400".into()), Some(2), true));
     let nfs: i64 = sqlx::query_scalar("SELECT count(*) FROM nullifiers").fetch_one(&mut *conn).await.unwrap();
-    assert_eq!(nfs, 4, "both bundles' nullifiers are recorded");
-    let (asset_burn,): (String,) =
-        sqlx::query_as("SELECT asset_bundle->>'burn' FROM transactions WHERE hash = $1")
+    assert_eq!(nfs, 4, "the one hidden-asset bundle's four slots are recorded");
+    let (burn_a, burn_asset): (String, i64) =
+        sqlx::query_as("SELECT burn_a::text, burn_asset FROM transactions WHERE hash = $1")
             .bind("cd".repeat(32))
             .fetch_one(&mut *conn)
             .await
             .unwrap();
-    assert_eq!(asset_burn, "500");
+    assert_eq!((burn_a, burn_asset), ("500".into(), 2));
     let linked: Option<String> = sqlx::query_scalar("SELECT tx_hash FROM notes WHERE leaf_index = 0")
         .fetch_one(&mut *conn)
         .await

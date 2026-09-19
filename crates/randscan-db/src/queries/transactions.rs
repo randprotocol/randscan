@@ -6,22 +6,28 @@ pub const TX_COLS: &str = "hash, block_hash, height, tx_index, kind, fee::text A
 
 /// Every column: `TX_COLS` plus the bundle and the action fields.
 pub const TX_DETAIL_COLS: &str = "hash, block_hash, height, tx_index, kind, fee::text AS fee, timestamp_ms, has_bundle, program_id, validator, amount::text AS amount, asset_index,
-    chain_id, anchor, nullifier_1, nullifier_2, commitment_1, commitment_2, burn::text AS burn, asset, bundle_time, proof_len, envelope_len_1, envelope_len_2,
+    chain_id, anchor, nullifier_1, nullifier_2, nullifier_3, nullifier_4,
+    commitment_1, commitment_2, commitment_3, commitment_4,
+    burn_a::text AS burn_a, burn_r::text AS burn_r, burn_asset, bundle_time, proof_len,
+    envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
     words_len, call_proof_len, input_envelope_len, cm, registered, action_nonce, attestation_len, recipient, note_time,
-    relayer_fee::text AS relayer_fee, to_chain, bridge_to, asset_bundle";
+    relayer_fee::text AS relayer_fee, to_chain, bridge_to, bridge_token, deposit_r, derived_cm, pq_signers,
+    token_action, bridge_governance";
 
-/// The public fields of one bundle, as the indexer stores them.
+/// The public fields of one hidden-asset bundle (chain 14: four input slots, four output slots,
+/// dummies included; no public `asset` field — see `randscan_core::Bundle`'s doc comment).
 #[derive(Debug, Clone, Default)]
 pub struct NewBundle {
     pub anchor: String,
-    pub nullifiers: [String; 2],
-    pub commitments: [String; 2],
+    pub nullifiers: [String; 4],
+    pub commitments: [String; 4],
     pub fee: String,
-    pub burn: String,
-    pub asset: i64,
+    pub burn_a: String,
+    pub burn_r: String,
+    pub burn_asset: i64,
     pub time: i64,
     pub proof_len: i64,
-    pub envelope_len: [i64; 2],
+    pub envelope_len: [i64; 4],
 }
 
 #[derive(Debug, Clone, Default)]
@@ -50,31 +56,43 @@ pub struct NewTx<'a> {
     pub relayer_fee: Option<String>,
     pub to_chain: Option<i32>,
     pub bridge_to: Option<&'a str>,
-    pub asset_bundle: Option<NewBundle>,
+    /// bridge_burn: the backing being redeemed (source-chain token address, 32 bytes hex).
+    pub bridge_token: Option<&'a str>,
+    /// bridge_attest / token_mint / register_token (initial mint): the note's blinding.
+    pub deposit_r: Option<&'a str>,
+    /// The chain-computed note's commitment, for linking its leaf to this transaction. Set from
+    /// the RPC's own `commitment` field on a `bridge_attest`, and recomputed by the indexer
+    /// (`randscan_core::notecommit::mint_commitment`) on a `token_mint` or a `register_token`
+    /// with an initial mint.
+    pub derived_cm: Option<String>,
+    /// bridge_attest / unpause_mints / register_bridged_token / list_backing.
+    pub pq_signers: Option<Vec<i32>>,
+    /// register_token / token_mint / set_authority / token_burn, in full.
+    pub token_action: Option<serde_json::Value>,
+    /// pause_mints / unpause_mints / register_bridged_token / list_backing, in full.
+    pub bridge_governance: Option<serde_json::Value>,
 }
 
-fn bundle_json(b: &NewBundle) -> serde_json::Value {
-    serde_json::json!({
-        "anchor": b.anchor, "nullifiers": b.nullifiers, "commitments": b.commitments,
-        "fee": b.fee, "burn": b.burn, "asset": b.asset, "time": b.time,
-        "proof_len": b.proof_len, "envelope_len": b.envelope_len,
-    })
-}
-
-/// Insert the transaction and every nullifier its bundles published.
+/// Insert the transaction and every nullifier its bundle published.
 pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Result<()> {
     let b = t.bundle.as_ref();
     let fee = b.map(|b| b.fee.as_str()).unwrap_or("0");
     sqlx::query(
         "INSERT INTO transactions (hash, block_hash, height, tx_index, chain_id, timestamp_ms, kind, fee,
-             has_bundle, anchor, nullifier_1, nullifier_2, commitment_1, commitment_2, burn, asset, bundle_time,
-             proof_len, envelope_len_1, envelope_len_2,
+             has_bundle, anchor, nullifier_1, nullifier_2, nullifier_3, nullifier_4,
+             commitment_1, commitment_2, commitment_3, commitment_4,
+             burn_a, burn_r, burn_asset, bundle_time,
+             proof_len, envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
              program_id, words_len, call_proof_len, input_envelope_len, amount, cm, validator, registered,
              action_nonce, attestation_len, recipient, note_time, asset_index, relayer_fee, to_chain, bridge_to,
-             asset_bundle)
+             bridge_token, deposit_r, derived_cm, pq_signers, token_action, bridge_governance)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric,
-             $9, $10, $11, $12, $13, $14, $15::numeric, $16, $17, $18, $19, $20,
-             $21, $22, $23, $24, $25::numeric, $26, $27, $28, $29, $30, $31, $32, $33, $34::numeric, $35, $36, $37)",
+             $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
+             $19::numeric, $20::numeric, $21, $22,
+             $23, $24, $25, $26, $27,
+             $28, $29, $30, $31, $32::numeric, $33, $34, $35,
+             $36, $37, $38, $39, $40, $41::numeric, $42, $43,
+             $44, $45, $46, $47, $48, $49)",
     )
     .bind(t.hash)
     .bind(t.block_hash)
@@ -88,14 +106,21 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(b.map(|b| b.anchor.as_str()))
     .bind(b.map(|b| b.nullifiers[0].as_str()))
     .bind(b.map(|b| b.nullifiers[1].as_str()))
+    .bind(b.map(|b| b.nullifiers[2].as_str()))
+    .bind(b.map(|b| b.nullifiers[3].as_str()))
     .bind(b.map(|b| b.commitments[0].as_str()))
     .bind(b.map(|b| b.commitments[1].as_str()))
-    .bind(b.map(|b| b.burn.as_str()))
-    .bind(b.map(|b| b.asset))
+    .bind(b.map(|b| b.commitments[2].as_str()))
+    .bind(b.map(|b| b.commitments[3].as_str()))
+    .bind(b.map(|b| b.burn_a.as_str()))
+    .bind(b.map(|b| b.burn_r.as_str()))
+    .bind(b.map(|b| b.burn_asset))
     .bind(b.map(|b| b.time))
     .bind(b.map(|b| b.proof_len))
     .bind(b.map(|b| b.envelope_len[0]))
     .bind(b.map(|b| b.envelope_len[1]))
+    .bind(b.map(|b| b.envelope_len[2]))
+    .bind(b.map(|b| b.envelope_len[3]))
     .bind(t.program_id)
     .bind(t.words_len)
     .bind(t.call_proof_len)
@@ -112,11 +137,16 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(t.relayer_fee.as_deref())
     .bind(t.to_chain)
     .bind(t.bridge_to)
-    .bind(t.asset_bundle.as_ref().map(bundle_json))
+    .bind(t.bridge_token)
+    .bind(t.deposit_r)
+    .bind(t.derived_cm.as_deref())
+    .bind(t.pq_signers.as_deref())
+    .bind(t.token_action.as_ref())
+    .bind(t.bridge_governance.as_ref())
     .execute(&mut *conn)
     .await?;
 
-    for bundle in t.bundle.iter().chain(t.asset_bundle.iter()) {
+    if let Some(bundle) = t.bundle.as_ref() {
         for nf in &bundle.nullifiers {
             // A dummy input still publishes a nullifier, and the chain rejects a repeat, so a
             // conflict here can only be a re-index of the same block.
@@ -260,14 +290,59 @@ pub async fn list_program_calls(pool: &PgPool, program: &str, limit: i64) -> Res
         .await?)
 }
 
-/// The transaction whose bundle (or mint) created the note with commitment `cm`.
+/// The transaction whose bundle (or mint, or chain-computed note) created the note with
+/// commitment `cm`.
 pub async fn find_transaction_by_commitment(pool: &PgPool, cm: &str) -> Result<Option<TxRow>> {
     let sql = format!(
-        "SELECT {TX_COLS} FROM transactions WHERE commitment_1 = $1 OR commitment_2 = $1 OR cm = $1
-         OR (asset_bundle IS NOT NULL AND asset_bundle->'commitments' ? $1) LIMIT 1"
+        "SELECT {TX_COLS} FROM transactions
+         WHERE commitment_1 = $1 OR commitment_2 = $1 OR commitment_3 = $1 OR commitment_4 = $1
+            OR cm = $1 OR derived_cm = $1 LIMIT 1"
     );
     Ok(sqlx::query_as::<_, TxRow>(&sql)
         .bind(cm)
         .fetch_optional(pool)
         .await?)
+}
+
+/// One point of a token's public supply history: every `register_token` (its initial mint only),
+/// `token_mint` and `token_burn` that named registry index `asset_index`, oldest first. `delta` is
+/// this row's own field to compute in the caller (register_token/token_mint positive from
+/// `amount`, token_burn negative) since the JSONB shapes differ per kind.
+#[derive(Debug, Clone, sqlx::FromRow)]
+pub struct TokenEventRow {
+    pub tx_hash: String,
+    pub height: i64,
+    pub timestamp_ms: i64,
+    pub kind: String,
+    pub amount: Option<String>,
+    pub token_action: Option<serde_json::Value>,
+}
+
+/// The transaction that registered a token: a `register_token` naming this registry index, or a
+/// `register_bridged_token` naming this asset id (that action's `tx_json` carries no registry
+/// index — only the id the chain will derive it under — so it is matched by id instead).
+pub async fn find_token_deploy_tx(pool: &PgPool, asset_index: i64, asset_id_hex: &str) -> Result<Option<String>> {
+    Ok(sqlx::query_scalar(
+        "SELECT hash FROM transactions
+         WHERE (kind = 'register_token' AND asset_index = $1)
+            OR (kind = 'register_bridged_token' AND token_action->>'asset_id' = $2)
+         ORDER BY height ASC LIMIT 1",
+    )
+    .bind(asset_index)
+    .bind(asset_id_hex)
+    .fetch_optional(pool)
+    .await?)
+}
+
+pub async fn list_token_events(pool: &PgPool, asset_index: i64, limit: i64) -> Result<Vec<TokenEventRow>> {
+    Ok(sqlx::query_as::<_, TokenEventRow>(
+        "SELECT hash AS tx_hash, height, timestamp_ms, kind, amount::text AS amount, token_action
+         FROM transactions
+         WHERE asset_index = $1 AND kind IN ('register_token', 'token_mint', 'token_burn')
+         ORDER BY height ASC, tx_index ASC LIMIT $2",
+    )
+    .bind(asset_index)
+    .bind(limit)
+    .fetch_all(pool)
+    .await?)
 }
