@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { KeyPanel, type SubmittedKey } from '@/components/KeyPanel';
 import { OpenedCallBlock, OpenedNoteBlock, type OpenedNoteRow, type SpentState } from '@/components/OpenedNotes';
+import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
 import { openCall, openNote, type OpenedCall, type OpenedNote } from '@/lib/viewing';
 import type { TransactionKind } from '@/types';
@@ -24,6 +25,10 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
   const [call, setCall] = useState<OpenedCall | null | undefined>(undefined);
   const [hIn, setHIn] = useState<string | null>(null);
   const [hasCallEnvelope, setHasCallEnvelope] = useState(false);
+  // Never fetched more than once per page (SWR-cached): resolves a disclosed note's `asset`
+  // index to its symbol and decimals ("12.50 zUSD") — the browser never sends which token it is
+  // asking about, since the whole registry is what a wallet reads through too.
+  const { data: tokenList } = useTokens();
 
   const run = async ({ kind: keyKind, key }: SubmittedKey) => {
     setBusy(true);
@@ -72,7 +77,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
         </p>
       )}
       {rows?.map((row) => (
-        <OpenedNoteBlock key={row.cm} row={row} />
+        <OpenedNoteBlock key={row.cm} row={row} tokens={tokenList?.tokens} />
       ))}
       {rows && kind === 'call' && (hasCallEnvelope ? <OpenedCallBlock call={call} hIn={hIn} /> : <OpenedCallBlock call={undefined} hIn={hIn} />)}
     </KeyPanel>

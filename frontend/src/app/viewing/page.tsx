@@ -8,9 +8,11 @@ import { KeyPanel, type SubmittedKey } from '@/components/KeyPanel';
 import { RoleBadge, SpentCell, type SpentState } from '@/components/OpenedNotes';
 import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { PageHeader } from '@/components/States';
+import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { formatAmount, formatAssetAmount, formatNumber } from '@/lib/utils';
+import { formatAmount, formatTokenAmount, formatNumber } from '@/lib/utils';
 import { keyInfo, openNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
+import type { TokenInfo } from '@/types';
 
 interface HistoryRow {
   leaf_index: number;
@@ -21,48 +23,53 @@ interface HistoryRow {
   spent: SpentState;
 }
 
-const columns: Column<HistoryRow>[] = [
-  {
-    key: 'leaf',
-    header: 'Leaf',
-    render: (r) => (
-      <Link href={`/notes/${r.cm}`} className="link font-mono">
-        #{formatNumber(r.leaf_index)}
-      </Link>
-    ),
-  },
-  {
-    key: 'height',
-    header: 'Height',
-    render: (r) => (
-      <Link href={`/blocks/${r.height}`} className="link font-mono">
-        {formatNumber(r.height)}
-      </Link>
-    ),
-  },
-  {
-    key: 'tx',
-    header: 'Transaction',
-    render: (r) =>
-      r.tx_hash ? <Hash value={r.tx_hash} href={`/transactions/${r.tx_hash}`} /> : <span className="text-mute">{r.height === 0 ? 'genesis' : 'deposit'}</span>,
-  },
-  { key: 'role', header: 'Role', render: (r) => <RoleBadge role={r.note.role} /> },
-  {
-    key: 'amount',
-    header: 'Amount',
-    render: (r) => <span className="font-mono text-text">{formatAssetAmount(r.note.amount, r.note.asset)}</span>,
-  },
-  {
-    key: 'counterparty',
-    header: 'Counterparty (pk)',
-    render: (r) => <Hash value={r.note.role === 'received' ? r.note.from : r.note.pk} start={8} end={6} />,
-  },
-  {
-    key: 'status',
-    header: 'Status',
-    render: (r) => (r.note.role === 'received' ? <SpentCell spent={r.spent} /> : <span className="text-mute">—</span>),
-  },
-];
+/** `tokens` resolves a received/sent note's `asset` index to its symbol and decimals — the same
+ * registry a wallet's own `resolve_asset` reads through, so a zUSD note renders "12.50 zUSD"
+ * rather than a bare unit count. */
+function buildColumns(tokens: TokenInfo[] | undefined): Column<HistoryRow>[] {
+  return [
+    {
+      key: 'leaf',
+      header: 'Leaf',
+      render: (r) => (
+        <Link href={`/notes/${r.cm}`} className="link font-mono">
+          #{formatNumber(r.leaf_index)}
+        </Link>
+      ),
+    },
+    {
+      key: 'height',
+      header: 'Height',
+      render: (r) => (
+        <Link href={`/blocks/${r.height}`} className="link font-mono">
+          {formatNumber(r.height)}
+        </Link>
+      ),
+    },
+    {
+      key: 'tx',
+      header: 'Transaction',
+      render: (r) =>
+        r.tx_hash ? <Hash value={r.tx_hash} href={`/transactions/${r.tx_hash}`} /> : <span className="text-mute">{r.height === 0 ? 'genesis' : 'deposit'}</span>,
+    },
+    { key: 'role', header: 'Role', render: (r) => <RoleBadge role={r.note.role} /> },
+    {
+      key: 'amount',
+      header: 'Amount',
+      render: (r) => <span className="font-mono text-text">{formatTokenAmount(r.note.amount, r.note.asset, tokens)}</span>,
+    },
+    {
+      key: 'counterparty',
+      header: 'Counterparty (pk)',
+      render: (r) => <Hash value={r.note.role === 'received' ? r.note.from : r.note.pk} start={8} end={6} />,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (r) => (r.note.role === 'received' ? <SpentCell spent={r.spent} /> : <span className="text-mute">—</span>),
+    },
+  ];
+}
 
 export default function ViewingPage() {
   const [busy, setBusy] = useState(false);
@@ -70,6 +77,8 @@ export default function ViewingPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<KeyInfo | null>(null);
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
+  const { data: tokenList } = useTokens();
+  const columns = buildColumns(tokenList?.tokens);
 
   const run = async ({ kind, key }: SubmittedKey) => {
     setBusy(true);

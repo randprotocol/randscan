@@ -1,4 +1,4 @@
-import type { TransactionKind } from '@/types';
+import type { TokenInfo, TransactionKind } from '@/types';
 
 export const TOKEN_SYMBOL = 'RAND';
 export const TOKEN_DECIMALS = 9;
@@ -128,22 +128,6 @@ export function formatStake(
   return suffix ? `${base} ${suffix}` : base;
 }
 
-/**
- * An amount in a bridged asset's own smallest unit (the registry index says which asset; index
- * 0 or null is RAND and gets the usual nine-decimal rendering). Bridged units have no fixed
- * decimals on this chain.
- */
-export function formatAssetAmount(
-  units: string | number | bigint | null | undefined,
-  assetIndex: number | null | undefined
-): string {
-  if (units === null || units === undefined) return '—';
-  if (assetIndex === null || assetIndex === undefined || assetIndex === 0) {
-    return formatAmount(units);
-  }
-  return `${formatUnits(units, 0)} units of asset #${assetIndex}`;
-}
-
 // ---------------------------------------------------------------------------
 // Numbers
 // ---------------------------------------------------------------------------
@@ -252,6 +236,14 @@ export const TRANSACTION_KINDS: TransactionKind[] = [
   'withdraw',
   'bridge_attest',
   'bridge_burn',
+  'register_token',
+  'token_mint',
+  'set_authority',
+  'token_burn',
+  'pause_mints',
+  'unpause_mints',
+  'register_bridged_token',
+  'list_backing',
 ];
 
 const KIND_LABELS: Record<TransactionKind, string> = {
@@ -264,6 +256,14 @@ const KIND_LABELS: Record<TransactionKind, string> = {
   withdraw: 'Withdraw',
   bridge_attest: 'Bridge in (attestation)',
   bridge_burn: 'Bridge out (burn)',
+  register_token: 'Token registered',
+  token_mint: 'Token mint',
+  set_authority: 'Token authority changed',
+  token_burn: 'Token burn',
+  pause_mints: 'Bridge mints paused',
+  unpause_mints: 'Bridge mints unpaused',
+  register_bridged_token: 'Bridged token listed',
+  list_backing: 'Backing listed',
   other: 'Other',
 };
 
@@ -277,6 +277,14 @@ const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
   withdraw: 'Withdraw',
   bridge_attest: 'Bridge in',
   bridge_burn: 'Bridge out',
+  register_token: 'Register token',
+  token_mint: 'Token mint',
+  set_authority: 'Set authority',
+  token_burn: 'Token burn',
+  pause_mints: 'Pause mints',
+  unpause_mints: 'Unpause mints',
+  register_bridged_token: 'List token',
+  list_backing: 'List backing',
   other: 'Other',
 };
 
@@ -290,6 +298,14 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   withdraw: 'badge badge-stake',
   bridge_attest: 'badge badge-bridge',
   bridge_burn: 'badge badge-bridge',
+  register_token: 'badge badge-mint',
+  token_mint: 'badge badge-mint',
+  set_authority: 'badge badge-neutral',
+  token_burn: 'badge badge-bridge',
+  pause_mints: 'badge badge-neutral',
+  unpause_mints: 'badge badge-neutral',
+  register_bridged_token: 'badge badge-bridge',
+  list_backing: 'badge badge-bridge',
   other: 'badge badge-neutral',
 };
 
@@ -298,13 +314,50 @@ export function amountIsBridged(kind: string): boolean {
   return kind === 'bridge_attest' || kind === 'bridge_burn';
 }
 
+/** Kinds whose public `amount` is in an RPL token's own unit (its registered `decimals`) —
+ * needs a token-registry lookup (`resolveToken`) to render correctly; never RAND's fixed 9. */
+export function amountIsTokenUnits(kind: string): boolean {
+  return kind === 'token_mint' || kind === 'token_burn' || kind === 'register_token';
+}
+
+// ---------------------------------------------------------------------------
+// RPL tokens
+// ---------------------------------------------------------------------------
+
+/** The registry row for `index`, or `undefined` when this build's cached registry does not (yet)
+ * know it — a token listed after this page loaded, or a node this explorer has never resolved. */
+export function resolveToken(
+  tokens: TokenInfo[] | null | undefined,
+  index: number | null | undefined
+): TokenInfo | undefined {
+  if (index === null || index === undefined || !tokens) return undefined;
+  return tokens.find((t) => t.index === index);
+}
+
+/**
+ * An RPL token amount rendered with its registered symbol and decimals: "12.50 zUSD". Falls back
+ * to "N units of asset #N" when the registry does not (yet) know the index — never assumes RAND's
+ * decimals, since an RPL token's are whatever it registered with.
+ */
+export function formatTokenAmount(
+  units: string | number | bigint | null | undefined,
+  index: number | null | undefined,
+  tokens: TokenInfo[] | null | undefined
+): string {
+  if (units === null || units === undefined) return '—';
+  if (index === null || index === undefined || index === 0) return formatAmount(units);
+  const token = resolveToken(tokens, index);
+  if (!token) return `${formatUnits(units, 0)} units of asset #${index}`;
+  return `${formatUnits(units, token.decimals)} ${token.symbol}`;
+}
+
 // ---------------------------------------------------------------------------
 // Bridge
 // ---------------------------------------------------------------------------
 
 /**
  * Bridged assets used to carry 8 decimals on the account chain; on the shielded chain a
- * bridged amount is in the asset's own smallest unit (see formatAssetAmount). Kept for the
+ * bridged amount is in the asset's own smallest unit (see formatTokenAmount). Kept for the
  * legacy rendering of a two-part "tokens (units)" string.
  */
 export const BRIDGED_DECIMALS = 8;

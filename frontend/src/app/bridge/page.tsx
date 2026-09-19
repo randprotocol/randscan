@@ -16,6 +16,7 @@ import {
   BRIDGE_SOURCE_CHAINS,
   bridgeChainName,
   cn,
+  formatAmount,
   formatBridgeChain,
   formatBridgeUnits,
   formatNumber,
@@ -92,6 +93,31 @@ const activityColumns: Column<BridgeAssetActivity>[] = [
         {formatBridgeUnits(a.outstanding, a.symbol)}
       </span>
     ),
+  },
+  {
+    key: "locked",
+    header: "Locked (registry)",
+    render: (a) =>
+      a.locked === null ? (
+        <span className="text-mute">—</span>
+      ) : (
+        <span className="font-mono">{formatBridgeUnits(a.locked, a.symbol)}</span>
+      ),
+  },
+  {
+    key: "minted_today",
+    header: "Minted today / cap",
+    render: (a) =>
+      a.minted_today === null && a.mint_cap_per_day === null ? (
+        <span className="text-mute">—</span>
+      ) : (
+        <span className="font-mono">
+          {formatBridgeUnits(a.minted_today, a.symbol)}
+          {a.mint_cap_per_day !== null && (
+            <span className="text-mute"> / {formatBridgeUnits(a.mint_cap_per_day, a.symbol)}</span>
+          )}
+        </span>
+      ),
   },
   {
     key: "last",
@@ -419,6 +445,48 @@ export default function BridgePage() {
       {bridge.enabled && (
         <>
           <Panel title="Bridge state">
+            <DetailRow label="Mint pause">
+              {bridge.mint_paused ? (
+                <span className="badge badge-neutral">
+                  Paused — transfer attests refused (burns and rotations stay open)
+                </span>
+              ) : (
+                <span className="badge badge-bridge">Not paused</span>
+              )}
+            </DetailRow>
+            <DetailRow label="Pause / unpause nonce">
+              <span className="font-mono">
+                {bridge.pause_nonce === null ? "—" : formatNumber(bridge.pause_nonce)}
+              </span>
+            </DetailRow>
+            <DetailRow label="List nonce">
+              <span className="font-mono">
+                {bridge.list_nonce === null ? "—" : formatNumber(bridge.list_nonce)}
+              </span>
+            </DetailRow>
+            <DetailRow label="Registration fee">
+              <span className="font-mono">
+                {bridge.registration_fee === null ? "—" : formatAmount(bridge.registration_fee)}
+              </span>
+            </DetailRow>
+            <DetailRow label={`PQ guardians (${bridge.pq_guardians.length})`}>
+              {bridge.pq_guardians.length === 0 ? (
+                <span className="text-mute">—</span>
+              ) : (
+                <span className="text-soft">
+                  {bridge.pq_guardians.length} Dilithium2 keys, index-aligned with the classical
+                  guardian set below. Every deposit attest and every governance action needing a
+                  quorum is co-signed by this set; a rotation never moves it.
+                </span>
+              )}
+            </DetailRow>
+            <DetailRow label="Pause key">
+              {bridge.pause_key ? (
+                <Hash value={bridge.pause_key} start={10} end={8} />
+              ) : (
+                <span className="text-mute">—</span>
+              )}
+            </DetailRow>
             <DetailRow label="Outbound emitter">
               <Hash value={bridge.emitter} full />
             </DetailRow>

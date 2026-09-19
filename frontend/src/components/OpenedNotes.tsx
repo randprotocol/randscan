@@ -3,9 +3,9 @@
 import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { DetailRow } from '@/components/States';
-import { formatAssetAmount, formatNumber } from '@/lib/utils';
+import { formatTokenAmount, formatNumber } from '@/lib/utils';
 import type { OpenedCall, OpenedNote } from '@/lib/viewing';
-import type { Nullifier } from '@/types';
+import type { Nullifier, TokenInfo } from '@/types';
 
 export type SpentState = { state: 'unspent' } | { state: 'spent'; nullifier: Nullifier } | { state: 'unknown' };
 
@@ -36,8 +36,10 @@ export function SpentCell({ spent }: { spent?: SpentState }) {
   );
 }
 
-/** One note of a transaction, as opened (or not) by the pasted key. */
-export function OpenedNoteBlock({ row }: { row: OpenedNoteRow }) {
+/** One note of a transaction, as opened (or not) by the pasted key. `tokens` resolves the
+ * disclosed `asset` index to a symbol and decimals ("12.50 zUSD"); a dummy input or output —
+ * sealed to nobody — opens for no key, so it renders the same as "not opened by this key". */
+export function OpenedNoteBlock({ row, tokens }: { row: OpenedNoteRow; tokens?: TokenInfo[] }) {
   const title = (
     <span className="inline-flex flex-wrap items-center gap-2">
       <Link href={`/notes/${row.cm}`} className="link font-mono">
@@ -58,7 +60,7 @@ export function OpenedNoteBlock({ row }: { row: OpenedNoteRow }) {
     return (
       <div className="border-t border-border-soft py-3">
         {title}
-        <p className="mt-1 text-sm text-mute">not opened by this key</p>
+        <p className="mt-1 text-sm text-mute">not opened by this key (or a dummy slot, sealed to nobody)</p>
       </div>
     );
   }
@@ -70,7 +72,7 @@ export function OpenedNoteBlock({ row }: { row: OpenedNoteRow }) {
         <RoleBadge role={n.role} />
       </div>
       <DetailRow label="Amount">
-        <span className="text-base font-semibold text-strong">{formatAssetAmount(n.amount, n.asset)}</span>
+        <span className="text-base font-semibold text-strong">{formatTokenAmount(n.amount, n.asset, tokens)}</span>
       </DetailRow>
       <DetailRow label="Owner (pk)">
         <Hash value={n.pk} full />

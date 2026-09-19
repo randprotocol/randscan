@@ -4,8 +4,9 @@ import Link from 'next/link';
 import { Column, DataTable } from './DataTable';
 import { Hash } from './Hash';
 import { KindBadge } from './KindBadge';
-import { formatAmount, formatAssetAmount, formatNumber, formatTimestamp } from '@/lib/utils';
-import type { BlockSummary, TransactionSummary } from '@/types';
+import { useTokens } from '@/hooks/useApi';
+import { formatAmount, formatTokenAmount, formatNumber, formatTimestamp } from '@/lib/utils';
+import type { BlockSummary, TokenInfo, TransactionSummary } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Blocks
@@ -80,9 +81,11 @@ export function BlocksTable({ blocks, isLoading, emptyMessage }: BlocksTableProp
 
 /**
  * What the action touched: the program of a deploy/call, the validator of a staking move or
- * mint, the public amount of a deposit. A plain transfer shows nothing, by design.
+ * mint, the public amount of a deposit or an RPL registration/mint/burn. A plain transfer shows
+ * nothing, by design — its asset is private, and `tokens` (the cached registry) resolves an RPL
+ * amount's index to its symbol ("12.50 zUSD") rather than a bare unit count.
  */
-function actionCell(tx: TransactionSummary) {
+function actionCell(tx: TransactionSummary, tokens?: TokenInfo[]) {
   const parts: React.ReactNode[] = [];
   if (tx.program) {
     parts.push(
@@ -103,7 +106,7 @@ function actionCell(tx: TransactionSummary) {
   if (tx.amount !== null) {
     parts.push(
       <span key="amount" className="font-mono text-text">
-        {formatAssetAmount(tx.amount, tx.asset_index)}
+        {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
       </span>
     );
   }
@@ -117,7 +120,7 @@ function actionCell(tx: TransactionSummary) {
   return <span className="inline-flex flex-wrap items-center gap-2">{parts}</span>;
 }
 
-export function transactionColumns(): Column<TransactionSummary>[] {
+export function transactionColumns(tokens?: TokenInfo[]): Column<TransactionSummary>[] {
   return [
     {
       key: 'hash',
@@ -141,7 +144,7 @@ export function transactionColumns(): Column<TransactionSummary>[] {
     {
       key: 'action',
       header: 'Action',
-      render: actionCell,
+      render: (tx) => actionCell(tx, tokens),
     },
     {
       key: 'fee',
@@ -181,7 +184,8 @@ export function TransactionsTable({
   emptyMessage,
   hideColumns = [],
 }: TransactionsTableProps) {
-  const columns = transactionColumns().filter((column) => !hideColumns.includes(column.key));
+  const { data: tokenList } = useTokens();
+  const columns = transactionColumns(tokenList?.tokens).filter((column) => !hideColumns.includes(column.key));
 
   return (
     <DataTable

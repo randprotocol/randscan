@@ -7,24 +7,27 @@ import { KindBadge } from '@/components/KindBadge';
 import { TransactionOpener } from '@/components/TransactionOpener';
 import { DetailSkeleton } from '@/components/Loading';
 import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/components/States';
-import { isNotFound, useTransaction } from '@/hooks/useApi';
+import { isNotFound, useTokens, useTransaction } from '@/hooks/useApi';
 import {
   formatAmount,
-  formatAssetAmount,
   formatBridgeAddress,
   formatBridgeChain,
   formatBytes,
   formatDateTime,
   formatNumber,
   formatTimestamp,
+  formatTokenAmount,
   getKindLabel,
+  resolveToken,
 } from '@/lib/utils';
-import type { Bundle, Receipt, TransactionDetail } from '@/types';
+import type { Bundle, Receipt, TokenInfo, TransactionDetail } from '@/types';
 
 export default function TransactionDetailPage() {
   const params = useParams<{ hash: string }>();
   const hash = decodeURIComponent(params.hash);
   const { data: tx, error, isLoading, mutate } = useTransaction(hash);
+  const { data: tokenList } = useTokens();
+  const tokens = tokenList?.tokens ?? [];
 
   if (isLoading && !tx) {
     return <DetailSkeleton />;
@@ -90,7 +93,7 @@ export default function TransactionDetailPage() {
             <span>Yes: paid from the sender&apos;s own notes, proved with a STARK</span>
           ) : (
             <span className="inline-flex flex-wrap items-center gap-2">
-              <span>No: signed by validator</span>
+              <span>No: signed by validator or guardian quorum</span>
               {tx.validator ? (
                 <Hash value={tx.validator} href={`/validators/${tx.validator}`} />
               ) : (
@@ -104,13 +107,9 @@ export default function TransactionDetailPage() {
         </DetailRow>
       </Panel>
 
-      {tx.bundle && <BundlePanel title="Bundle" bundle={tx.bundle} />}
+      {tx.bundle && <BundlePanel bundle={tx.bundle} />}
 
-      <KindPanel tx={tx} />
-
-      {tx.kind === 'bridge_burn' && tx.asset_bundle && (
-        <BundlePanel title="Asset bundle" bundle={tx.asset_bundle} asset />
-      )}
+      <KindPanel tx={tx} tokens={tokens} />
 
       {tx.kind === 'call' && <ReceiptPanel receipt={tx.receipt} />}
 
@@ -123,42 +122,37 @@ export default function TransactionDetailPage() {
 // Bundle
 // ---------------------------------------------------------------------------
 
-function BundlePanel({ title, bundle, asset }: { title: string; bundle: Bundle; asset?: boolean }) {
+function BundlePanel({ bundle }: { bundle: Bundle }) {
+  const burned = bundle.burn_a !== '0' || bundle.burn_r !== '0';
   return (
-    <Panel title={title}>
+    <Panel title="Bundle">
       <DetailRow label="Anchor">
         <Hash value={bundle.anchor} full />
       </DetailRow>
       {bundle.nullifiers.map((nf, i) => (
-        <DetailRow key={`nf-${i}`} label={`Nullifier ${i + 1}`}>
+        <DetailRow key={`nf-${i}`} label={`Nullifier ${i + 1}${i < 2 ? ' (asset)' : ' (RAND)'}`}>
           <Hash value={nf} full />
         </DetailRow>
       ))}
       {bundle.commitments.map((cm, i) => (
-        <DetailRow key={`cm-${i}`} label={`Commitment ${i + 1}`}>
+        <DetailRow key={`cm-${i}`} label={`Commitment ${i + 1}${i < 2 ? ' (asset)' : ' (RAND)'}`}>
           <Hash value={cm} href={`/notes/${cm}`} full />
         </DetailRow>
       ))}
-      <DetailRow label="Fee">
-        {asset ? (
-          <span className="text-mute">0 (the fee bundle pays)</span>
-        ) : (
-          formatAmount(bundle.fee)
-        )}
-      </DetailRow>
-      <DetailRow label="Burn">
-        {bundle.burn === '0' ? (
-          <span className="text-mute">0</span>
+      <DetailRow label="Fee">{formatAmount(bundle.fee)}</DetailRow>
+      <DetailRow label="Burned">
+        {!burned ? (
+          <span className="text-mute">Nothing burned</span>
         ) : (
           <span className="font-semibold text-strong">
-            {formatAssetAmount(bundle.burn, bundle.asset)}
+            {bundle.burn_r !== '0' && <span>{formatAmount(bundle.burn_r)} (RAND)</span>}
+            {bundle.burn_a !== '0' && (
+              <span>
+                {formatAmount(bundle.burn_a, 0, `units of asset #${bundle.burn_asset}`)}
+              </span>
+            )}
           </span>
         )}
-      </DetailRow>
-      <DetailRow label="Asset">
-        <span className="font-mono">
-          {bundle.asset === 0 ? '0 (RAND)' : `#${formatNumber(bundle.asset)} (bridged)`}
-        </span>
       </DetailRow>
       <DetailRow label="Time (target height)">
         <Link href={`/blocks/${bundle.time}`} className="link font-mono">
@@ -170,13 +164,14 @@ function BundlePanel({ title, bundle, asset }: { title: string; bundle: Bundle; 
       </DetailRow>
       <DetailRow label="Envelope sizes">
         <span className="font-mono">
-          {formatBytes(bundle.envelope_len[0])} · {formatBytes(bundle.envelope_len[1])}
+          {bundle.envelope_len.map((n) => formatBytes(n)).join(' · ')}
         </span>
       </DetailRow>
       <p className="px-4 py-3 text-xs text-mute">
-        The proof and the two note envelopes are reported by size only. Nothing in a bundle
-        reveals the sender, the receiver or the amount; a dummy input or output looks like a real
-        one.
+        Four slots, dummies included: slots 1–2 carry a private asset (RAND or any RPL token) and
+        slots 3–4 always RAND. There is no public asset field — a transfer of RAND and a transfer
+        of any RPL token are the same shape, field for field. The proof and the envelopes are
+        reported by size only.
       </p>
     </Panel>
   );
@@ -198,16 +193,40 @@ function ValidatorRow({ label, address }: { label: string; address: string | nul
   );
 }
 
-function KindPanel({ tx }: { tx: TransactionDetail }) {
+function PqSignersRow({ signers }: { signers: number[] | null }) {
+  if (!signers || signers.length === 0) return null;
+  return (
+    <DetailRow label="PQ guardian co-signers">
+      <span className="font-mono">{signers.map((i) => `#${i}`).join(', ')}</span>
+    </DetailRow>
+  );
+}
+
+/** A resolved token's symbol as a link to its page, or "asset #N" when this build's cached
+ * registry does not (yet) know the index. */
+function AssetLink({ index, tokens }: { index: number | null; tokens: TokenInfo[] }) {
+  if (index === null) return <span className="text-mute">—</span>;
+  if (index === 0) return <span className="font-mono">RAND</span>;
+  const token = resolveToken(tokens, index);
+  if (!token) return <span className="font-mono">asset #{index}</span>;
+  return (
+    <Link href={`/tokens/${token.index}`} className="link font-mono">
+      {token.symbol} (#{index})
+    </Link>
+  );
+}
+
+function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] }) {
   const title = `${getKindLabel(tx.kind)} details`;
 
   if (tx.kind === 'transfer') {
     return (
       <Panel title={title}>
         <p className="px-4 py-3 text-sm text-mute">
-          A plain shielded transfer: up to two notes spent, up to two created, and the fee. Who
-          paid whom, and how much, is known only to the two parties and to whoever they hand a
-          viewing key.
+          A plain shielded transfer of RAND or of any RPL token — the asset is private, so this
+          page cannot say which one moved. Up to two notes spent, up to two created, and the fee.
+          Who paid whom, how much and in what asset is known only to the two parties and to
+          whoever they hand a viewing key or a transaction key.
         </p>
       </Panel>
     );
@@ -317,17 +336,15 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
     return (
       <Panel title={title}>
         <DetailRow label="Asset">
-          <span className="font-mono">
-            {tx.asset_index === null ? '—' : `#${formatNumber(tx.asset_index)}`}
-          </span>
+          <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
         <DetailRow label="Amount burned">
           <span className="text-base font-semibold text-strong">
-            {formatAssetAmount(tx.amount, tx.asset_index)}
+            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
           </span>
         </DetailRow>
         <DetailRow label="Relayer fee">
-          <span>{formatAssetAmount(tx.relayer_fee, tx.asset_index)}</span>
+          <span>{formatTokenAmount(tx.relayer_fee, tx.asset_index, tokens)}</span>
         </DetailRow>
         <DetailRow label="Destination chain">
           <span>{formatBridgeChain(tx.to_chain)}</span>
@@ -341,9 +358,19 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
             <span className="text-mute">—</span>
           )}
         </DetailRow>
+        <DetailRow label="Coin redeemed">
+          {tx.bridge_token ? (
+            <span className="font-mono break-all" title={tx.bridge_token}>
+              {formatBridgeAddress(tx.bridge_token)}
+            </span>
+          ) : (
+            <span className="text-mute">—</span>
+          )}
+        </DetailRow>
         <p className="px-4 py-3 text-xs text-mute">
-          The one two-bundle transaction: the fee bundle above pays in RAND and the asset bundle
-          below burns the bridged notes. Bridged amounts are in the asset&apos;s own smallest unit.
+          One hidden-asset bundle carries the whole burn: its <code>burn_a</code> and{' '}
+          <code>burn_asset</code> are this action&apos;s asset and amount, and its fee pays the
+          bridge fee in RAND.
         </p>
       </Panel>
     );
@@ -363,16 +390,14 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
           )}
         </DetailRow>
         <DetailRow label="Asset">
-          <span className="font-mono">
-            {tx.asset_index === null ? '—' : `#${formatNumber(tx.asset_index)}`}
-          </span>
+          <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
         <DetailRow label="Amount">
           {tx.amount === null ? (
             <span className="text-mute">Guardian-set rotation, no deposit</span>
           ) : (
             <span className="text-base font-semibold text-strong">
-              {formatAssetAmount(tx.amount, tx.asset_index)}
+              {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
             </span>
           )}
         </DetailRow>
@@ -385,9 +410,180 @@ function KindPanel({ tx }: { tx: TransactionDetail }) {
             </Link>
           )}
         </DetailRow>
+        <DetailRow label="Deposit commitment">
+          {tx.commitment ? (
+            <Hash value={tx.commitment} href={`/notes/${tx.commitment}`} full />
+          ) : (
+            <span className="text-mute">— (rotation)</span>
+          )}
+        </DetailRow>
+        <PqSignersRow signers={tx.pq_signers} />
         <p className="px-4 py-3 text-xs text-mute">
           A guardian-signed message that deposits a bridged asset as a note for the recipient.
           The amount is public here and nowhere else.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'register_token') {
+    const action = tx.token_action?.kind === 'register_token' ? tx.token_action : null;
+    return (
+      <Panel title={title}>
+        <DetailRow label="Token">
+          <Link href={`/tokens/${tx.asset_index}`} className="link">
+            {action?.symbol ?? `#${tx.asset_index}`}
+          </Link>
+        </DetailRow>
+        <DetailRow label="Name">{action?.name ?? '—'}</DetailRow>
+        <DetailRow label="Decimals">
+          <span className="font-mono">{action ? formatNumber(action.decimals) : '—'}</span>
+        </DetailRow>
+        <DetailRow label="Authority">
+          <span className="font-mono">{action?.authority ?? '—'}</span>
+        </DetailRow>
+        <DetailRow label="Registry index">
+          <span className="font-mono">#{formatNumber(tx.asset_index)}</span>
+        </DetailRow>
+        <DetailRow label="Initial mint">
+          {action?.initial ? (
+            <span className="text-base font-semibold text-strong">
+              {formatTokenAmount(action.initial.amount, tx.asset_index, tokens)} to{' '}
+              <Hash value={action.initial.recipient} />
+            </span>
+          ) : (
+            <span className="text-mute">None</span>
+          )}
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          A token&apos;s registration and its initial mint are public by design, as a bridge
+          deposit is (spec §4) — only a later transfer of the token&apos;s notes is shielded.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'token_mint') {
+    const action = tx.token_action?.kind === 'token_mint' ? tx.token_action : null;
+    return (
+      <Panel title={title}>
+        <DetailRow label="Asset">
+          <AssetLink index={tx.asset_index} tokens={tokens} />
+        </DetailRow>
+        <DetailRow label="Amount">
+          <span className="text-base font-semibold text-strong">
+            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+          </span>
+        </DetailRow>
+        <DetailRow label="Recipient">
+          {tx.recipient ? <Hash value={tx.recipient} full /> : <span className="text-mute">—</span>}
+        </DetailRow>
+        <DetailRow label="Mint nonce">
+          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          Every word of the minted note is here (its sender is the chain&apos;s fixed mint tag),
+          so the recipient rebuilds it with nothing decrypted, whatever envelope{action ? '' : ''}{' '}
+          the minter published.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'set_authority') {
+    const action = tx.token_action?.kind === 'set_authority' ? tx.token_action : null;
+    return (
+      <Panel title={title}>
+        <DetailRow label="Asset">
+          <AssetLink index={tx.asset_index} tokens={tokens} />
+        </DetailRow>
+        <DetailRow label="Nonce">
+          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        </DetailRow>
+        <DetailRow label="New authority">
+          {action?.new_authority ? (
+            <Hash value={action.new_authority} href={`/validators/${action.new_authority}`} full />
+          ) : (
+            <span className="text-mute">None (renounced — this token can never be minted again)</span>
+          )}
+        </DetailRow>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'token_burn') {
+    return (
+      <Panel title={title}>
+        <DetailRow label="Asset">
+          <AssetLink index={tx.asset_index} tokens={tokens} />
+        </DetailRow>
+        <DetailRow label="Amount burned">
+          <span className="text-base font-semibold text-strong">
+            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+          </span>
+        </DetailRow>
+        <p className="px-4 py-3 text-xs text-mute">
+          A holder burn: public by design, since it is what makes the token&apos;s total supply
+          auditable. A transfer of the same token is a plain shielded transfer — its asset stays
+          private.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'pause_mints' || tx.kind === 'unpause_mints') {
+    const action = tx.bridge_governance;
+    const nonce = action && 'nonce' in action ? action.nonce : null;
+    const signers = action && 'pq_signers' in action ? action.pq_signers : null;
+    return (
+      <Panel title={title}>
+        <DetailRow label="Nonce">
+          <span className="font-mono">{nonce === null ? '—' : formatNumber(nonce)}</span>
+        </DetailRow>
+        <PqSignersRow signers={signers ?? null} />
+        <p className="px-4 py-3 text-xs text-mute">
+          {tx.kind === 'pause_mints'
+            ? 'While paused, every transfer attest is refused; burns and guardian-set rotations stay open. Signed by the genesis pause key alone.'
+            : 'Lifting the pause needs the PQ guardian quorum — the pause key can never unpause by itself.'}
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'register_bridged_token' || tx.kind === 'list_backing') {
+    const action = tx.bridge_governance;
+    return (
+      <Panel title={title}>
+        {action?.kind === 'register_bridged_token' && (
+          <>
+            <DetailRow label="Name">{action.name}</DetailRow>
+            <DetailRow label="Symbol">{action.symbol}</DetailRow>
+            <DetailRow label="Source chain">{formatBridgeChain(action.chain)}</DetailRow>
+            <DetailRow label="Source token">
+              <span className="font-mono break-all">{formatBridgeAddress(action.token)}</span>
+            </DetailRow>
+            <DetailRow label="Source decimals">
+              <span className="font-mono">{formatNumber(action.decimals)}</span>
+            </DetailRow>
+          </>
+        )}
+        {action?.kind === 'list_backing' && (
+          <>
+            <DetailRow label="Token">
+              <AssetLink index={action.token_index} tokens={tokens} />
+            </DetailRow>
+            <DetailRow label="Source chain">{formatBridgeChain(action.chain)}</DetailRow>
+            <DetailRow label="Source token">
+              <span className="font-mono break-all">{formatBridgeAddress(action.token)}</span>
+            </DetailRow>
+            <DetailRow label="Source decimals">
+              <span className="font-mono">{formatNumber(action.decimals)}</span>
+            </DetailRow>
+          </>
+        )}
+        <PqSignersRow signers={tx.pq_signers} />
+        <p className="px-4 py-3 text-xs text-mute">
+          Authorised by the PQ guardian quorum, on a RAND fee bundle its submitter pays.
         </p>
       </Panel>
     );

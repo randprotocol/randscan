@@ -19,6 +19,8 @@ import type {
   ProgramSummary,
   SearchResult,
   Supply,
+  TokenDetail,
+  TokenList,
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
@@ -223,6 +225,21 @@ export function getBridgeTokens(): Promise<ApprovedToken[]> {
 /** 404 on a node that serves no supply audit. */
 export function getSupply(): Promise<Supply> {
   return request<Supply>('/supply');
+}
+
+// ---------------------------------------------------------------------------
+// RPL tokens
+// ---------------------------------------------------------------------------
+
+/** The whole RPL token registry, as last cached from the node. */
+export function getTokens(): Promise<TokenList> {
+  return request<TokenList>('/tokens');
+}
+
+/** One token by registry index, 64-hex id or `rpl1…` text form, its deploy transaction and its
+ * public supply history. */
+export function getToken(id: string | number): Promise<TokenDetail> {
+  return request<TokenDetail>(`/tokens/${encodeURIComponent(String(id))}`);
 }
 
 // ---------------------------------------------------------------------------

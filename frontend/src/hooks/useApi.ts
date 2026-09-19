@@ -18,6 +18,8 @@ import type {
   ProgramSummary,
   SearchResult,
   Supply,
+  TokenDetail,
+  TokenList,
   TransactionDetail,
   TransactionKind,
   TransactionSummary,
@@ -204,6 +206,29 @@ export function useSupply(config?: SWRConfiguration): SWRResponse<Supply | null>
       }
     },
     { ...defaultConfig, refreshInterval: 30_000, ...config }
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RPL tokens
+// ---------------------------------------------------------------------------
+
+export function useTokens(config?: SWRConfiguration): SWRResponse<TokenList> {
+  return useSWR<TokenList>('tokens', api.getTokens, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
+}
+
+export function useToken(
+  id: string | number | null,
+  config?: SWRConfiguration
+): SWRResponse<TokenDetail> {
+  return useSWR<TokenDetail>(
+    id === null || id === '' ? null : ['token', String(id)],
+    () => api.getToken(id as string | number),
+    { ...defaultConfig, ...config }
   );
 }
 
