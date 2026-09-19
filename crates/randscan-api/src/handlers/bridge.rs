@@ -14,6 +14,12 @@ pub async fn get_bridge(State(state): State<AppState>) -> ApiResult<Json<BridgeS
             emitters: Default::default(),
             guardian_set_index: None,
             guardians: vec![],
+            pq_guardians: vec![],
+            mint_paused: false,
+            pause_nonce: None,
+            list_nonce: None,
+            pause_key: None,
+            registration_fee: None,
             burn_sequence: None,
             next_index: None,
             assets: vec![],
@@ -53,6 +59,9 @@ pub async fn bridge_assets(State(state): State<AppState>) -> ApiResult<Json<Vec<
                 outstanding: units_sub(&deposited, &burned),
                 first_height: f.and_then(|f| f.first_height),
                 last_height: f.and_then(|f| f.last_height),
+                locked: a.locked.clone(),
+                minted_today: a.minted_today.clone(),
+                mint_cap_per_day: a.mint_cap_per_day.clone(),
             }
         })
         .collect();

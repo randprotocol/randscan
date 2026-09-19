@@ -10,6 +10,7 @@ mod notes;
 mod programs;
 mod search;
 mod stats;
+mod tokens;
 mod transactions;
 mod validators;
 
@@ -25,5 +26,6 @@ pub use notes::*;
 pub use programs::*;
 pub use search::*;
 pub use stats::*;
+pub use tokens::*;
 pub use transactions::*;
 pub use validators::*;
