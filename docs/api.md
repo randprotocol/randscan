@@ -15,28 +15,42 @@ instead of tight polling when you need to react to new blocks.
 ## What is public on a shielded chain
 
 RAND is a fully shielded chain (fullnode `docs/shielded.md`). Every balance is a set of notes
-in a commitment tree, and every transaction is a **bundle** (two spent notes, two created notes,
-a public fee and a STARK proof) plus an optional public **action**. There are **no accounts, no
-balances, no senders and no recipients** anywhere in this API. What the explorer can show is:
+in a commitment tree, and every transaction is a **hidden-asset bundle** (chain 14: four spent
+notes and four created notes, dummies included, a public fee and a STARK proof) plus an optional
+public **action**. There are **no accounts, no balances, no senders and no recipients** anywhere
+in this API, and — since chain 14 — **no public asset on a bundle**: slots 1–2 carry a private
+asset (RAND or any RPL token) and slots 3–4 always RAND, so a transfer of RAND and a transfer of
+any RPL token are the same shape, byte for byte. What the explorer can show is:
 
-- every block, and every transaction's bundle *as published*: the anchor, two nullifiers, two
-  commitments, the fee, the burn, the asset index, the target height, and the proof and envelope
-  sizes;
+- every block, and every transaction's bundle *as published*: the anchor, four nullifiers, four
+  commitments, the fee, what (if anything) was burned, the target height, and the proof and
+  envelope sizes;
 - the action a transaction carried and its public fields: a deploy's program, a call's program
   and receipt, a validator's bond / unbond / withdraw amounts, a faucet mint's amount, a bridge
-  deposit's amount and a bridge burn's destination — these are the only amounts ever public;
+  deposit's amount, a bridge burn's destination, and an RPL token's registration / mint / burn
+  (spec §4 — a token's registration and its mints are public by design, the way a bridge deposit
+  is) — these are the only amounts ever public, and none of them is a *transfer*;
+- the RPL token registry (`GET /tokens`, `GET /tokens/:id`): every registered token's name,
+  symbol, decimals, authority and total supply, with a bridged token's per-backing locked amount;
 - the commitment tree leaf by leaf, the nullifier set, the validator register (stake, rewards,
-  unbonding queue), the supply audit, and the bridge's public state.
+  unbonding queue), the supply audit, and the bridge's public state (including its mint pause and
+  PQ guardian set, bridge hardening B1/B3/B4).
 
-To see a balance or a transfer's parties you need the owner's viewing key and a wallet; the
-explorer has neither. A future release will let you paste a viewing key to open your own rows.
+To see a balance, a transfer's parties, or **which asset a transfer moved**, you need a viewing
+key or a transaction key and a wallet (or this site's own key-paste tools); the explorer holds no
+key and decrypts nothing server-side. `rand_checkTransaction`-style disclosure (`docs/rpc.md` §4)
+is the *only* place an asset index is ever revealed for a transfer — never the public page.
 
 ## Conventions
 
 - **Amounts are strings of units.** 1 RAND = 1,000,000,000 units (9 decimals). Amounts are
   unsigned 128-bit integers and are always serialised as decimal strings, never as JSON numbers.
-  `"10000000000"` is 10 RAND. An amount of a **bridged asset** (`asset_index` > 0) is in that
-  asset's own smallest unit, which the source chain defines.
+  `"10000000000"` is 10 RAND. An amount naming a token registry index other than 0
+  (`asset_index`) — a bridge deposit/burn or an RPL `token_mint`/`token_burn`/`register_token` —
+  is in **that token's own smallest unit** (its registered `decimals`, from `GET /tokens/:id`),
+  not RAND's 9; resolve the index before dividing. `registration_fee` and `next_index` are the
+  two exceptions served as plain JSON numbers, not decimal strings (they are small, chain-wide
+  constants, not values that grow with usage).
 - **Timestamps** are `timestamp_ms`: Unix milliseconds, set by the block proposer.
 - **Hashes, program ids, commitments, nullifiers and anchors** are 64 lowercase hex characters,
   no `0x` prefix. Inputs accept an optional `0x` and uppercase.
@@ -111,6 +125,8 @@ for v in validators:
 | `GET /bridge` | the bridge's public state and asset registry |
 | `GET /bridge/assets` | every registered bridged asset with its deposits, burns and outstanding supply |
 | `GET /bridge/tokens` | the tokens the bridge accepts, with their contract addresses on each chain |
+| `GET /tokens` | the whole RPL token registry, as cached from the node |
+| `GET /tokens/:id` | one token by registry index, 64-hex id or `rpl1…` text form, its deploy transaction and its public supply history |
 | `GET /nodes` | the explorer node and its peers, with geolocation |
 
 `GET /health`:
@@ -172,13 +188,23 @@ Note values are hidden, but every crossing of the pool boundary is public, so th
 {
   "enabled": true, "emitter": "01…", "emitters": { "2": "02…" },
   "guardian_set_index": 0, "guardians": ["aabb…"],
+  "pq_guardians": ["…", "…"],
+  "mint_paused": false, "pause_nonce": 0, "list_nonce": 0, "pause_key": "dd…",
+  "registration_fee": 1000000000,
   "burn_sequence": 1, "next_index": 2,
-  "assets": [{ "index": 1, "chain": 2, "token": "aaaa…", "asset_id": "…" }]
+  "assets": [{ "index": 1, "chain": 2, "token": "aaaa…", "asset_id": "…",
+               "decimals": 6, "locked": "600", "minted_today": "0", "mint_day": 20345 }]
 }
 ```
 
 `assets[].index` is the `asset_index` a bridged note carries; index 0 is RAND. There are no
 balances: bridged value is notes. A chain without a bridge reports `{ "enabled": false }`.
+`pq_guardians`, `mint_paused`, `pause_nonce`, `list_nonce`, `pause_key`, `registration_fee` and
+`assets[].decimals`/`locked`/`minted_today`/`mint_day` are bridge hardening B1/B3/B4 — absent or
+`null`/empty on a node predating them. `mint_paused: true` means every transfer attest is refused
+(burns and guardian-set rotations stay open); lifting the pause needs the PQ guardian quorum, the
+pause key alone can never unpause. `registration_fee` and `next_index` are the two fields served
+as plain numbers here, not decimal strings.
 
 `GET /bridge/assets` joins that registry with the indexed `bridge_attest` and `bridge_burn`
 transactions, one row per asset in index order (an empty array on a chain without a bridge):
@@ -188,7 +214,8 @@ transactions, one row per asset in index order (an empty array on a chain withou
   "index": 1, "chain": 2, "token": "000000000000000000000000dac17f…", "asset_id": "…",
   "symbol": "USDT", "name": "Tether USD", "decimals": 6,
   "deposits": 12, "deposited": "125000000000", "burns": 3, "burned": "20000000000",
-  "outstanding": "105000000000", "first_height": 1040, "last_height": 19877
+  "outstanding": "105000000000", "first_height": 1040, "last_height": 19877,
+  "locked": "600", "minted_today": "0", "mint_cap_per_day": "10000000000"
 }]
 ```
 
@@ -197,7 +224,10 @@ transactions, one row per asset in index order (an empty array on a chain withou
 otherwise. `deposited`, `burned` and `outstanding` (`deposited - burned`, what is held in shielded
 notes right now) are strings of **bridge units, always 8 decimals** whatever the token's own
 decimals at home; the bridge contracts convert on the way in and out. A guardian-set rotation is a
-`bridge_attest` with no asset and is not counted.
+`bridge_attest` with no asset and is not counted. `locked`/`minted_today`/`mint_cap_per_day` are
+this backing's own figures straight from the registry (bridge hardening B1); `outstanding` is
+this indexer's own reconciliation from indexed flows — the two should agree, and a difference is
+worth investigating.
 
 `GET /bridge/tokens` is the allowlist, a static list that does not depend on the node:
 
@@ -217,6 +247,61 @@ with 12 zero bytes; a Solana mint verbatim), so it can be matched against `asset
 `status` is `allowed` or `discontinued`; a discontinued entry carries a `note` saying why and is
 listed so the address is on record, not because deposits are accepted. Today the list is USDT and
 USDC on Ethereum, BSC, Tron and Solana, with USDC on Tron discontinued.
+
+### RPL tokens
+
+`GET /tokens` (the whole registry, as cached from the node — this call tells the node nothing
+about which token you care about, unlike a per-token lookup):
+
+```json
+{
+  "enabled": true, "registration_fee": 1000000000, "next_index": 4,
+  "tokens": [
+    { "index": 3, "id": "aabb…", "id_text": "rpl1…", "name": "zUSD", "symbol": "zUSD",
+      "decimals": 6,
+      "authority": { "kind": "bridge", "backings": [
+        { "chain": 2, "token": "bbcc…", "decimals": 6, "locked": "600",
+          "minted_today": "0", "mint_day": 20345, "mint_cap_per_day": "10000000000" }
+      ] },
+      "mint_nonce": 1, "total_supply": "5700", "registered_at": 3 }
+  ]
+}
+```
+
+`index` is the `asset` word a note of this token carries — 0 is RAND and never appears here.
+`id_text` is the checksummed `rpl1…` text form (bech32m, HRP `rpl`, 62 characters). `authority` is
+`{"kind":"none"}` (fixed supply, or renounced), `{"kind":"key","key","address"}`,
+`{"kind":"bridge","backings":[…]}` (each backing's **source** decimals and locked amount — the
+token itself is always eight decimals on Rand) or `{"kind":"program","program"}`.
+`registration_fee` and `next_index` are plain numbers; every other amount is a decimal string. A
+chain without a token registry (or a node predating this endpoint) reports
+`{ "enabled": false, "tokens": [] }`.
+
+`GET /tokens/:id` — `:id` is a registry index, a 64-hex id, or an `rpl1…` text form:
+
+```json
+{
+  "index": 3, "id": "aabb…", "id_text": "rpl1…", "name": "zUSD", "symbol": "zUSD", "decimals": 6,
+  "authority": { "kind": "bridge", "backings": [ … ] },
+  "mint_nonce": 1, "total_supply": "5700", "registered_at": 3,
+  "deploy_tx": "4f2c…e7",
+  "supply_history": [
+    { "tx_hash": "4f2c…e7", "height": 3, "timestamp_ms": 1789000003000, "kind": "register_token", "delta": "5000" },
+    { "tx_hash": "9a1b…", "height": 10, "timestamp_ms": 1789000010000, "kind": "token_mint", "delta": "700" },
+    { "tx_hash": "c3d4…", "height": 12, "timestamp_ms": 1789000012000, "kind": "token_burn", "delta": "-400" }
+  ]
+}
+```
+
+`deploy_tx` is the `register_token` (or `register_bridged_token`) transaction, `null` when it
+predates this indexer's tracking. `supply_history` is every public mint/burn event naming this
+token, oldest first, `delta` signed in the token's own smallest unit — the same events
+`GET /tokens` sums into `total_supply`. 404 when no token matches `:id`.
+
+**Privacy:** `GET /tokens/:id` tells the node which token you asked about; a wallet resolving a
+transfer's asset reads the whole `GET /tokens` list instead, which costs the same whichever token
+is meant. Neither endpoint says anything about which *notes* hold a token — that stays private,
+disclosed only by a viewing key or a transaction key, never by index alone.
 
 `GET /nodes` returns an array of:
 
@@ -264,8 +349,11 @@ need `height`.
 | `GET /transactions/:hash` | `TransactionDetail` |
 
 Filters: `kind` is one of `transfer`, `mint`, `deploy`, `call`, `bond`, `unbond`, `withdraw`,
-`bridge_attest`, `bridge_burn`; `height` restricts to one block; `validator` to the staking
-actions (and mints) of one validator address; `program` to the deploy and calls of one program.
+`bridge_attest`, `bridge_burn`, `register_token`, `token_mint`, `set_authority`, `token_burn`,
+`pause_mints`, `unpause_mints`, `register_bridged_token`, `list_backing`; `height` restricts to
+one block; `validator` to the staking actions (and mints) of one validator address; `program` to
+the deploy and calls of one program. There is no `token_transfer` filter: a transfer of any RPL
+token is `transfer`, indistinguishable from a RAND payment.
 
 `TransactionSummary`:
 
@@ -282,43 +370,88 @@ actions (and mints) of one validator address; `program` to the deploy and calls 
 ```
 
 There is no sender, recipient, nonce or (for a transfer) amount: a stored transfer has no such
-field. `has_bundle` is false for the three validator-signed actions (`mint`, `unbond`,
-`withdraw`), which carry no bundle and pay no fee. The kinds and which fields they fill:
+field, and its `asset_index` is always `null` — a transfer's asset is private, full stop. Every
+kind's amount whose `asset_index` names a token other than RAND (index 0) is in that token's own
+smallest unit, not RAND's 9 decimals; resolve `asset_index` through `GET /tokens/:id` first.
+`has_bundle` is false for the validator/authority-signed and PQ-guardian-only actions (`mint`,
+`unbond`, `withdraw`, `pause_mints`, `unpause_mints`), which carry no bundle and pay no fee. The
+kinds and which fields they fill:
 
 | kind | what it is | `amount` | other summary fields | detail-only fields |
 |---|---|---|---|---|
-| `transfer` | a plain shielded transfer (the node's `none` action) | null | | `bundle` |
+| `transfer` | a plain shielded transfer of RAND or any RPL token (the node's `none` action) — the asset is private | null | | `bundle` |
 | `mint` | testnet faucet deposit, signed by a validator | RAND units of the new note | `validator` = the minter | `cm` |
 | `deploy` | a zkVM program deployment, paid by the bundle | null | `program` = the new program id | `words_len` |
 | `call` | a confidential call, paid by the bundle | null | `program` | `call_proof_len`, `input_envelope_len`, `receipt` |
 | `bond` | stake leaving the pool into a validator's register entry | RAND units | `validator` | `registered` (a first-time registration) |
 | `unbond` | stake moved to the unbonding queue (validator-signed) | RAND units | `validator` | `action_nonce` |
 | `withdraw` | released stake and rewards deposited as a new note (validator-signed) | RAND units | `validator` | `action_nonce` |
-| `bridge_attest` | a guardian-signed inbound message depositing a bridged note | bridged units (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time` |
-| `bridge_burn` | a bridged asset burned to another chain | bridged units | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `asset_bundle` |
+| `bridge_attest` | a guardian-signed inbound message depositing a bridged note | that token's units (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time`, `deposit_r`, `commitment`, `pq_signers` |
+| `bridge_burn` | a bridged asset burned to another chain, one bundle | that token's units | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `bridge_token` |
+| `register_token` | an RPL token registered, with an optional initial mint | the initial mint's amount, or null | `asset_index` = the new index | `token_action`, `recipient`, `note_time`, `deposit_r` |
+| `token_mint` | a signed mint of an existing RPL token | that token's units | `asset_index` | `token_action`, `recipient`, `note_time`, `deposit_r`, `action_nonce` |
+| `set_authority` | an RPL token's mint authority changed (or renounced) | null | `asset_index` | `token_action`, `action_nonce` |
+| `token_burn` | a holder burn of an RPL token, public by design | that token's units | `asset_index` | `token_action` |
+| `pause_mints` | the bridge's genesis pause key pauses all transfer attests | null | | `bridge_governance`, `action_nonce` |
+| `unpause_mints` | the PQ guardian quorum lifts the mint pause | null | | `bridge_governance`, `pq_signers`, `action_nonce` |
+| `register_bridged_token` | a new bridged token listed after genesis by the PQ guardian quorum | null | | `bridge_governance`, `pq_signers` |
+| `list_backing` | another source-chain backing added to an already-listed bridged token | null | `asset_index` | `bridge_governance`, `pq_signers` |
 | `other` | a kind newer than this explorer build | null | | none |
 
 `TransactionDetail` adds `chain_id`, `bundle` and the per-kind fields above (null when they do
-not apply). The bundle is the transaction's public face:
+not apply). The bundle is the transaction's public face — chain 14's hidden-asset bundle, four
+slots, dummies included, **with no public asset field**:
 
 ```json
 "bundle": {
   "anchor": "6b1d…c4",
-  "nullifiers": ["8c04…d1", "5e77…20"],
-  "commitments": ["2a9f…07", "b310…88"],
-  "fee": "1000000", "burn": "0", "asset": 0, "time": 5,
-  "proof_len": 302857, "envelope_len": [1380, 1380]
+  "nullifiers": ["8c04…d1", "5e77…20", "03aa…6f", "e19b…42"],
+  "commitments": ["2a9f…07", "b310…88", "77c1…0e", "5d20…b3"],
+  "fee": "1000000", "burn_a": "0", "burn_r": "0", "burn_asset": 0, "time": 5,
+  "proof_len": 302857, "envelope_len": [1380, 1380, 1380, 1380]
 }
 ```
 
-`anchor` is the tree root the proof was made against; `nullifiers` mark the two spent notes
-(a dummy input still publishes one, so every bundle looks alike); `commitments` are the two notes
-created; `burn` is value leaving the pool into the action (a bond, a bridge burn), `asset` the
-asset the bundle balances (0 = RAND) and `time` the height the sender targeted. The proof and
-the two encrypted envelopes are reported by size only; nothing in a bundle names a sender,
-receiver or amount. A `bridge_burn` carries a second bundle in `asset_bundle` (same shape) that
-burns the bridged asset; `bridge_to` is a 32-byte hex address on `to_chain` (1 Rand, 2 Ethereum,
-3 BSC, 4 Tron, 5 Solana; 20-byte addresses left-padded with zeros).
+`anchor` is the tree root the proof was made against; `nullifiers` mark the four spent notes
+(a dummy input still publishes one, so every bundle looks alike, and slots 1–2 carry a private
+asset while slots 3–4 always carry RAND); `commitments` are the four notes created. `burn_a` is
+the private asset burned (non-zero only on a `token_burn` or a `bridge_burn`, `burn_asset` naming
+which registry index) and `burn_r` is RAND burned (non-zero only on a `bond`); `time` is the
+height the sender targeted. The proof and the four encrypted envelopes are reported by size only;
+**nothing in a bundle names a sender, receiver, amount or asset** — a transfer of RAND and a
+transfer of any RPL token are the identical shape. A `bridge_burn` burns through this one bundle
+(`burn_a`/`burn_asset` are the action's own asset and amount; there is no second bundle since
+chain 14); `bridge_token` is the backing being redeemed, hex, and `bridge_to` a 32-byte hex
+address on `to_chain` (1 Rand, 2 Ethereum, 3 BSC, 4 Tron, 5 Solana; 20-byte addresses left-padded
+with zeros).
+
+RPL token actions (`token_action`) and bridge-governance actions (`bridge_governance`) carry the
+action's own fields in full, tagged by `kind`:
+
+```json
+"token_action": {
+  "kind": "register_token", "name": "zUSD", "symbol": "zUSD", "decimals": 6, "authority": "bridge",
+  "index": 3, "initial_amount": "5000",
+  "initial": { "amount": "5000", "recipient": "rand1…", "time": 3, "r": "bb…" }
+}
+```
+
+`register_token`'s `authority` here is the bare tag (`"none" | "key" | "bridge" | "program"`); the
+full authority (with its key or backings) is `GET /tokens/:id`'s. `initial` is `null` for a
+registration with no initial mint. `token_mint` adds `asset`, `amount`, `recipient`, `time`, `r`,
+`nonce`; `set_authority` adds `asset`, `nonce`, `new_authority` (`null` is a renunciation — the
+token can never be minted again); `token_burn` adds `asset`, `amount`. Every word of a minted
+note (`register_token`'s initial mint or a `token_mint`) is here — `recipient`, `note_time`
+(top-level) and `deposit_r`, alongside `amount` — so a recipient rebuilds the note with nothing
+decrypted, whatever envelope the minter published; the note's own commitment is not published
+directly (unlike a `bridge_attest`'s), so look for it among `GET /transactions/:hash/envelopes`'s
+notes instead.
+
+`bridge_governance`'s four kinds (`pause_mints`, `unpause_mints`, `register_bridged_token`,
+`list_backing`) each carry their own signed fields plus `nonce`; all but `pause_mints` (the
+genesis pause key's own signature) are authorised by the PQ guardian quorum, reported at the
+top level as `pq_signers` (the co-signing guardians' indices) — the same field a `bridge_attest`
+carries.
 
 The receipt of a confidential call:
 
@@ -353,11 +486,13 @@ reports what the node reports.
 { "nullifier": "8c04…d1", "tx_hash": "4f2c…e7", "height": 41, "tx_index": 0 }
 ```
 
-`tx_hash` of a note is the transaction whose bundle or mint carried the commitment, and `null`
-for a genesis deposit, a validator's withdraw deposit or a bridge deposit (their commitment is
-computed by the chain and not on the wire). The leaf index is what a wallet uses to ask the node
-for a Merkle witness. A wallet that wants to detect payments scans envelopes with its viewing
-key; the explorer cannot do that for you.
+`tx_hash` of a note is the transaction whose bundle, mint, or chain-computed note (a
+`bridge_attest` deposit, a `token_mint`, or a `register_token`'s initial mint) carried or created
+the commitment, and `null` for a genesis deposit or a validator's withdraw deposit (whose
+commitment is computed by the chain and not on the wire, and whose envelope this indexer does not
+attribute to a transaction). The leaf index is what a wallet uses to ask the node for a Merkle
+witness. A wallet that wants to detect payments scans envelopes with its viewing key; the
+explorer cannot do that for you.
 
 ### Envelopes and viewing keys
 
@@ -387,6 +522,20 @@ only a viewing key; neither asks for a spend key or the wallet key file. An open
 so what the page shows is what the chain committed to, not what a ciphertext claims. To build
 your own tool, fetch these endpoints and use the crate; nothing about a key ever goes over the
 network.
+
+`GET /transactions/:hash/envelopes`'s `notes` array holds the bundle's four slots (dummies
+included) **plus** the one chain-computed note a `bridge_attest` deposit, a `token_mint` or a
+`register_token`'s initial mint appends — its envelope rides in the *action* on the wire, not the
+bundle, but the node indexes and serves it the same way as any other leaf. A dummy input or
+output opens for no key at all (it is sealed to nobody), which the transaction page shows the
+same way as "not opened by this key" — it never says "dummy" outright, since the chain gives no
+way to tell a real note that is simply not yours from a genuine dummy.
+
+Once a key opens a note, its disclosed `asset` is the token registry index — resolve it through
+`GET /tokens/:id` (or the cached `GET /tokens` list) for the symbol and decimals: index 3 at
+6 decimals renders "12.50 zUSD". This is the **only** place the API ever ties an amount to a
+specific asset for a *transfer* — the public transaction page and every list view never do,
+because they do not have the key.
 
 `GET /envelopes` pages with `next_leaf` (`null` on the last page) and reports `total_leaves`.
 `envelope` is `null` for a leaf indexed before envelopes were stored; it fills in on the next
