@@ -314,12 +314,6 @@ export function amountIsBridged(kind: string): boolean {
   return kind === 'bridge_attest' || kind === 'bridge_burn';
 }
 
-/** Kinds whose public `amount` is in an RPL token's own unit (its registered `decimals`) —
- * needs a token-registry lookup (`resolveToken`) to render correctly; never RAND's fixed 9. */
-export function amountIsTokenUnits(kind: string): boolean {
-  return kind === 'token_mint' || kind === 'token_burn' || kind === 'register_token';
-}
-
 // ---------------------------------------------------------------------------
 // RPL tokens
 // ---------------------------------------------------------------------------

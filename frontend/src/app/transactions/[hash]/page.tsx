@@ -107,7 +107,7 @@ export default function TransactionDetailPage() {
         </DetailRow>
       </Panel>
 
-      {tx.bundle && <BundlePanel bundle={tx.bundle} />}
+      {tx.bundle && <BundlePanel bundle={tx.bundle} tokens={tokens} />}
 
       <KindPanel tx={tx} tokens={tokens} />
 
@@ -122,7 +122,7 @@ export default function TransactionDetailPage() {
 // Bundle
 // ---------------------------------------------------------------------------
 
-function BundlePanel({ bundle }: { bundle: Bundle }) {
+function BundlePanel({ bundle, tokens }: { bundle: Bundle; tokens: TokenInfo[] }) {
   const burned = bundle.burn_a !== '0' || bundle.burn_r !== '0';
   return (
     <Panel title="Bundle">
@@ -147,9 +147,7 @@ function BundlePanel({ bundle }: { bundle: Bundle }) {
           <span className="font-semibold text-strong">
             {bundle.burn_r !== '0' && <span>{formatAmount(bundle.burn_r)} (RAND)</span>}
             {bundle.burn_a !== '0' && (
-              <span>
-                {formatAmount(bundle.burn_a, 0, `units of asset #${bundle.burn_asset}`)}
-              </span>
+              <span>{formatTokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}</span>
             )}
           </span>
         )}

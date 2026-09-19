@@ -99,34 +99,9 @@ impl TxKind {
         }
     }
 
-    /// Kinds whose `amount` is public on chain (deposits, staking moves, and an RPL mint/burn —
-    /// a token's registration and mints are public by design, spec §4, the way a bridge deposit
-    /// is; only a later *transfer* of the token's notes is shielded).
-    pub fn has_public_amount(&self) -> bool {
-        matches!(
-            self,
-            TxKind::Mint
-                | TxKind::Bond
-                | TxKind::Unbond
-                | TxKind::Withdraw
-                | TxKind::BridgeAttest
-                | TxKind::BridgeBurn
-                | TxKind::TokenMint
-                | TxKind::TokenBurn
-        )
-    }
-
     /// Kinds whose `amount` is in a bridged asset's own unit rather than RAND units.
     pub fn amount_is_bridged(&self) -> bool {
         matches!(self, TxKind::BridgeAttest | TxKind::BridgeBurn)
-    }
-
-    /// Kinds whose public `amount` is in an RPL token's own unit (its registered `decimals`)
-    /// rather than RAND's fixed 9 — a bridged token's amount is as well, but
-    /// [`amount_is_bridged`](Self::amount_is_bridged) already flags those; this is the RPL-native
-    /// pair. A renderer needs the token registry (keyed on `asset_index`) to know the decimals.
-    pub fn amount_is_token_units(&self) -> bool {
-        matches!(self, TxKind::TokenMint | TxKind::TokenBurn)
     }
 
     /// Kinds authorised by a PQ (Dilithium2) guardian quorum rather than a bundle proof or a
@@ -399,14 +374,14 @@ mod tests {
     }
 
     #[test]
-    fn rpl_token_amounts_need_the_token_registry_to_render() {
-        assert!(TxKind::TokenMint.has_public_amount());
-        assert!(TxKind::TokenMint.amount_is_token_units());
+    fn rpl_token_amounts_are_not_flagged_as_bridged() {
+        // TokenMint/TokenBurn amounts are in the token's own unit (its registered `decimals`,
+        // resolved through the token registry by `asset_index` — `formatTokenAmount` on the
+        // frontend does this directly from `asset_index`, with no need for a `TxKind`-keyed
+        // predicate), but they are not bridged: a native RPL token has no source chain.
         assert!(!TxKind::TokenMint.amount_is_bridged());
-        assert!(TxKind::TokenBurn.amount_is_token_units());
-        // A plain transfer's amount is never public, in RAND or any RPL token.
-        assert!(!TxKind::Transfer.has_public_amount());
-        assert!(!TxKind::Transfer.amount_is_token_units());
+        assert!(!TxKind::TokenBurn.amount_is_bridged());
+        assert!(!TxKind::Transfer.amount_is_bridged());
     }
 
     #[test]

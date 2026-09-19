@@ -152,9 +152,15 @@ impl TxDetailRow {
         })
     }
 
-    /// bridge_attest: the deposit's commitment, from the RPC's `commitment` field. token_mint /
-    /// register_token (initial mint): this indexer's own recomputation (`derived_cm`, see the
-    /// migration's doc comment). `None` for every other kind.
+    /// The public `commitment` field of `TransactionDetail` — **bridge_attest only**, mirroring
+    /// exactly what the node's own `tx_json` renders (its deposit's leaf, copied off the wire
+    /// into `derived_cm` at insert time; see `NewTx::derived_cm`'s doc comment). `derived_cm`
+    /// also holds a `token_mint`'s or a `register_token`'s recomputed note commitment (this
+    /// indexer's own, since the node does not publish one for those), but that value is
+    /// deliberately **not** surfaced here: the node never renders a `commitment` field for
+    /// those two kinds, so neither does this API — look for that note among
+    /// `GET /transactions/:hash/envelopes`'s `notes` instead, the same way a caller would need to
+    /// for any other note this API does not name directly.
     pub fn commitment(&self) -> Option<String> {
         match self.tx.kind.as_str() {
             "bridge_attest" => self.derived_cm.clone(),
