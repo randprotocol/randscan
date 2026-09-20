@@ -14,6 +14,10 @@ target/
 
 # Build artifacts
 *.wasm
+# ...except the viewing-key module the frontend serves. Its JS glue is committed, and the glue is
+# useless without its binary: a checkout that has one and not the other deploys a /viewing page
+# whose every key (viewing or transaction) fails on a 404 for the .wasm, as chain 14's did.
+!frontend/public/viewing/randscan_viewing_bg.wasm
 dist/
 pkg/
 
