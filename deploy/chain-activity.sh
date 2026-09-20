@@ -13,7 +13,7 @@
 # (two proofs against the same wallet would race for the same notes).
 #
 # Usage: deploy/chain-activity.sh [transfer|deploy|call]   (no argument = next in rotation)
-# Env:   BIN, WALLETS (or W1/W2 key files), RPC, RPC_FALLBACK, EXPLORER, STATE_DIR, ROTATION, NICE (e.g. "nice -n 10" when the
+# Env:   BIN (a directory holding `rand`; an optional BIN/.git-rev names the commit a host-tuned copy was built from), WALLETS (or W1/W2 key files), RPC, RPC_FALLBACK, EXPLORER, STATE_DIR, ROTATION, NICE (e.g. "nice -n 10" when the
 #        prover shares a box with a validator; proofs are ~1.3 MB at constraint set 5 and take
 #        1.5–4 min, so run this where the node is local: a 2.6 MB hex submit over a slow uplink
 #        outruns the wallet's 15 s RPC timeout).
@@ -115,6 +115,21 @@ if [ -n "$known" ] && [ "$known" != "$identity" ]; then
   done
 fi
 echo "$identity" > "$STATE_DIR/chain"
+
+# A wallet built apart from the node. On a slow box BIN may hold a `rand` rebuilt for the host's
+# CPU (the fleet builds for baseline x86-64; the prover's AVX2 field code only compiles in with
+# RUSTFLAGS="-C target-cpu=x86-64-v3", and on node E that is 185 s a bundle proof instead of 309 s
+# — the difference between landing inside the 256-block time window at ~1.15 s blocks and
+# missing it). Such a copy does not follow the fleet's updates, so it records the commit it was
+# built from in BIN/.git-rev, and a node on another build gets a loud line here rather than
+# proofs of a wire format the chain no longer takes.
+built=$(cat "$BIN/.git-rev" 2>/dev/null || true)
+if [ -n "$built" ]; then
+  node_sha=$(rpc rand_getVersion '[]' | grep -o '"git_sha":"[0-9a-f]*' | cut -d'"' -f4)
+  if [ -n "$node_sha" ] && [ "$node_sha" != "$built" ]; then
+    log "WARN: $BIN/rand was built from ${built:0:7} but the node runs ${node_sha:0:7}; rebuild it (see $BIN/README)"
+  fi
+fi
 
 n=$(cat "$STATE_DIR/n" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "$STATE_DIR/n"
 # ROTATION can drop a step, e.g. "transfer deploy" while a node build refuses calls.
