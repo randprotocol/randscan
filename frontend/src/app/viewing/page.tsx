@@ -10,7 +10,7 @@ import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { PageHeader } from '@/components/States';
 import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { formatAmount, formatTokenAmount, formatNumber } from '@/lib/utils';
+import { defaultTokens, formatAmount, formatTokenAmount, formatNumber } from '@/lib/utils';
 import { keyInfo, openNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
 import type { TokenInfo } from '@/types';
 
@@ -71,6 +71,59 @@ function buildColumns(tokens: TokenInfo[] | undefined): Column<HistoryRow>[] {
   ];
 }
 
+/** One line of the balance list: what the key's unspent received notes of one asset add up to. */
+interface BalanceRow {
+  /** The `asset` word — 0 is RAND. */
+  asset: number;
+  token?: TokenInfo;
+  units: bigint;
+  notes: number;
+}
+
+/** RAND first, then the default tokens (zUSD) whether the key holds any or not, then every
+ * other asset the key holds an unspent note of. */
+function buildBalances(received: HistoryRow[], tokens: TokenInfo[] | undefined): BalanceRow[] {
+  const held = new Map<number, { units: bigint; notes: number }>();
+  for (const r of received) {
+    if (r.spent.state !== 'unspent') continue;
+    const h = held.get(r.note.asset) ?? { units: BigInt(0), notes: 0 };
+    held.set(r.note.asset, { units: h.units + BigInt(r.note.amount), notes: h.notes + 1 });
+  }
+  const listed = [0, ...defaultTokens(tokens).map((t) => t.index)];
+  const others = Array.from(held.keys()).filter((a) => !listed.includes(a)).sort((a, b) => a - b);
+  return [...listed, ...others].map((asset) => ({
+    asset,
+    token: tokens?.find((t) => t.index === asset),
+    units: held.get(asset)?.units ?? BigInt(0),
+    notes: held.get(asset)?.notes ?? 0,
+  }));
+}
+
+function buildBalanceColumns(tokens: TokenInfo[] | undefined): Column<BalanceRow>[] {
+  return [
+    {
+      key: 'token',
+      header: 'Token',
+      render: (b) =>
+        b.asset === 0 ? (
+          <span className="text-text">RAND</span>
+        ) : b.token ? (
+          <Link href={`/tokens/${b.token.id_text}`} className="link">
+            {b.token.symbol} <span className="text-mute">{b.token.name}</span>
+          </Link>
+        ) : (
+          <span className="text-mute">asset #{b.asset}</span>
+        ),
+    },
+    {
+      key: 'balance',
+      header: 'Spendable balance',
+      render: (b) => <span className="font-mono text-text">{formatTokenAmount(b.units.toString(), b.asset, tokens)}</span>,
+    },
+    { key: 'notes', header: 'Unspent notes', render: (b) => <span className="font-mono">{formatNumber(b.notes)}</span> },
+  ];
+}
+
 export default function ViewingPage() {
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<{ scanned: number; total: number } | null>(null);
@@ -123,9 +176,8 @@ export default function ViewingPage() {
   };
 
   const received = rows?.filter((r) => r.note.role === 'received') ?? [];
-  const balance = received
-    .filter((r) => r.spent.state === 'unspent' && r.note.asset === 0)
-    .reduce((sum, r) => sum + BigInt(r.note.amount), BigInt(0));
+  const balances = buildBalances(received, tokenList?.tokens);
+  const balance = balances[0].units;
 
   return (
     <div className="space-y-6">
@@ -147,7 +199,7 @@ export default function ViewingPage() {
       {info && rows && (
         <>
           <StatsRow columns={4}>
-            <StatsCard title="Spendable balance" value={formatAmount(balance.toString())} subtitle="unspent notes received, RAND only" />
+            <StatsCard title="Spendable balance" value={formatAmount(balance.toString())} subtitle="unspent notes received, RAND; tokens below" />
             <StatsCard title="Notes received" value={formatNumber(received.length)} subtitle={`${formatNumber(received.filter((r) => r.spent.state === 'unspent').length)} unspent`} />
             <StatsCard title="Notes sent" value={formatNumber(rows.filter((r) => r.note.role === 'sent').length)} />
             <StatsCard
@@ -161,6 +213,7 @@ export default function ViewingPage() {
               Shielded address: <Hash value={info.address} start={20} end={10} />
             </p>
           )}
+          <DataTable columns={buildBalanceColumns(tokenList?.tokens)} data={balances} keyExtractor={(b) => String(b.asset)} />
           <DataTable columns={columns} data={rows} keyExtractor={(r) => r.cm} emptyMessage="This key opens no note on the chain" />
           <p className="text-xs text-mute">
             Every row was decrypted in this browser and its commitment recomputed from the plaintext. A change note appears as received.

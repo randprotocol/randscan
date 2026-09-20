@@ -377,6 +377,19 @@ export function formatTokenAmount(
   return `${formatUnits(units, token.decimals)} ${token.symbol}`;
 }
 
+/**
+ * The tokens a balance list always shows, held or not — as a wallet lists RAND at zero. Today
+ * that is zUSD, found by its bridge authority rather than by index (an index is a chain's
+ * registration order and moves at a chain cut) or by symbol alone (anyone may register a token
+ * called "zUSD"; only governance lists a bridge-backed one). Empty when the registry has none.
+ */
+export function defaultTokens(tokens: TokenInfo[] | null | undefined): TokenInfo[] {
+  const zusd = (tokens ?? [])
+    .filter((t) => t.symbol === 'zUSD' && t.authority.kind === 'bridge')
+    .sort((a, b) => a.index - b.index)[0];
+  return zusd ? [zusd] : [];
+}
+
 // ---------------------------------------------------------------------------
 // Bridge
 // ---------------------------------------------------------------------------
