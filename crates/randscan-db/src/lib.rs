@@ -78,9 +78,12 @@ const MIGRATIONS: &[(i32, &str)] = &[
         include_str!("../../../migrations/006_note_envelopes.sql"),
     ),
     (7, include_str!("../../../migrations/007_rand_symbol.sql")),
+    // Version 8 is burned: the chain-11 receivers migration ran as 8 on the live database
+    // (2026-09-16) and was reverted from the tree with the short-address feature. A database that
+    // recorded 8 would skip anything reusing that number, so this one is 9.
     (
-        8,
-        include_str!("../../../migrations/008_hidden_asset_bundle_and_rpl_tokens.sql"),
+        9,
+        include_str!("../../../migrations/009_hidden_asset_bundle_and_rpl_tokens.sql"),
     ),
 ];
 
