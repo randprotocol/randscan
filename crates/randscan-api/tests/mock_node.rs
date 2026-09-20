@@ -24,11 +24,11 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     chain.push_block(vec![transfer.clone(), mint.clone()]);
 
     let program = h("program-1");
-    let deploy = tx(7, "deploy", Some(bundle("d")), json!({ "kind": "deploy", "program": program, "words": 412 }));
+    let deploy = tx(7, "deploy", Some(bundle("d")), json!({ "kind": "deploy", "program": program, "words": 412, "public_words_len": 27151 }));
     let call_tx = tx(7, "call", Some(bundle("c")), json!({ "kind": "call", "program": program, "proof_len": 1202416, "input_envelope_len": 1280 }));
     let bond = tx(7, "bond", Some(bundle("b")), json!({ "kind": "bond", "validator": VALIDATOR_B, "amount": 1000000000000u64, "registered": true }));
     let unbond = tx(7, "unbond", None, json!({ "kind": "unbond", "validator": VALIDATOR_B, "amount": 5000000000u64, "nonce": 1 }));
-    let withdraw = tx(7, "withdraw", None, json!({ "kind": "withdraw", "validator": VALIDATOR, "amount": 9000000, "nonce": 3 }));
+    let withdraw = tx(7, "withdraw", None, json!({ "kind": "withdraw", "validator": VALIDATOR, "amount": "9000000", "nonce": 3, "time": 1994 }));
     chain.push_block(vec![deploy.clone(), call_tx.clone(), bond.clone(), unbond.clone(), withdraw.clone()]);
 
     let attest = tx(7, "attest", Some(bundle("a")), json!({
@@ -177,7 +177,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(d["program"], program);
     assert_eq!(d["call_proof_len"], 1202416, "a constraint-set-5 proof size is stored as reported");
     assert_eq!(d["input_envelope_len"], 1280);
-    assert!(d["receipt"].is_null(), "the mock serves no receipt");
+    // The receipt is the node's, with the public digest the proof was checked against (v0.4).
+    assert_eq!(d["receipt"]["tier"], 14, "{d}");
+    assert_eq!(d["receipt"]["h_in"], h("h_in"));
+    assert_eq!(d["receipt"]["h_pub"], public_digest(&program));
 
     let (_, _, d) = call_api(&live.app, &format!("/api/v1/transactions/{}", bond["hash"].as_str().unwrap())).await;
     assert_eq!(d["kind"], "bond");
@@ -192,6 +195,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(d["kind"], "withdraw");
     assert_eq!(d["amount"], "9000000");
     assert_eq!(d["action_nonce"], 3);
+    assert_eq!(d["note_time"], 1994, "a withdraw's deposit note publishes its time word");
 
     let (_, _, d) = call_api(&live.app, &format!("/api/v1/transactions/{}", attest["hash"].as_str().unwrap())).await;
     assert_eq!(d["kind"], "bridge_attest");
@@ -361,7 +365,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, env) = call_api(&live.app, &format!("/api/v1/transactions/{}/envelopes", call_tx["hash"].as_str().unwrap())).await;
     assert_eq!(env["kind"], "call");
     assert_eq!(env["call_envelope"]["body"], "0b".repeat(60));
-    assert!(env["h_in"].is_null(), "no receipt indexed by the mock");
+    assert_eq!(env["h_in"], h("h_in"), "the transcript opens against the receipt's h_in");
     let (_, _, page) = call_api(&live.app, "/api/v1/envelopes?from_leaf=0&limit=1000").await;
     assert_eq!(page["total_leaves"], expected_leaves);
     assert_eq!(page["notes"].as_array().unwrap().len(), 1000);
@@ -387,6 +391,15 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // Stats carry the tree, the register and the supply audit.
     let stats = live.wait_for("/api/v1/stats", WAIT, |s| s["chain_id"] == 7 && s["height"] == 4 && s["validator_count"] == 2).await;
     assert_eq!(stats["total_transactions"], 2019, "{stats}");
+    // The chain's identity and limits, and the node's build (v0.3 / v0.4).
+    let (_, _, genesis) = call_api(&live.app, "/api/v1/blocks/0").await;
+    assert_eq!(stats["genesis_hash"], genesis["hash"], "{stats}");
+    assert!(stats["genesis_hash"].is_string());
+    assert_eq!(stats["node_version"], "0.1.0");
+    assert_eq!(stats["node_git_sha"], MOCK_GIT_SHA);
+    assert_eq!(stats["fri_profile"], "test");
+    assert_eq!(stats["limits"], json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
+        "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 }));
     assert_eq!(stats["notes"], expected_leaves);
     // 2014 bundle-carrying transactions (2000 transfers, 1 mint's bundle-less action aside, plus
     // deploy/call/bond/attest/rotation/burn/future/register_token/token_mint/set_authority/
@@ -441,26 +454,46 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // USDT, registered but never used, so it is named and zero.
     let (_, _, assets) = call_api(&live.app, "/api/v1/bridge/assets").await;
     let assets = assets.as_array().expect("array");
-    assert_eq!(assets.len(), 2, "{assets:?}");
-    assert_eq!(assets[0]["index"], 1);
-    assert_eq!(assets[0]["chain"], 2);
-    assert_eq!(assets[0]["deposits"], 1);
-    assert_eq!(assets[0]["deposited"], "1000");
+    assert_eq!(assets.len(), 3, "{assets:?}");
+    // Token 1 has two backings (chain 14: one zUSD, many coins). The burn named (chain 2, cc…),
+    // so it is that backing's alone; the other coin of the same token saw nothing. A row must
+    // never repeat the whole token's tally as its own.
+    assert_eq!((&assets[0]["index"], &assets[0]["chain"]), (&json!(1), &json!(2)));
+    assert_eq!((&assets[1]["index"], &assets[1]["chain"]), (&json!(1), &json!(3)));
     assert_eq!(assets[0]["burns"], 1);
     assert_eq!(assets[0]["burned"], "400");
+    assert_eq!(assets[1]["burns"], 0, "a burn is its own backing's: {:?}", assets[1]);
+    assert_eq!(assets[1]["burned"], "0");
+    // What a backing holds is the registry's `locked`, not a figure rebuilt from token-wide sums.
     assert_eq!(assets[0]["outstanding"], "600");
+    assert_eq!(assets[1]["outstanding"], "0");
+    // A deposit publishes the token it minted, not the coin that was locked for it, so with
+    // several backings it cannot be laid at one of them: per backing it is null, and the whole
+    // token's figure is served under its own name, the same on each of the token's rows.
+    for row in &assets[..2] {
+        assert_eq!(row["backings"], 2);
+        assert_eq!(row["deposits"], Value::Null, "{row}");
+        assert_eq!(row["deposited"], Value::Null);
+        assert_eq!(row["token_deposits"], 1);
+        assert_eq!(row["token_deposited"], "1000");
+        assert_eq!(row["token_burns"], 1);
+        assert_eq!(row["token_burned"], "400");
+    }
     assert_eq!(assets[0]["symbol"], Value::Null);
     assert_eq!(assets[0]["first_height"], assets[0]["last_height"]);
     assert_eq!(assets[0]["locked"], "600", "the registry's own figure, alongside the indexed flows");
     assert_eq!(assets[0]["minted_today"], "1000");
     assert_eq!(assets[0]["mint_cap_per_day"], (100_000u64 * 100_000_000).to_string());
-    assert_eq!(assets[1]["index"], 2);
-    assert_eq!(assets[1]["symbol"], "USDT");
-    assert_eq!(assets[1]["name"], "Tether USD");
-    assert_eq!(assets[1]["decimals"], 6);
-    assert_eq!(assets[1]["deposits"], 0);
-    assert_eq!(assets[1]["outstanding"], "0");
-    assert_eq!(assets[1]["last_height"], Value::Null);
+    // Token 2 has one backing, so the token's deposits are that backing's.
+    assert_eq!(assets[2]["index"], 2);
+    assert_eq!(assets[2]["symbol"], "USDT");
+    assert_eq!(assets[2]["name"], "Tether USD");
+    assert_eq!(assets[2]["decimals"], 6);
+    assert_eq!(assets[2]["backings"], 1);
+    assert_eq!(assets[2]["deposits"], 0);
+    assert_eq!(assets[2]["deposited"], "0");
+    assert_eq!(assets[2]["outstanding"], "0");
+    assert_eq!(assets[2]["last_height"], Value::Null);
 
     // The RPL token registry (task S1 item 2): the list page and one token's detail, its
     // backing's locked/minted_today, its deploy transaction and its public supply history.
@@ -516,6 +549,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, p) = call_api(&live.app, &format!("/api/v1/programs/{program}")).await;
     assert_eq!(p["call_count"], 1);
     assert!(p.get("deployer").is_none(), "{p}");
+    // The deploy-time public input (v0.4): the length is the action's, the digest the node's.
+    assert_eq!(p["public_words_len"], 27151, "{p}");
+    assert_eq!(p["public_digest"], public_digest(&program));
+    assert_eq!(p["code_hash"], h(&format!("code-{program}")));
 
     // Broadcast fan-out (what /ws subscribers receive) carried every kind.
     let got = {
@@ -557,6 +594,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(stats["total_transactions"], 1, "old chain data gone: {stats}");
     assert_eq!(stats["notes"], 5, "the genesis note plus the one bundle's four output slots");
     assert!(stats["epoch"].is_null() && stats["pool_value"].is_null(), "S2 fields absent on an S3 node: {stats}");
+    // A node older than v0.3 / v0.4 has none of the three methods; the old chain's answers must
+    // not linger. The FRI profile still comes from `rand_status`.
+    assert!(stats["limits"].is_null() && stats["genesis_hash"].is_null() && stats["node_git_sha"].is_null(), "{stats}");
+    assert_eq!(stats["fri_profile"], "test");
     assert_eq!(stats["total_supply"], "0");
     assert_eq!(stats["active_validator_count"], 1, "every register entry is active before S2");
     let (status, _, _) = call_api(&live.app, &format!("/api/v1/transactions/{burn_hash}")).await;

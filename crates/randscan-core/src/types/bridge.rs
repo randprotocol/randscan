@@ -83,10 +83,15 @@ pub struct BridgeState {
     pub assets: Vec<BridgeAsset>,
 }
 
-/// One registered bridged asset with everything the chain has seen of it: the registry row plus
-/// the deposits that minted it and the burns that sent it back. Amounts are decimal strings of
-/// the asset's own smallest unit (the source chain's token decimals); `deposited - burned` is the
-/// supply of this asset held in shielded notes right now.
+/// One *backing* of a bridged token — one source coin — with what the chain has seen of it.
+/// Amounts are decimal strings of the bridged token's own smallest unit.
+///
+/// Since chain 14 one token (one registry `index`) may have several backings, and the chain's
+/// public record does not attribute everything to one of them. A burn names the coin it redeems,
+/// so `burns`/`burned` are this backing's own. A deposit publishes only the token it minted, so
+/// `deposits`/`deposited` are this backing's only when it is the token's one backing, and `null`
+/// otherwise; the whole token's figures are the `token_*` fields, identical on each of the
+/// token's rows — sum them once per `index`, never per row.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BridgeAssetActivity {
     pub index: i64,
@@ -100,17 +105,27 @@ pub struct BridgeAssetActivity {
     pub name: Option<String>,
     /// the token's decimals on its home chain; amounts below are still in bridge units (8)
     pub decimals: Option<u8>,
-    pub deposits: i64,
-    pub deposited: String,
+    /// How many backings the token at `index` has (rows sharing this `index`).
+    pub backings: i64,
+    /// This backing's deposits; `None` when the token has several backings (see above).
+    pub deposits: Option<i64>,
+    pub deposited: Option<String>,
+    /// Burns that redeemed this backing (`(to_chain, token)` of the burn).
     pub burns: i64,
     pub burned: String,
-    /// `deposited - burned`
+    /// What this backing holds for the chain right now: the registry's `locked`. Only on a node
+    /// that does not serve `locked` is it rebuilt as `deposited - burned`, which is exact there
+    /// because such a node has one backing per token.
     pub outstanding: String,
+    /// The whole token's tallies, the same on every row of the token.
+    pub token_deposits: i64,
+    pub token_deposited: String,
+    pub token_burns: i64,
+    pub token_burned: String,
+    /// First and last height of any bridge activity of the token (not of this backing alone).
     pub first_height: Option<i64>,
     pub last_height: Option<i64>,
-    /// This backing's own locked amount, straight from the registry (bridge hardening B1);
-    /// `outstanding` above is the indexer's own reconciliation from indexed flows — the two
-    /// should agree, and a difference is worth an operator's attention.
+    /// This backing's own locked amount, straight from the registry (bridge hardening B1).
     pub locked: Option<String>,
     pub minted_today: Option<String>,
     pub mint_cap_per_day: Option<String>,

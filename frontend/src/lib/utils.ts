@@ -159,6 +159,38 @@ export function formatBytes(bytes: number | null | undefined): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+/**
+ * Deposits and burns across bridge rows, each token counted once. The rows are per *backing* and
+ * a token with several backings repeats its `token_*` tallies on each of them, so summing rows
+ * would count a deposit once per backing.
+ */
+export function bridgeTokenTotals(
+  rows: { index: number; token_deposits: number; token_burns: number }[],
+): { deposits: number; burns: number } {
+  const seen = new Set<number>();
+  let deposits = 0;
+  let burns = 0;
+  for (const r of rows) {
+    if (seen.has(r.index)) continue;
+    seen.add(r.index);
+    deposits += r.token_deposits;
+    burns += r.token_burns;
+  }
+  return { deposits, burns };
+}
+
+/**
+ * A genesis size cap in binary units, whole where it is whole: 8388608 is "8 MiB", 65536 is
+ * "64 KiB". The caps are powers of two, so `formatBytes`' two decimals would only add noise.
+ */
+export function formatBinaryBytes(bytes: number | null | undefined): string {
+  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
+  const trim = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  if (bytes >= 1024 * 1024) return `${trim(bytes / (1024 * 1024))} MiB`;
+  if (bytes >= 1024) return `${trim(bytes / 1024)} KiB`;
+  return `${formatNumber(bytes)} B`;
+}
+
 /** Uptime in seconds rendered as e.g. "3h 12m", "5m 3s", "2d 4h". */
 export function formatConnectedTime(seconds: number | null | undefined): string {
   if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {

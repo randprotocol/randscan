@@ -216,6 +216,7 @@ pub struct ReceiptRow {
     pub height: i64,
     pub tx_index: i32,
     pub h_in: String,
+    pub h_pub: Option<String>,
 }
 
 impl From<ReceiptRow> for Receipt {
@@ -228,6 +229,7 @@ impl From<ReceiptRow> for Receipt {
             height: r.height,
             index: r.tx_index,
             h_in: r.h_in,
+            h_pub: r.h_pub,
         }
     }
 }
@@ -320,6 +322,8 @@ pub struct ProgramRow {
     pub base_pc: i64,
     pub words_len: i64,
     pub code_hash: String,
+    pub public_words_len: i64,
+    pub public_digest: Option<String>,
     pub call_count: i64,
     pub last_called_height: Option<i64>,
 }
@@ -333,6 +337,8 @@ impl From<ProgramRow> for ProgramSummary {
             base_pc: p.base_pc,
             words_len: p.words_len,
             code_hash: p.code_hash,
+            public_words_len: p.public_words_len,
+            public_digest: p.public_digest,
             call_count: p.call_count,
             last_called_height: p.last_called_height,
         }
@@ -366,6 +372,11 @@ pub struct NetworkStatsRow {
     pub hc_bundle: Option<String>,
     pub epoch: Option<i64>,
     pub epoch_blocks: Option<i64>,
+    pub genesis_hash: Option<String>,
+    pub node_version: Option<String>,
+    pub node_git_sha: Option<String>,
+    pub fri_profile: Option<String>,
+    pub limits: Option<serde_json::Value>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -397,6 +408,12 @@ impl From<NetworkStatsRow> for NetworkStats {
             hc_bundle: s.hc_bundle,
             epoch: s.epoch,
             epoch_blocks: s.epoch_blocks,
+            genesis_hash: s.genesis_hash,
+            node_version: s.node_version,
+            node_git_sha: s.node_git_sha,
+            fri_profile: s.fri_profile,
+            // A shape this build cannot read is served as absent, not as a failed stats reply.
+            limits: s.limits.and_then(|v| serde_json::from_value(v).ok()),
             updated_at: s.updated_at.to_rfc3339(),
         }
     }

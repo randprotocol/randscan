@@ -2,29 +2,37 @@ use crate::{ProgramRow, Result};
 use sqlx::{PgConnection, PgPool};
 
 const SELECT: &str = "SELECT p.id, p.deploy_tx, p.deployed_at_height, p.base_pc, p.words_len, p.code_hash,
+        p.public_words_len, p.public_digest,
         (SELECT COUNT(*) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS call_count,
         (SELECT MAX(t.height) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS last_called_height
      FROM programs p";
 
-pub async fn insert_program(
-    conn: &mut PgConnection,
-    id: &str,
-    deploy_tx: &str,
-    deployed_at_height: i64,
-    base_pc: i64,
-    words_len: i64,
-    code_hash: &str,
-) -> Result<()> {
+pub struct NewProgram<'a> {
+    pub id: &'a str,
+    pub deploy_tx: &'a str,
+    pub deployed_at_height: i64,
+    pub base_pc: i64,
+    pub words_len: i64,
+    pub code_hash: &'a str,
+    /// The deploy-time public input: its length (0 without one) and its digest.
+    pub public_words_len: i64,
+    pub public_digest: Option<&'a str>,
+}
+
+pub async fn insert_program(conn: &mut PgConnection, p: &NewProgram<'_>) -> Result<()> {
     sqlx::query(
-        "INSERT INTO programs (id, deploy_tx, deployed_at_height, base_pc, words_len, code_hash)
-         VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (id) DO NOTHING",
+        "INSERT INTO programs (id, deploy_tx, deployed_at_height, base_pc, words_len, code_hash,
+                               public_words_len, public_digest)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (id) DO NOTHING",
     )
-    .bind(id)
-    .bind(deploy_tx)
-    .bind(deployed_at_height)
-    .bind(base_pc)
-    .bind(words_len)
-    .bind(code_hash)
+    .bind(p.id)
+    .bind(p.deploy_tx)
+    .bind(p.deployed_at_height)
+    .bind(p.base_pc)
+    .bind(p.words_len)
+    .bind(p.code_hash)
+    .bind(p.public_words_len)
+    .bind(p.public_digest)
     .execute(conn)
     .await?;
     Ok(())

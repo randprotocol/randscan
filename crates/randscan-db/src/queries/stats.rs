@@ -27,6 +27,11 @@ pub struct StatsUpdate<'a> {
     pub hc_bundle: Option<&'a str>,
     pub epoch: Option<i64>,
     pub epoch_blocks: Option<i64>,
+    pub genesis_hash: Option<&'a str>,
+    pub node_version: Option<&'a str>,
+    pub node_git_sha: Option<&'a str>,
+    pub fri_profile: Option<&'a str>,
+    pub limits: Option<serde_json::Value>,
 }
 
 pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<()> {
@@ -36,7 +41,9 @@ pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<
             active_validator_count = $10, total_stake = $11::numeric, total_supply = $12::numeric,
             pool_value = $13::numeric, program_count = $14, avg_block_time_ms = $15, peer_count = $16,
             mempool_size = $17, node_syncing = $18, faucet = $19, confidential = $20, current_leader = $21,
-            tree_root = $22, hc_bundle = $23, epoch = $24, epoch_blocks = $25, updated_at = NOW()
+            tree_root = $22, hc_bundle = $23, epoch = $24, epoch_blocks = $25,
+            genesis_hash = $26, node_version = $27, node_git_sha = $28, fri_profile = $29,
+            limits = $30, updated_at = NOW()
          WHERE id = 1",
     )
     .bind(s.chain_id)
@@ -64,6 +71,11 @@ pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<
     .bind(s.hc_bundle)
     .bind(s.epoch)
     .bind(s.epoch_blocks)
+    .bind(s.genesis_hash)
+    .bind(s.node_version)
+    .bind(s.node_git_sha)
+    .bind(s.fri_profile)
+    .bind(&s.limits)
     .execute(pool)
     .await?;
     Ok(())
@@ -75,7 +87,8 @@ pub async fn get_network_stats(pool: &PgPool) -> Result<NetworkStatsRow> {
                 validator_count, active_validator_count, total_stake::text AS total_stake,
                 total_supply::text AS total_supply, pool_value::text AS pool_value, program_count,
                 avg_block_time_ms, peer_count, mempool_size, node_syncing, faucet, confidential,
-                current_leader, tree_root, hc_bundle, epoch, epoch_blocks, updated_at
+                current_leader, tree_root, hc_bundle, epoch, epoch_blocks, genesis_hash,
+                node_version, node_git_sha, fri_profile, limits, updated_at
          FROM network_stats WHERE id = 1",
     )
     .fetch_one(pool)

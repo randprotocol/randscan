@@ -27,6 +27,15 @@ pub fn shielded_address(seed: &str) -> String {
 }
 
 /// 64 lowercase hex characters derived from `seed`.
+/// What the mock's `rand_getVersion` reports as the node's commit.
+pub const MOCK_GIT_SHA: &str = "b3c594cd5872bbc132cfafcd7314614436e6131a";
+
+/// The digest the mock reports for a program deployed with a public input: its `public_digest`,
+/// and the `h_pub` of every receipt of a call to it.
+pub fn public_digest(program: &str) -> String {
+    h(&format!("public-{program}"))
+}
+
 pub fn h(seed: &str) -> String {
     hex::encode(Sha256::digest(seed.as_bytes()))
 }
@@ -200,6 +209,14 @@ impl MockChain {
             .sum()
     }
 
+    /// Every committed transaction with its block height and its index in the block.
+    fn committed(&self) -> impl Iterator<Item = (u64, usize, &Value)> + '_ {
+        self.blocks.iter().flat_map(|b| {
+            let height = b["height"].as_u64().unwrap_or(0);
+            b["transactions"].as_array().into_iter().flatten().enumerate().map(move |(i, t)| (height, i, t))
+        })
+    }
+
     fn dispatch(&mut self, method: &str, params: &Value) -> Result<Value, (i64, String)> {
         self.calls.push(method.to_string());
         let p = |i: usize| params.get(i).cloned().unwrap_or(Value::Null);
@@ -299,6 +316,11 @@ impl MockChain {
                     { "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1"),
                       "decimals": 8, "locked": 600,
                       "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 1_000, "mint_day": 0 },
+                    // Chain 14's shape: one bridged token, several backings. This second coin of
+                    // token 1 was never deposited or redeemed.
+                    { "index": 1, "chain": 3, "token": "ce".repeat(32), "asset_id": h("asset-1-bsc"),
+                      "decimals": 18, "locked": 0,
+                      "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 0, "mint_day": 0 },
                     { "index": 2, "chain": 2, "token": format!("{}dac17f958d2ee523a2206206994597c13d831ec7", "0".repeat(24)), "asset_id": h("asset-2"),
                       "decimals": 6, "locked": 0,
                       "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 0, "mint_day": 0 }
@@ -339,7 +361,43 @@ impl MockChain {
                     .any(|t| t["hash"] == hash && t["action"]["kind"] == "call");
                 if is_call { json!({ "tx": hash, "h_in": h("h_in"), "kem_ct": "", "to_sender": "0a".repeat(60), "to_auditor": "", "body": "0b".repeat(60) }) } else { Value::Null }
             }
-            "rand_getReceipt" | "rand_getProgram" => Value::Null,
+            // A program's record, from the deploy that created it. One deployed with a public
+            // input reports its digest; one without reports `null` (v0.4).
+            "rand_getProgram" => {
+                let id = p(0).as_str().unwrap_or("").to_string();
+                self.committed()
+                    .find(|(_, _, t)| t["action"]["kind"] == "deploy" && t["action"]["program"] == id)
+                    .map(|(height, _, t)| {
+                        let public = t["action"]["public_words_len"].as_u64().unwrap_or(0);
+                        json!({ "id": id, "base_pc": 0, "words_len": t["action"]["words"], "code_hash": h(&format!("code-{id}")),
+                            "deployed_at": height, "public_words_len": public,
+                            "public_digest": if public > 0 { json!(public_digest(&id)) } else { Value::Null } })
+                    })
+                    .unwrap_or(Value::Null)
+            }
+            // A call's receipt: `h_pub` is the called program's public digest, `null` without one.
+            "rand_getReceipt" => {
+                let hash = p(0).as_str().unwrap_or("").to_string();
+                let call = self.committed().find(|(_, _, t)| t["hash"] == hash && t["action"]["kind"] == "call");
+                match call {
+                    None => Value::Null,
+                    Some((height, index, t)) => {
+                        let program = t["action"]["program"].as_str().unwrap_or("").to_string();
+                        let has_public = self.committed().any(|(_, _, d)| d["action"]["kind"] == "deploy"
+                            && d["action"]["program"] == program && d["action"]["public_words_len"].as_u64().unwrap_or(0) > 0);
+                        json!({ "tx": hash, "program": program, "tier": 14, "outputs": [1, 0, 25, 0, 0, 0, 0, 0],
+                            "height": height, "index": index, "h_in": h("h_in"),
+                            "h_pub": if has_public { json!(public_digest(&program)) } else { Value::Null } })
+                    }
+                }
+            }
+            // v0.3 / v0.4: the node's build, the genesis hash and the genesis call limits (chain
+            // 14's values). An older node does not know the methods.
+            "rand_getVersion" if !self.pre_s2 => json!({ "version": "0.1.0", "git_sha": MOCK_GIT_SHA,
+                "chain_id": self.chain_id, "hc_bundle": h("hc_bundle"), "fri_profile": "test" }),
+            "rand_getGenesisHash" if !self.pre_s2 => self.blocks.first().map(|b| b["hash"].clone()).unwrap_or(Value::Null),
+            "rand_getLimits" if !self.pre_s2 => json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
+                "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 }),
             other => return Err((-32601, format!("unknown method {other}"))),
         })
     }

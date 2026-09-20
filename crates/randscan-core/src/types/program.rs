@@ -12,6 +12,11 @@ pub struct ProgramSummary {
     pub base_pc: i64,
     pub words_len: i64,
     pub code_hash: String,
+    /// The length of the public input fixed at deploy (0 without one).
+    pub public_words_len: i64,
+    /// Its digest (Word8 hex): what every call's proof is checked against, and a call receipt's
+    /// `h_pub`. `None` for a program deployed without a public input.
+    pub public_digest: Option<String>,
     pub call_count: i64,
     pub last_called_height: Option<i64>,
 }

@@ -85,6 +85,10 @@ const MIGRATIONS: &[(i32, &str)] = &[
         9,
         include_str!("../../../migrations/009_hidden_asset_bundle_and_rpl_tokens.sql"),
     ),
+    (
+        10,
+        include_str!("../../../migrations/010_public_input_and_chain_limits.sql"),
+    ),
 ];
 
 /// Advisory lock key used to serialize migration runs across concurrent callers. The

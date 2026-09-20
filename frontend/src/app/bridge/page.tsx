@@ -18,6 +18,7 @@ import {
   cn,
   formatAmount,
   formatBridgeChain,
+  bridgeTokenTotals,
   formatBridgeUnits,
   formatNumber,
 } from "@/lib/utils";
@@ -49,10 +50,21 @@ function FlowCell({
   units,
   symbol,
 }: {
-  count: number;
-  units: string;
+  count: number | null;
+  units: string | null;
   symbol: string | null;
 }) {
+  // A deposit names the token it minted, not the source coin locked for it, so a token with
+  // several backings has no per-coin deposit figure; "On Rand now" is the per-coin truth.
+  if (count === null || units === null)
+    return (
+      <span
+        className="text-mute"
+        title="A deposit publishes the token it minted, not which source coin was locked, so it cannot be attributed to one coin of a multi-coin token."
+      >
+        n/a
+      </span>
+    );
   if (count === 0) return <span className="text-mute">—</span>;
   return (
     <span className="flex flex-col">
@@ -147,7 +159,11 @@ function SourceChainPanel({
   emitter: string | undefined;
   assets: BridgeAssetActivity[];
 }) {
-  const deposits = assets.reduce((n, a) => n + a.deposits, 0);
+  // Burns name their coin, so they add up per source chain. Deposits do only when every row here
+  // is its token's one backing; otherwise this chain's share of them is not public.
+  const deposits = assets.every((a) => a.deposits !== null)
+    ? assets.reduce((n, a) => n + (a.deposits ?? 0), 0)
+    : null;
   const burns = assets.reduce((n, a) => n + a.burns, 0);
   return (
     <section className="space-y-3">
@@ -165,7 +181,8 @@ function SourceChainPanel({
           {assets.length > 0 && (
             <>
               {" · "}
-              {formatNumber(deposits)} in, {formatNumber(burns)} out
+              {deposits !== null && <>{formatNumber(deposits)} in, </>}
+              {formatNumber(burns)} out
             </>
           )}
         </p>
@@ -366,8 +383,7 @@ export default function BridgePage() {
   const otherChains = [...byChain.keys()].filter(
     (id) => !BRIDGE_SOURCE_CHAINS.some((c) => c.id === id),
   );
-  const deposits = assets.reduce((n, a) => n + a.deposits, 0);
-  const burns = assets.reduce((n, a) => n + a.burns, 0);
+  const { deposits, burns } = bridgeTokenTotals(assets);
   const activeChains = BRIDGE_SOURCE_CHAINS.filter(
     (c) => (byChain.get(c.id) ?? []).length > 0,
   );

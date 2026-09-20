@@ -415,6 +415,23 @@ impl IndexerService {
                 None
             }
         };
+        // The chain's identity and limits and the node's build. None of them stalls the stats:
+        // a node without the method (before v0.3 / v0.4) or a failed read leaves the field
+        // absent. They are re-read every refresh rather than cached per chain, because a
+        // same-chain node update changes the build without any reset to hang an invalidation on.
+        let limits = self.rpc.limits().await.unwrap_or_else(|e| {
+            warn!("limits fetch failed: {:#}", e);
+            None
+        });
+        let version = self.rpc.version().await.unwrap_or_else(|e| {
+            warn!("version fetch failed: {:#}", e);
+            None
+        });
+        let genesis_hash = self.rpc.genesis_hash().await.unwrap_or_else(|e| {
+            warn!("genesis hash fetch failed: {:#}", e);
+            None
+        });
+        let non_empty = |s: &String| !s.is_empty();
         let supply = self.supply.read().await.clone();
         let (chain_id, symbol, decimals) = self.chain_info().await?;
         let height = db::max_block_height(pool).await?.unwrap_or(-1).max(0);
@@ -475,6 +492,18 @@ impl IndexerService {
                     .map(|s| s.as_str()),
                 epoch: epoch.as_ref().map(|e| e.epoch as i64),
                 epoch_blocks: epoch.as_ref().map(|e| e.epoch_blocks as i64),
+                genesis_hash: genesis_hash.as_deref(),
+                node_version: version.as_ref().map(|v| v.version.as_str()),
+                node_git_sha: version
+                    .as_ref()
+                    .map(|v| &v.git_sha)
+                    .filter(|s| non_empty(s))
+                    .map(|s| s.as_str()),
+                // `rand_status` has carried the profile since before `rand_getVersion` existed.
+                fri_profile: Some(&status.fri_profile)
+                    .filter(|s| non_empty(s))
+                    .map(|s| s.as_str()),
+                limits: limits.as_ref().and_then(|l| serde_json::to_value(l).ok()),
             },
         )
         .await?;

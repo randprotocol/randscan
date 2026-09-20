@@ -37,7 +37,33 @@ pub struct NetworkStats {
     pub hc_bundle: Option<String>,
     pub epoch: Option<i64>,
     pub epoch_blocks: Option<i64>,
+    /// Block 0's hash as the node reports it (`rand_getGenesisHash`); a chain id alone does not
+    /// tell two cuts apart.
+    pub genesis_hash: Option<String>,
+    /// The node's crate version and the commit it was built from (`rand_getVersion`).
+    pub node_version: Option<String>,
+    pub node_git_sha: Option<String>,
+    pub fri_profile: Option<String>,
+    /// The chain's call limits, or `None` on a node without `rand_getLimits`.
+    pub limits: Option<ChainLimits>,
     pub updated_at: String,
+}
+
+/// The size caps a chain's genesis sets (`rand_getLimits`, v0.4). They were constants before
+/// chain 13; chain 14 runs 65 535 words, 8 MiB proofs, 20 MiB blocks, 64 KiB call envelopes and
+/// 32 768 public words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ChainLimits {
+    /// The most code words a program may have.
+    pub max_program_words: u64,
+    /// The largest proof, bundle or call.
+    pub max_proof_bytes: u64,
+    /// The largest block, and so the largest transaction.
+    pub max_block_bytes: u64,
+    /// The largest sealed call-input envelope.
+    pub max_call_envelope_bytes: u64,
+    /// The most public words a deploy may fix; 0 means no program has a public input.
+    pub max_program_public_words: u64,
 }
 
 /// The node's supply audit (`rand_getSupply`, phase S2): every crossing of the pool boundary is

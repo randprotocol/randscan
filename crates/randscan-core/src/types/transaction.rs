@@ -194,6 +194,9 @@ pub struct Receipt {
     pub index: i32,
     /// The proof's salted commitment to the call's private inputs (zkVM M4.1).
     pub h_in: String,
+    /// The program's deploy-time public digest the proof was checked against. `None` means the
+    /// program has no public input and the proof was checked against the empty one's digest.
+    pub h_pub: Option<String>,
 }
 
 /// An RPL mint authority (`register_token`'s `authority`, `set_authority`'s target): `"none"`

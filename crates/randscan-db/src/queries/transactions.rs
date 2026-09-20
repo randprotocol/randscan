@@ -175,10 +175,11 @@ pub async fn insert_receipt(
     height: i64,
     tx_index: i32,
     h_in: &str,
+    h_pub: Option<&str>,
 ) -> Result<()> {
     sqlx::query(
-        "INSERT INTO receipts (tx_hash, program, tier, outputs, height, tx_index, h_in)
-         VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT (tx_hash) DO NOTHING",
+        "INSERT INTO receipts (tx_hash, program, tier, outputs, height, tx_index, h_in, h_pub)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (tx_hash) DO NOTHING",
     )
     .bind(tx_hash)
     .bind(program)
@@ -187,6 +188,7 @@ pub async fn insert_receipt(
     .bind(height)
     .bind(tx_index)
     .bind(h_in)
+    .bind(h_pub)
     .execute(conn)
     .await?;
     Ok(())
@@ -210,7 +212,7 @@ pub async fn get_transaction_summary(pool: &PgPool, hash: &str) -> Result<Option
 
 pub async fn get_receipt(pool: &PgPool, tx_hash: &str) -> Result<Option<ReceiptRow>> {
     Ok(sqlx::query_as::<_, ReceiptRow>(
-        "SELECT tx_hash, program, tier, outputs, height, tx_index, h_in FROM receipts WHERE tx_hash = $1",
+        "SELECT tx_hash, program, tier, outputs, height, tx_index, h_in, h_pub FROM receipts WHERE tx_hash = $1",
     )
     .bind(tx_hash)
     .fetch_optional(pool)

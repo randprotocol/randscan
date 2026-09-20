@@ -10,6 +10,7 @@ import { useLatestBlocks, useLatestTransactions, useStats } from '@/hooks/useApi
 import { useNewBlocks, useNewTransactions, useStatsUpdates } from '@/hooks/useWebSocket';
 import {
   formatAmount,
+  formatBinaryBytes,
   formatDurationMs,
   formatNumber,
   formatStake,
@@ -165,6 +166,32 @@ export default function DashboardPage() {
           <span>· confidential calls {stats.confidential ? 'on' : 'off'}</span>
           <span>
             · {TOKEN_SYMBOL} has {stats.decimals} decimals
+          </span>
+          {stats.genesis_hash && (
+            <span className="inline-flex items-center gap-1">
+              · genesis <Hash value={stats.genesis_hash} start={8} end={6} />
+            </span>
+          )}
+          {stats.node_version && (
+            <span>
+              · node {stats.node_version}
+              {stats.node_git_sha ? ` (${stats.node_git_sha.slice(0, 7)})` : ''}
+            </span>
+          )}
+        </p>
+      )}
+
+      {stats?.limits && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
+          <span>Limits: programs {formatNumber(stats.limits.max_program_words)} words</span>
+          <span>· proofs {formatBinaryBytes(stats.limits.max_proof_bytes)}</span>
+          <span>· blocks {formatBinaryBytes(stats.limits.max_block_bytes)}</span>
+          <span>· call envelopes {formatBinaryBytes(stats.limits.max_call_envelope_bytes)}</span>
+          <span>
+            · public input{' '}
+            {stats.limits.max_program_public_words > 0
+              ? `${formatNumber(stats.limits.max_program_public_words)} words`
+              : 'off'}
           </span>
         </p>
       )}

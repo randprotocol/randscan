@@ -256,6 +256,24 @@ impl RpcClient {
             .await
     }
 
+    /// The chain's call limits, from its genesis (v0.4). `None` on a node without the method.
+    pub async fn limits(&self) -> Result<Option<randscan_core::ChainLimits>> {
+        self.call_optional_method("rand_getLimits", serde_json::json!([]))
+            .await
+    }
+
+    /// The node's build (v0.3). `None` on a node without the method.
+    pub async fn version(&self) -> Result<Option<RpcVersion>> {
+        self.call_optional_method("rand_getVersion", serde_json::json!([]))
+            .await
+    }
+
+    /// The genesis hash, hex (v0.3). `None` on a node without the method.
+    pub async fn genesis_hash(&self) -> Result<Option<String>> {
+        self.call_optional_method("rand_getGenesisHash", serde_json::json!([]))
+            .await
+    }
+
     pub async fn is_connected(&self) -> bool {
         self.head().await.is_ok()
     }
@@ -422,6 +440,8 @@ pub enum RpcAction {
     Deploy {
         program: String,
         words: u64,
+        /// The deploy-time public input's length (0 without one, and on a pre-v0.4 node).
+        public_words_len: u64,
     },
     Call {
         program: String,
@@ -442,6 +462,8 @@ pub enum RpcAction {
         validator: String,
         amount: Units,
         nonce: u64,
+        /// The deposit note's `time` word, chosen by the withdrawing node (chain 8 onward).
+        time: Option<u64>,
     },
     BridgeAttest {
         attestation_len: u64,
@@ -554,6 +576,8 @@ enum KnownAction {
     Deploy {
         program: String,
         words: u64,
+        #[serde(default)]
+        public_words_len: u64,
     },
     Call {
         program: String,
@@ -578,6 +602,8 @@ enum KnownAction {
         amount: Units,
         #[serde(default)]
         nonce: u64,
+        #[serde(default)]
+        time: Option<u64>,
     },
     BridgeAttest {
         attestation_len: u64,
@@ -701,7 +727,15 @@ impl<'de> Deserialize<'de> for RpcAction {
             Ok(k) => Ok(match k {
                 KnownAction::None => RpcAction::None,
                 KnownAction::Mint { cm, amount, minter } => RpcAction::Mint { cm, amount, minter },
-                KnownAction::Deploy { program, words } => RpcAction::Deploy { program, words },
+                KnownAction::Deploy {
+                    program,
+                    words,
+                    public_words_len,
+                } => RpcAction::Deploy {
+                    program,
+                    words,
+                    public_words_len,
+                },
                 KnownAction::Call {
                     program,
                     proof_len,
@@ -733,10 +767,12 @@ impl<'de> Deserialize<'de> for RpcAction {
                     validator,
                     amount,
                     nonce,
+                    time,
                 } => RpcAction::Withdraw {
                     validator,
                     amount,
                     nonce,
+                    time,
                 },
                 KnownAction::BridgeAttest {
                     attestation_len,
@@ -892,6 +928,10 @@ pub struct RpcReceipt {
     pub index: u32,
     #[serde(default)]
     pub h_in: String,
+    /// The program's deploy-time public digest the proof was checked against; `None` when that
+    /// was the digest of the empty public input (and on a pre-v0.4 node).
+    #[serde(default)]
+    pub h_pub: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -901,6 +941,21 @@ pub struct RpcProgram {
     pub words_len: u32,
     pub code_hash: String,
     pub deployed_at: u64,
+    #[serde(default)]
+    pub public_words_len: u64,
+    /// `None` for a program deployed without a public input.
+    #[serde(default)]
+    pub public_digest: Option<String>,
+}
+
+/// `rand_getVersion`: which build the node runs.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcVersion {
+    pub version: String,
+    #[serde(default)]
+    pub git_sha: String,
+    #[serde(default)]
+    pub fri_profile: String,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -924,6 +979,39 @@ pub struct RpcTreeInfo {
 mod tests {
     use super::*;
 
+    #[test]
+    fn parses_the_public_input_fields() {
+        // A deploy without the field (a pre-v0.4 node) is a program without a public input.
+        let old: RpcAction =
+            serde_json::from_str(r#"{"kind":"deploy","program":"675a","words":412}"#).unwrap();
+        assert!(matches!(
+            old,
+            RpcAction::Deploy {
+                public_words_len: 0,
+                ..
+            }
+        ));
+        let p: RpcProgram = serde_json::from_str(r#"{"id":"7402","base_pc":0,"words_len":9100,"code_hash":"ab12","deployed_at":40,"public_words_len":27151,"public_digest":"5d20"}"#).unwrap();
+        assert_eq!(p.public_words_len, 27151);
+        assert_eq!(p.public_digest.as_deref(), Some("5d20"));
+        let bare: RpcProgram = serde_json::from_str(r#"{"id":"675a","base_pc":0,"words_len":412,"code_hash":"ab12","deployed_at":17,"public_words_len":0,"public_digest":null}"#).unwrap();
+        assert_eq!((bare.public_words_len, bare.public_digest), (0, None));
+        let r: RpcReceipt = serde_json::from_str(r#"{"tx":"d4c7","program":"7402","tier":16,"outputs":[1,0,0,0,0,0,0,0],"height":41,"index":0,"h_in":"9c0e","h_pub":"5d20"}"#).unwrap();
+        assert_eq!(r.h_pub.as_deref(), Some("5d20"));
+    }
+
+    #[test]
+    fn parses_the_live_chain_14_version_and_limits() {
+        let v: RpcVersion = serde_json::from_str(r#"{"chain_id":14,"fri_profile":"production","git_sha":"b3c594cd5872bbc132cfafcd7314614436e6131a","hc_bundle":"83d3","version":"0.1.0"}"#).unwrap();
+        assert_eq!(v.version, "0.1.0");
+        assert_eq!(v.fri_profile, "production");
+        assert!(v.git_sha.starts_with("b3c594c"));
+        let l: randscan_core::ChainLimits = serde_json::from_str(r#"{"max_block_bytes":20971520,"max_call_envelope_bytes":65536,"max_program_public_words":32768,"max_program_words":65535,"max_proof_bytes":8388608}"#).unwrap();
+        assert_eq!(l.max_proof_bytes, 8 << 20);
+        assert_eq!(l.max_block_bytes, 20 << 20);
+        assert_eq!(l.max_program_public_words, 32768);
+    }
+
     fn bundle_json() -> serde_json::Value {
         serde_json::json!({
             "anchor": "6b1d", "nullifiers": ["8c04", "5e77", "03aa", "e19b"],
@@ -942,11 +1030,11 @@ mod tests {
             "transactions": [
                 { "hash": "t0", "chain_id": 14, "bundle": b, "action": { "kind": "none" } },
                 { "hash": "t1", "chain_id": 14, "bundle": null, "action": { "kind": "mint", "cm": "2a9f", "amount": 100000000000u64, "minter": "2nRd" } },
-                { "hash": "t2", "chain_id": 14, "bundle": b, "action": { "kind": "deploy", "program": "675a", "words": 412 } },
+                { "hash": "t2", "chain_id": 14, "bundle": b, "action": { "kind": "deploy", "program": "675a", "words": 412, "public_words_len": 27151 } },
                 { "hash": "t3", "chain_id": 14, "bundle": b, "action": { "kind": "call", "program": "675a", "proof_len": 268123, "input_envelope_len": 1280 } },
                 { "hash": "t4", "chain_id": 14, "bundle": b, "action": { "kind": "bond", "validator": "2nRd", "amount": 500, "registered": false } },
                 { "hash": "t5", "chain_id": 14, "bundle": null, "action": { "kind": "unbond", "validator": "2nRd", "amount": 7, "nonce": 2 } },
-                { "hash": "t6", "chain_id": 14, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": 9, "nonce": 3 } },
+                { "hash": "t6", "chain_id": 14, "bundle": null, "action": { "kind": "withdraw", "validator": "2nRd", "amount": "9", "nonce": 3, "time": 1994 } },
                 { "hash": "t7", "chain_id": 14, "bundle": b, "action": { "kind": "bridge_attest", "attestation_len": 520, "recipient": "rand1abc", "asset": 1, "asset_index": 1, "amount": 1000, "time": 41, "r": "aa", "commitment": "cc", "pq_signers": [0, 1] } },
                 { "hash": "t8", "chain_id": 14, "bundle": b, "action": { "kind": "bridge_burn", "asset": 2, "amount": 400, "relayer_fee": 100, "to_chain": 5, "token": "cdcd", "to": "abab" } },
                 { "hash": "t9", "chain_id": 14, "bundle": b, "action": { "kind": "register_token", "name": "zUSD", "symbol": "zUSD", "decimals": 6, "authority": "bridge", "index": 3, "initial_amount": 5000, "initial": { "amount": 5000, "recipient": "rand1abc", "time": 40, "r": "bb" } } },
@@ -978,7 +1066,11 @@ mod tests {
         ));
         assert!(matches!(
             &b.transactions[6].action,
-            RpcAction::Withdraw { nonce: 3, .. }
+            RpcAction::Withdraw {
+                nonce: 3,
+                time: Some(1994),
+                ..
+            }
         ));
         match &b.transactions[7].action {
             RpcAction::BridgeAttest {
@@ -1125,6 +1217,7 @@ mod tests {
     fn parses_receipt_and_status() {
         let r: RpcReceipt = serde_json::from_str(r#"{"tx":"d4c7","program":"675a","tier":14,"outputs":[1,0,25,0,0,0,0,0],"height":17,"index":0,"h_in":"9c0e"}"#).unwrap();
         assert_eq!(r.h_in, "9c0e");
+        assert_eq!(r.h_pub, None);
         let s: NodeStatus = serde_json::from_str(r#"{"height":1998,"head_hash":"x","view":2251,"high_qc_view":2250,"syncing":false,"sync_target":1998,"peer_count":5,"mempool_size":0,"is_validator":true,"faucet":true,"confidential":true,"fri_profile":"production","programs":2,"notes":41,"nullifiers":12,"tree_root":"6b1d","hc_bundle":"f07a","address":null,"peer_id":"12D3"}"#).unwrap();
         assert_eq!(s.notes, 41);
         assert_eq!(s.address, None);

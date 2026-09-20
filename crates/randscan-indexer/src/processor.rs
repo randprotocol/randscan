@@ -26,12 +26,15 @@ struct PreparedReceipt {
     height: i64,
     index: i32,
     h_in: String,
+    h_pub: Option<String>,
 }
 
-/// What `rand_getProgram` adds to a deploy action: the code hash and the base pc.
+/// What `rand_getProgram` adds to a deploy action: the code hash, the base pc and the digest of
+/// the deploy-time public input (`None` without one).
 struct ProgramMeta {
     base_pc: i64,
     code_hash: String,
+    public_digest: Option<String>,
 }
 
 impl BlockProcessor {
@@ -56,6 +59,7 @@ impl BlockProcessor {
                         height: r.height as i64,
                         index: r.index as i32,
                         h_in: r.h_in,
+                        h_pub: r.h_pub,
                     }),
                     Ok(None) => warn!("no receipt yet for call {} at height {}", tx.hash, height),
                     Err(e) => warn!("receipt fetch failed for {}: {}", tx.hash, e),
@@ -72,16 +76,19 @@ impl BlockProcessor {
                     Ok(Some(p)) => ProgramMeta {
                         base_pc: p.base_pc as i64,
                         code_hash: p.code_hash,
+                        public_digest: p.public_digest,
                     },
                     Ok(None) => ProgramMeta {
                         base_pc: 0,
                         code_hash: program.clone(),
+                        public_digest: None,
                     },
                     Err(e) => {
                         warn!("program fetch {} failed: {}", program, e);
                         ProgramMeta {
                             base_pc: 0,
                             code_hash: program.clone(),
+                            public_digest: None,
                         }
                     }
                 };
@@ -158,16 +165,26 @@ impl BlockProcessor {
             .await
             .with_context(|| format!("insert tx {}", tx.hash))?;
 
-            if let RpcAction::Deploy { program, words } = &tx.action {
+            if let RpcAction::Deploy {
+                program,
+                words,
+                public_words_len,
+            } = &tx.action
+            {
                 let meta = programs.get(program);
                 db::insert_program(
                     &mut dbtx,
-                    program,
-                    &tx.hash,
-                    height,
-                    meta.map(|m| m.base_pc).unwrap_or(0),
-                    *words as i64,
-                    meta.map(|m| m.code_hash.as_str()).unwrap_or(program),
+                    &db::NewProgram {
+                        id: program,
+                        deploy_tx: &tx.hash,
+                        deployed_at_height: height,
+                        base_pc: meta.map(|m| m.base_pc).unwrap_or(0),
+                        words_len: *words as i64,
+                        code_hash: meta.map(|m| m.code_hash.as_str()).unwrap_or(program),
+                        // The length is the action's own; only the digest needs the node's record.
+                        public_words_len: *public_words_len as i64,
+                        public_digest: meta.and_then(|m| m.public_digest.as_deref()),
+                    },
                 )
                 .await?;
             }
@@ -190,7 +207,15 @@ impl BlockProcessor {
 
         for r in &receipts {
             db::insert_receipt(
-                &mut dbtx, &r.tx_hash, &r.program, r.tier, &r.outputs, r.height, r.index, &r.h_in,
+                &mut dbtx,
+                &r.tx_hash,
+                &r.program,
+                r.tier,
+                &r.outputs,
+                r.height,
+                r.index,
+                &r.h_in,
+                r.h_pub.as_deref(),
             )
             .await?;
         }
@@ -378,7 +403,7 @@ impl<'a> TxFields<'a> {
                 validator: Some(minter),
                 ..Self::empty(TxKind::Mint)
             },
-            RpcAction::Deploy { program, words } => TxFields {
+            RpcAction::Deploy { program, words, .. } => TxFields {
                 program: Some(program),
                 words_len: Some(*words as i64),
                 ..Self::empty(TxKind::Deploy)
@@ -417,10 +442,13 @@ impl<'a> TxFields<'a> {
                 validator,
                 amount,
                 nonce,
+                time,
             } => TxFields {
                 validator: Some(validator),
                 amount: Some(amount.0.clone()),
                 action_nonce: Some(*nonce as i64),
+                // The deposit note's own `time` word, as a bridge deposit's and a token mint's.
+                note_time: time.map(|t| t as i64),
                 ..Self::empty(TxKind::Withdraw)
             },
             RpcAction::BridgeAttest {

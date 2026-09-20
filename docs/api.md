@@ -123,7 +123,7 @@ for v in validators:
 | `GET /stats` | network statistics |
 | `GET /supply` | the node's supply audit (404 on a node that does not serve it) |
 | `GET /bridge` | the bridge's public state and asset registry |
-| `GET /bridge/assets` | every registered bridged asset with its deposits, burns and outstanding supply |
+| `GET /bridge/assets` | every backing of every bridged token with its burns and what it holds, and the token's deposits |
 | `GET /bridge/tokens` | the tokens the bridge accepts, with their contract addresses on each chain |
 | `GET /tokens` | the whole RPL token registry, as cached from the node |
 | `GET /tokens/:id` | one token by registry index, 64-hex id or `rpl1…` text form, its deploy transaction and its public supply history |
@@ -159,6 +159,11 @@ unreachable. Check `indexer.lag` before trusting "latest" data during an outage.
   "current_leader": "F6rYLexPhyMmwPNqbEmyyp5FiTmtQqDgZyqScUqYY4F6",
   "tree_root": "6b1d…c4", "hc_bundle": "f07a…19",
   "epoch": 20, "epoch_blocks": 1000,
+  "genesis_hash": "1cff3b7d…c7ff",
+  "node_version": "0.1.0", "node_git_sha": "b3c594cd5872bbc132cfafcd7314614436e6131a",
+  "fri_profile": "production",
+  "limits": { "max_program_words": 65535, "max_proof_bytes": 8388608, "max_block_bytes": 20971520,
+              "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 },
   "updated_at": "2026-09-12T05:20:38.591804+00:00"
 }
 ```
@@ -169,6 +174,16 @@ and `pool_value` come from the node's supply audit and are `"0"` / `null` on a n
 not serve it. `tree_root` is the current commitment-tree root and `hc_bundle` the digest of the
 bundle guest every proof on this chain is checked against. `current_leader` is the validator
 expected to propose the next block.
+
+`genesis_hash` is block 0's hash as the node reports it — a chain id alone does not tell two
+cuts apart. `node_version` and `node_git_sha` say which build the explorer's node runs (`-dirty`
+is appended when that build's tree was not clean), and `fri_profile` which proof profile.
+`limits` are the size caps the chain's genesis sets (the node's `rand_getLimits`; they were
+constants before chain 13): the most code words a program may have, the largest proof, the
+largest block and so the largest transaction, the largest sealed call-input envelope, and the
+most public words a deploy may fix (`0` means no program on the chain has a public input). Each
+of the five is `null` on a node too old to serve it, and they are re-read on every stats refresh,
+so a same-chain node update shows up here without a re-index.
 
 `GET /supply` returns the audit verbatim (all units strings):
 
@@ -207,27 +222,50 @@ pause key alone can never unpause. `registration_fee` and `next_index` are the t
 as plain numbers here, not decimal strings.
 
 `GET /bridge/assets` joins that registry with the indexed `bridge_attest` and `bridge_burn`
-transactions, one row per asset in index order (an empty array on a chain without a bridge):
+transactions, **one row per backing** (source coin) in registry order (an empty array on a chain
+without a bridge). Since chain 14 one bridged token — one `index` — may have several backings:
+zUSD is index 1 with seven of them.
 
 ```json
 [{
-  "index": 1, "chain": 2, "token": "000000000000000000000000dac17f…", "asset_id": "…",
-  "symbol": "USDT", "name": "Tether USD", "decimals": 6,
-  "deposits": 12, "deposited": "125000000000", "burns": 3, "burned": "20000000000",
-  "outstanding": "105000000000", "first_height": 1040, "last_height": 19877,
-  "locked": "600", "minted_today": "0", "mint_cap_per_day": "10000000000"
+  "index": 1, "chain": 3, "token": "00000000000000000000000055d39832…", "asset_id": "…",
+  "symbol": "USDT", "name": "Tether USD", "decimals": 18, "backings": 7,
+  "deposits": null, "deposited": null, "burns": 0, "burned": "0",
+  "outstanding": "100000000",
+  "token_deposits": 3, "token_deposited": "300000000", "token_burns": 0, "token_burned": "0",
+  "first_height": 1040, "last_height": 19877,
+  "locked": "100000000", "minted_today": "100000000", "mint_cap_per_day": "10000000000000"
 }]
 ```
 
 `chain` is the bridge chain id of the token's home: 2 Ethereum, 3 BSC, 4 Tron, 5 Solana. `symbol`,
 `name` and `decimals` are set when `(chain, token)` is on the approved list below and `null`
-otherwise. `deposited`, `burned` and `outstanding` (`deposited - burned`, what is held in shielded
-notes right now) are strings of **bridge units, always 8 decimals** whatever the token's own
+otherwise. Amounts are strings of **bridge units, always 8 decimals** whatever the token's own
 decimals at home; the bridge contracts convert on the way in and out. A guardian-set rotation is a
-`bridge_attest` with no asset and is not counted. `locked`/`minted_today`/`mint_cap_per_day` are
-this backing's own figures straight from the registry (bridge hardening B1); `outstanding` is
-this indexer's own reconciliation from indexed flows — the two should agree, and a difference is
-worth investigating.
+`bridge_attest` with no asset and is not counted.
+
+What is a backing's own and what is the whole token's:
+
+- `burns` / `burned` are **this backing's**. A burn names the coin it redeems, `(to_chain, token)`,
+  and the ledger holds that pair to one of the token's backings.
+- `outstanding` is **this backing's**: what it holds for the chain right now, the registry's
+  `locked`. (On a node too old to serve `locked` it is rebuilt as `deposited - burned`, which is
+  exact there because such a node has one backing per token.) `locked`, `minted_today` and
+  `mint_cap_per_day` are the registry's figures verbatim (bridge hardening B1).
+- `deposits` / `deposited` are this backing's **only when it is the token's one backing**
+  (`backings` = 1), and `null` otherwise. A deposit publishes the token it minted and not the coin
+  that was locked for it — that is inside the attestation bytes, which the node serves by length
+  alone — so with several backings it cannot be laid at one of them.
+- `token_deposits`, `token_deposited`, `token_burns`, `token_burned`, `first_height` and
+  `last_height` are **the whole token's**, identical on every row that shares the `index`. To total
+  them across rows, count each `index` once; a token's per-backing `burns` add up to its
+  `token_burns`.
+
+**Changed 2026-09-20.** Before this, `deposits`, `deposited`, `burns`, `burned` and `outstanding`
+were tallied per `index` and repeated on every backing of the token, so on chain 14 each of
+zUSD's seven rows reported the whole token's figures (and a client summing the rows counted every
+deposit seven times), while `outstanding` disagreed with `locked` on the same row. Breaking for a
+client that read `deposits`/`deposited` as always present: they are now nullable.
 
 `GET /bridge/tokens` is the allowlist, a static list that does not depend on the node:
 
@@ -385,7 +423,7 @@ kinds and which fields they fill:
 | `call` | a confidential call, paid by the bundle | null | `program` | `call_proof_len`, `input_envelope_len`, `receipt` |
 | `bond` | stake leaving the pool into a validator's register entry | RAND units | `validator` | `registered` (a first-time registration) |
 | `unbond` | stake moved to the unbonding queue (validator-signed) | RAND units | `validator` | `action_nonce` |
-| `withdraw` | released stake and rewards deposited as a new note (validator-signed) | RAND units | `validator` | `action_nonce` |
+| `withdraw` | released stake and rewards deposited as a new note (validator-signed) | RAND units | `validator` | `action_nonce`, `note_time` (the deposit note's time word) |
 | `bridge_attest` | a guardian-signed inbound message depositing a bridged note | that token's units (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time`, `deposit_r`, `commitment`, `pq_signers` |
 | `bridge_burn` | a bridged asset burned to another chain, one bundle | that token's units | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `bridge_token` |
 | `register_token` | an RPL token registered, with an optional initial mint | the initial mint's amount, or null | `asset_index` = the new index | `token_action`, `recipient`, `note_time`, `deposit_r` |
@@ -460,12 +498,15 @@ The receipt of a confidential call:
   "tx": "b08244b044e8d719aa4e2c1bd22a92914924ae7a6cd41c4c363a608e211f09b0",
   "program": "675adeea7e4242d8dc48bf56faedb7bea14a4f832d7c8a973f942fa7dd850065",
   "tier": 14, "outputs": [1, 0, 200, 0, 0, 0, 0, 0],
-  "height": 105, "index": 0, "h_in": "9c0e…7f"
+  "height": 105, "index": 0, "h_in": "9c0e…7f", "h_pub": null
 }
 ```
 
 `outputs` are the program's eight public output words; they no longer move value (the old
-effect kind 1 is gone with the accounts). `h_in` is the proof's salted commitment to the call's
+effect kind 1 is gone with the accounts). `h_pub` is the digest of the program's deploy-time
+public input the proof was checked against — the program's `public_digest` — and `null` when the
+program has none, in which case the proof was checked against the digest of the empty input.
+`h_in` is the proof's salted commitment to the call's
 private inputs; `input_envelope_len` says whether the caller published a sealed transcript of
 those inputs (null when not). The transcript opens only for the caller's viewing key, the
 per-call key, or the auditor the caller named; the node serves the bytes
@@ -589,12 +630,18 @@ entry active.
   "deployed_at_height": 10,
   "base_pc": 0, "words_len": 42,
   "code_hash": "675adeea7e4242d8dc48bf56faedb7bea14a4f832d7c8a973f942fa7dd850065",
+  "public_words_len": 0, "public_digest": null,
   "call_count": 3, "last_called_height": 105
 }
 ```
 
 Programs are content addressed and immutable; `id` never changes. There is no deployer: a deploy
 is paid by a shielded bundle, so the chain does not know who deployed it.
+
+A program's public input is fixed at deploy and bound into its `id`: `public_words_len` is its
+length in words (`0` without one) and `public_digest` its digest, `null` without one. Every call
+to the program is proved over those words, and each receipt repeats the digest as `h_pub`. The
+words themselves are not stored here; the node serves them (`rand_getProgramPublic`).
 
 ### Search
 

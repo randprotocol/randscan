@@ -319,6 +319,13 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
             </span>
           </DetailRow>
         )}
+        {tx.kind === 'withdraw' && tx.note_time !== null && (
+          <DetailRow label="Note time">
+            <Link href={`/blocks/${tx.note_time}`} className="link font-mono">
+              #{formatNumber(tx.note_time)}
+            </Link>
+          </DetailRow>
+        )}
         <p className="px-4 py-3 text-xs text-mute">
           {tx.kind === 'bond'
             ? 'Value left the pool (the bundle’s burn) into the validator’s public stake.'
@@ -631,6 +638,13 @@ function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
       </DetailRow>
       <DetailRow label="Input commitment (H_IN)">
         {receipt.h_in ? <Hash value={receipt.h_in} full /> : <span className="text-mute">—</span>}
+      </DetailRow>
+      <DetailRow label="Public input (H_PUB)">
+        {receipt.h_pub ? (
+          <Hash value={receipt.h_pub} full />
+        ) : (
+          <span className="text-mute">Empty — the program was deployed without a public input</span>
+        )}
       </DetailRow>
       <DetailRow label="Outputs">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">

@@ -73,6 +73,18 @@ export default function ProgramDetailPage() {
         <DetailRow label="Code hash">
           <Hash value={program.code_hash} full />
         </DetailRow>
+        <DetailRow label="Public input">
+          {program.public_words_len > 0 ? (
+            <span className="font-mono">{formatNumber(program.public_words_len)} words</span>
+          ) : (
+            <span className="text-mute">None — calls are checked against the empty input</span>
+          )}
+        </DetailRow>
+        {program.public_digest && (
+          <DetailRow label="Public digest (H_PUB)">
+            <Hash value={program.public_digest} full />
+          </DetailRow>
+        )}
         <DetailRow label="Call count">
           <span className="font-mono">{formatNumber(program.call_count)}</span>
         </DetailRow>

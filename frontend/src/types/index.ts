@@ -147,6 +147,11 @@ export interface Receipt {
   index: number;
   /** The proof's salted commitment to the call's private inputs (zkVM M4.1). */
   h_in: string;
+  /**
+   * The program's deploy-time public digest the proof was checked against. `null` means the
+   * program has no public input and the proof was checked against the empty one's digest.
+   */
+  h_pub: string | null;
 }
 
 /** `register_token`'s optional initial mint: every word of the note the chain computes for it. */
@@ -374,15 +379,30 @@ export interface BridgeAssetActivity extends BridgeAsset {
   /** set when (chain, token) is on the approved list */
   symbol: string | null;
   name: string | null;
-  deposits: number;
-  deposited: string;
+  /** How many backings (source coins) the token at `index` has. */
+  backings: number;
+  /**
+   * This backing's deposits. `null` when the token has several backings: a deposit publishes the
+   * token it minted, not the coin that was locked for it. Use `token_deposits` for the token.
+   */
+  deposits: number | null;
+  deposited: string | null;
+  /** Burns that redeemed this backing; a burn names its coin, so these are exact per row. */
   burns: number;
   burned: string;
+  /** What this backing holds for the chain now: the registry's `locked`. */
   outstanding: string;
+  /**
+   * The whole token's tallies, identical on every row of the token. Sum them once per `index`,
+   * never per row (see `bridgeTokenTotals`).
+   */
+  token_deposits: number;
+  token_deposited: string;
+  token_burns: number;
+  token_burned: string;
+  /** First and last height of any bridge activity of the token, not of this backing alone. */
   first_height: number | null;
   last_height: number | null;
-  /** This backing's own figures straight from the registry (bridge hardening B1); `outstanding`
-   * above is the indexer's own reconciliation from indexed flows — the two should agree. */
   mint_cap_per_day: string | null;
 }
 
@@ -536,6 +556,10 @@ export interface ProgramSummary {
   base_pc: number;
   words_len: number;
   code_hash: string;
+  /** The length of the public input fixed at deploy (0 without one). */
+  public_words_len: number;
+  /** Its digest: what every call's proof is checked against (a receipt's `h_pub`). */
+  public_digest: string | null;
   call_count: number;
   last_called_height: number | null;
 }
@@ -577,7 +601,25 @@ export interface NetworkStats {
   hc_bundle: string | null;
   epoch: number | null;
   epoch_blocks: number | null;
+  /** Block 0's hash: a chain id alone does not tell two cuts apart. */
+  genesis_hash: string | null;
+  node_version: string | null;
+  /** The commit the node was built from, `-dirty` appended when its tree was not clean. */
+  node_git_sha: string | null;
+  fri_profile: string | null;
+  /** The chain's call limits; `null` on a node without `rand_getLimits`. */
+  limits: ChainLimits | null;
   updated_at: string;
+}
+
+/** The size caps a chain's genesis sets (`rand_getLimits`); constants before chain 13. */
+export interface ChainLimits {
+  max_program_words: number;
+  max_proof_bytes: number;
+  max_block_bytes: number;
+  max_call_envelope_bytes: number;
+  /** 0 means no program on this chain can have a public input. */
+  max_program_public_words: number;
 }
 
 export interface IndexerHealth {
