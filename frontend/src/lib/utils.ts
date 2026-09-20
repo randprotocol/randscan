@@ -390,6 +390,36 @@ export function defaultTokens(tokens: TokenInfo[] | null | undefined): TokenInfo
   return zusd ? [zusd] : [];
 }
 
+/** One line of a balance list: what a key's unspent notes of one asset add up to. */
+export interface TokenBalance {
+  /** The `asset` word — 0 is RAND. */
+  asset: number;
+  token?: TokenInfo;
+  units: bigint;
+  notes: number;
+}
+
+/** The balance list of `unspent` notes: RAND first, then the default tokens (zUSD) whether any
+ * is held or not, then every other asset a note carries, by index. */
+export function tokenBalances(
+  unspent: { asset: number; amount: string }[],
+  tokens: TokenInfo[] | null | undefined
+): TokenBalance[] {
+  const held = new Map<number, { units: bigint; notes: number }>();
+  for (const n of unspent) {
+    const h = held.get(n.asset) ?? { units: BigInt(0), notes: 0 };
+    held.set(n.asset, { units: h.units + BigInt(n.amount), notes: h.notes + 1 });
+  }
+  const listed = [0, ...defaultTokens(tokens).map((t) => t.index)];
+  const others = Array.from(held.keys()).filter((a) => !listed.includes(a)).sort((a, b) => a - b);
+  return [...listed, ...others].map((asset) => ({
+    asset,
+    token: resolveToken(tokens, asset),
+    units: held.get(asset)?.units ?? BigInt(0),
+    notes: held.get(asset)?.notes ?? 0,
+  }));
+}
+
 // ---------------------------------------------------------------------------
 // Bridge
 // ---------------------------------------------------------------------------

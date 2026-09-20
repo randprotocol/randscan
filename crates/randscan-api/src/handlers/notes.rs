@@ -60,3 +60,47 @@ pub async fn get_nullifier(
         .ok_or_else(|| AppError::NotFound("nullifier".into()))?;
     Ok(Json(row.into()))
 }
+
+/// The most nullifiers one `POST /api/v1/nullifiers/lookup` may name.
+pub const MAX_NULLIFIER_LOOKUP: usize = 1000;
+
+#[derive(Debug, serde::Deserialize)]
+pub struct NullifierLookup {
+    pub nullifiers: Vec<String>,
+}
+
+#[derive(Debug, serde::Serialize)]
+pub struct NullifierLookupResult {
+    /// The published ones among those asked for; a nullifier absent here is unspent.
+    pub spent: Vec<Nullifier>,
+}
+
+/// POST /api/v1/nullifiers/lookup — which of up to 1000 nullifiers are published. A history scan
+/// asks about every note a key received; one request per note would spend a whole anonymous
+/// rate-limit window on the first sixty.
+pub async fn lookup_nullifiers(
+    State(state): State<AppState>,
+    Json(body): Json<NullifierLookup>,
+) -> ApiResult<Json<NullifierLookupResult>> {
+    if body.nullifiers.len() > MAX_NULLIFIER_LOOKUP {
+        return Err(AppError::BadRequest(format!(
+            "at most {} nullifiers per lookup",
+            MAX_NULLIFIER_LOOKUP
+        )));
+    }
+    let mut nfs = Vec::with_capacity(body.nullifiers.len());
+    for nf in &body.nullifiers {
+        match classify_query(nf) {
+            QueryKind::Hash(h) => nfs.push(h),
+            _ => {
+                return Err(AppError::BadRequest(
+                    "nullifier must be 64 hex characters".into(),
+                ))
+            }
+        }
+    }
+    let rows = db::get_nullifiers(state.db.inner(), &nfs).await?;
+    Ok(Json(NullifierLookupResult {
+        spent: rows.into_iter().map(Into::into).collect(),
+    }))
+}

@@ -521,6 +521,7 @@ reports what the node reports.
 | `GET /notes?page&limit` | paginated leaves of the commitment tree, newest first |
 | `GET /notes/:id` | one leaf by commitment (64 hex) or by leaf index (decimal) |
 | `GET /nullifiers/:nf` | the transaction that published a nullifier |
+| `POST /nullifiers/lookup` | body `{"nullifiers": ["…64 hex", …]}` (at most 1000): `{"spent": [...]}`, the published ones among them — one absent is unspent |
 
 ```json
 { "leaf_index": 40, "cm": "2a9f…07", "height": 37, "tx_hash": "4f2c…e7" }

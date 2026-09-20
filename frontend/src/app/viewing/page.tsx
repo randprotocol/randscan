@@ -10,7 +10,7 @@ import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { PageHeader } from '@/components/States';
 import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { defaultTokens, formatAmount, formatTokenAmount, formatNumber } from '@/lib/utils';
+import { formatAmount, formatTokenAmount, formatNumber, tokenBalances, type TokenBalance } from '@/lib/utils';
 import { keyInfo, openNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
 import type { TokenInfo } from '@/types';
 
@@ -71,35 +71,7 @@ function buildColumns(tokens: TokenInfo[] | undefined): Column<HistoryRow>[] {
   ];
 }
 
-/** One line of the balance list: what the key's unspent received notes of one asset add up to. */
-interface BalanceRow {
-  /** The `asset` word — 0 is RAND. */
-  asset: number;
-  token?: TokenInfo;
-  units: bigint;
-  notes: number;
-}
-
-/** RAND first, then the default tokens (zUSD) whether the key holds any or not, then every
- * other asset the key holds an unspent note of. */
-function buildBalances(received: HistoryRow[], tokens: TokenInfo[] | undefined): BalanceRow[] {
-  const held = new Map<number, { units: bigint; notes: number }>();
-  for (const r of received) {
-    if (r.spent.state !== 'unspent') continue;
-    const h = held.get(r.note.asset) ?? { units: BigInt(0), notes: 0 };
-    held.set(r.note.asset, { units: h.units + BigInt(r.note.amount), notes: h.notes + 1 });
-  }
-  const listed = [0, ...defaultTokens(tokens).map((t) => t.index)];
-  const others = Array.from(held.keys()).filter((a) => !listed.includes(a)).sort((a, b) => a - b);
-  return [...listed, ...others].map((asset) => ({
-    asset,
-    token: tokens?.find((t) => t.index === asset),
-    units: held.get(asset)?.units ?? BigInt(0),
-    notes: held.get(asset)?.notes ?? 0,
-  }));
-}
-
-function buildBalanceColumns(tokens: TokenInfo[] | undefined): Column<BalanceRow>[] {
+function buildBalanceColumns(tokens: TokenInfo[] | undefined): Column<TokenBalance>[] {
   return [
     {
       key: 'token',
@@ -157,14 +129,15 @@ export default function ViewingPage() {
         if (page.next_leaf === null) break;
         from = page.next_leaf;
       }
-      for (const r of found) {
-        if (r.note.role === 'received' && r.note.nullifier) {
-          try {
-            const nf = await api.getNullifier(r.note.nullifier);
-            r.spent = { state: 'spent', nullifier: nf };
-          } catch (e) {
-            r.spent = api.isNotFoundError(e) ? { state: 'unspent' } : { state: 'unknown' };
-          }
+      // Every received note's nullifier in one request per thousand: a lookup that fails fails the
+      // scan, since a note of unknown status would silently drop out of the balances.
+      const owned = found.filter((r) => r.note.role === 'received' && r.note.nullifier);
+      for (let i = 0; i < owned.length; i += api.NULLIFIER_LOOKUP_MAX) {
+        const chunk = owned.slice(i, i + api.NULLIFIER_LOOKUP_MAX);
+        const spent = new Map((await api.lookupNullifiers(chunk.map((r) => r.note.nullifier!))).map((nf) => [nf.nullifier, nf]));
+        for (const r of chunk) {
+          const nf = spent.get(r.note.nullifier!);
+          r.spent = nf ? { state: 'spent', nullifier: nf } : { state: 'unspent' };
         }
       }
       setRows(found.sort((a, b) => b.leaf_index - a.leaf_index));
@@ -176,7 +149,10 @@ export default function ViewingPage() {
   };
 
   const received = rows?.filter((r) => r.note.role === 'received') ?? [];
-  const balances = buildBalances(received, tokenList?.tokens);
+  const balances = tokenBalances(
+    received.filter((r) => r.spent.state === 'unspent').map((r) => r.note),
+    tokenList?.tokens
+  );
   const balance = balances[0].units;
 
   return (

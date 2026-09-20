@@ -143,6 +143,17 @@ pub async fn get_nullifier(pool: &PgPool, nullifier: &str) -> Result<Option<Null
     .await?)
 }
 
+/// Those of `nullifiers` that are published, in no particular order; an unpublished one is
+/// simply absent.
+pub async fn get_nullifiers(pool: &PgPool, nullifiers: &[String]) -> Result<Vec<NullifierRow>> {
+    Ok(sqlx::query_as::<_, NullifierRow>(
+        "SELECT nullifier, tx_hash, height, tx_index FROM nullifiers WHERE nullifier = ANY($1)",
+    )
+    .bind(nullifiers)
+    .fetch_all(pool)
+    .await?)
+}
+
 pub async fn count_nullifiers(pool: &PgPool) -> Result<i64> {
     Ok(sqlx::query_scalar("SELECT COUNT(*) FROM nullifiers")
         .fetch_one(pool)
