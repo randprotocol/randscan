@@ -93,6 +93,28 @@ chain=$(rpc rand_chainId '[]' | grep -o '"result":[0-9]*' | cut -d: -f2)
 head=$(rpc rand_getHead '[]' | grep -o '"height":[0-9]*' | cut -d: -f2)
 [ -n "$chain" ] || { log "FAIL: no node at $RPC"; exit 1; }
 
+# A chain cut. A wallet's note store names leaves of the tree it was scanned from; on a new chain
+# those leaves do not exist and every proved step fails ("no leaf at index N"), and the last
+# deployed program is gone with the old chain too. So the chain the stores belong to is kept in
+# STATE_DIR, and when the node serves another one the stores are moved aside (never deleted) and
+# the program id forgotten; the wallet rescans from leaf 0. The genesis hash tells two cuts with
+# one chain id apart; a node without the method (before v0.3) is known by its chain id alone.
+genesis=$(rpc rand_getGenesisHash '[]' | grep -o '"result":"[0-9a-f]*"' | cut -d'"' -f4)
+identity="$chain:${genesis:-unknown}"
+known=$(cat "$STATE_DIR/chain" 2>/dev/null || true)
+if [ -n "$known" ] && [ "$known" != "$identity" ]; then
+  for w in "$W1" "$W2"; do
+    store="$w.notes.json"
+    [ -f "$store" ] || continue
+    aside="$store.chain${known%%:*}-stale"
+    i=1; while [ -e "$aside" ]; do i=$((i+1)); aside="$store.chain${known%%:*}-stale-$i"; done
+    mv "$store" "$aside"
+    log "chain cut $known -> $identity: moved $(basename "$store") to $(basename "$aside")"
+  done
+  rm -f "$STATE_DIR/program"
+fi
+echo "$identity" > "$STATE_DIR/chain"
+
 n=$(cat "$STATE_DIR/n" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "$STATE_DIR/n"
 # ROTATION can drop a step, e.g. "transfer deploy" while a node build refuses calls.
 read -r -a rotation <<<"${ROTATION:-transfer deploy call}"
