@@ -1,6 +1,7 @@
 'use client';
 
-import { useParams } from 'next/navigation';
+import { useEffect } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Column, DataTable } from '@/components/DataTable';
 import { Hash } from '@/components/Hash';
@@ -64,6 +65,14 @@ export default function TokenDetailPage() {
   const params = useParams<{ id: string }>();
   const id = decodeURIComponent(params.id);
   const { data: token, error, isLoading, mutate } = useToken(id);
+  const router = useRouter();
+
+  // A token's address is its `rpl1…` id: a page reached by registry index or hex id moves there.
+  useEffect(() => {
+    if (token && token.id_text && id !== token.id_text) {
+      router.replace(`/tokens/${token.id_text}`);
+    }
+  }, [token, id, router]);
 
   if (isLoading && !token) {
     return <DetailSkeleton />;

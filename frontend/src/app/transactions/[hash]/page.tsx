@@ -208,7 +208,7 @@ function AssetLink({ index, tokens }: { index: number | null; tokens: TokenInfo[
   const token = resolveToken(tokens, index);
   if (!token) return <span className="font-mono">asset #{index}</span>;
   return (
-    <Link href={`/tokens/${token.index}`} className="link font-mono">
+    <Link href={`/tokens/${token.id_text}`} className="link font-mono">
       {token.symbol} (#{index})
     </Link>
   );
@@ -436,7 +436,7 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
     return (
       <Panel title={title}>
         <DetailRow label="Token">
-          <Link href={`/tokens/${tx.asset_index}`} className="link">
+          <Link href={`/tokens/${(tx.asset_index !== null && resolveToken(tokens, tx.asset_index)?.id_text) || tx.asset_index}`} className="link">
             {action?.symbol ?? `#${tx.asset_index}`}
           </Link>
         </DetailRow>

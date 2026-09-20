@@ -27,7 +27,7 @@ const columns: Column<TokenInfo>[] = [
     header: 'Token',
     render: (t) => (
       <span className="flex flex-col">
-        <Link href={`/tokens/${t.index}`} className="link font-medium">
+        <Link href={`/tokens/${t.id_text}`} className="link font-medium">
           {t.symbol}
         </Link>
         <span className="text-xs text-mute">{t.name}</span>
