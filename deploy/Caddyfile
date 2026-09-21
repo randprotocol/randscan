@@ -4,6 +4,23 @@
 __DOMAIN__ {
 	encode gzip zstd
 
+	# The sale service's upstream (randprotocol.org's server/sale, SALE_RPC_UPSTREAM
+	# = https://__DOMAIN__/rpc): the node RPC admitted from the web droplet only.
+	# vps-setup.sh re-renders this file on every deploy — keep this route in the
+	# template or randprotocol.org's /account loses the chain's token names.
+	@rpc {
+		path /rpc
+		remote_ip 159.65.138.161
+	}
+	handle @rpc {
+		rewrite * /
+		reverse_proxy 127.0.0.1:8545
+	}
+	@rpc_denied path /rpc
+	handle @rpc_denied {
+		respond 403
+	}
+
 	@api path /api/* /ws
 	handle @api {
 		reverse_proxy 127.0.0.1:3000 {
