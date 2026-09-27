@@ -9,14 +9,14 @@ description = "Opens shielded-chain envelopes with a viewing key or a per-transa
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The exact versions the fullnode's vendored zkVM (crates/randprotocol-zkvm, commit e2aae20) pins:
-# the Poseidon2 round constants are drawn from a seeded rand StdRng, so both the field/hash
-# crates and the RNG must match bit for bit.
+# The exact versions the fullnode's vendored zkVM (crates/randprotocol-zkvm, commit e2aae20) pins.
+# The Poseidon2 round constants are circuits' committed table (../randscan-core/src/
+# poseidon2_constants.rs by #[path], audit ZKV-2), no longer a seeded rand StdRng draw; rand is a
+# dev-dependency only, for the table's test that re-runs the old draw.
 p3-goldilocks = "=0.7.0"
 p3-poseidon2 = "=0.7.0"
 p3-field = "=0.7.0"
 p3-symmetric = "=0.7.0"
-rand = { version = "=0.10.2", features = ["std_rng"] }
 ml-kem = "=0.3.2"
 chacha20poly1305 = "=0.11.0"
 bs58 = "0.5"
@@ -27,6 +27,9 @@ wasm-bindgen = "0.2"
 # Nothing here draws randomness, but the AEAD/cipher crates link getrandom; in the browser it
 # resolves to crypto.getRandomValues (see .cargo/config.toml for the backend cfg).
 getrandom = { version = "0.4", features = ["wasm_js"] }
+
+[dev-dependencies]
+rand = { version = "=0.10.2", features = ["std_rng"] }
 
 [profile.release]
 opt-level = "s"

@@ -14,24 +14,20 @@
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 use p3_symmetric::{CryptographicHasher, PaddingFreeSponge};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 use std::sync::OnceLock;
 
 pub type Word8 = [u32; 8];
 type Val = Goldilocks;
 type Perm = Poseidon2Goldilocks<8>;
 
-/// `machine::PERM_SEED` in the fullnode: the seed every node draws the Poseidon2 round
-/// constants from ("RandZK").
-const PERM_SEED: u64 = 0x5261_6e64_5a4b;
-
 /// `domain::CM`: the note-commitment domain tag.
 const DOMAIN_CM: u32 = 4;
 
 fn perm() -> &'static Perm {
     static PERM: OnceLock<Perm> = OnceLock::new();
-    PERM.get_or_init(|| Perm::new_from_rng_128(&mut StdRng::seed_from_u64(PERM_SEED)))
+    // The committed table (audit ZKV-2), not a seeded RNG draw: `rand` does not promise its
+    // standard generator is stable across releases, so a draw could silently move every hash.
+    PERM.get_or_init(crate::poseidon2_constants::permutation)
 }
 
 fn split_digest(elems: [Val; 4]) -> Word8 {
@@ -187,6 +183,91 @@ mod tests {
             word8_to_hex(&note.commitment()),
             "7c73c93ede9ed2995ee876578ea30cdbcc941f952e5fff9d1515ca21e757342d"
         );
+    }
+
+    /// Audit ZKV-2 / scan R2: the round constants are the committed table, never a seeded RNG
+    /// draw at runtime (`rand` does not promise its standard generator is stable across releases).
+    #[test]
+    fn notecommit_draws_no_constants_at_runtime() {
+        let src = include_str!("notecommit.rs");
+        for pattern in [concat!("new_from", "_rng"), concat!("Std", "Rng"), concat!("seed_from", "_u64")] {
+            assert!(!src.contains(pattern), "notecommit.rs still derives constants: {pattern}");
+        }
+    }
+
+    /// The fullnode's and circuits' known-answer vectors for the width-8 permutation
+    /// (`poseidon2_constants::tests::the_permutation_answers_its_known_vectors`, captured on
+    /// circuits `573ef2e`, the seeded draw), run through the permutation this crate hashes with.
+    #[test]
+    fn the_permutation_answers_the_fullnode_known_vectors() {
+        use p3_symmetric::Permutation;
+        let vectors: [([u64; 8], [u64; 8]); 3] = [
+            (
+                [0; 8],
+                [0x1e4b2c9eebb442b0, 0x2fbb0154ab9d22da, 0x9c397e8d1b856b3d, 0x3900699f4fe93a6e, 0xcb37891674d3ad6b, 0x9b530f7ac1ef1f56, 0x0510bc15edfecf33, 0xf9caffe23a93cd28],
+            ),
+            (
+                [0, 1, 2, 3, 4, 5, 6, 7],
+                [0x682c703ce406cd60, 0x35fe4cacd5147b44, 0xf0b819068ae2838e, 0xde5f0a9ba791a8f4, 0xcf8ee9826729b322, 0x38e89ce1e7fcb535, 0xf58f43c0801e00db, 0x694ec48edbb331fa],
+            ),
+            (
+                [0xffff_ffff_0000_0000; 8],
+                [0xdfebf956a8205183, 0xbacca056a5ba1b75, 0xdc24d665e3f9864b, 0x1ad86aab4b3e131a, 0xc68f628d6f8833e6, 0x0b913e0aa0757959, 0x248d88435c62b658, 0x7bc6fc5500a81dbc],
+            ),
+        ];
+        for (input, want) in vectors {
+            assert_eq!(perm().permute(Val::new_array(input)), Val::new_array(want), "permute({input:x?})");
+        }
+    }
+
+    /// Two alloc notes of the chain-15 genesis (fullnode `deploy/genesis-chain15.json`), whose
+    /// commitments every node recomputes from their openings at `rand-node init` (`from` the zero
+    /// word): a RAND note (asset 0) and the carried-over zUSD note (asset 1).
+    #[test]
+    fn note_commitments_match_the_chain_15_genesis() {
+        let cases = [
+            (
+                "47bd82b0401f3bc5b33e043fc7d076cca4d88f3233698ead959fa6009f284d36",
+                1_000_000_000_000u64,
+                0u32,
+                "21764e9e43246765ae9464120b7bc134a80d62d680c613b649e6d0468fb632f2",
+                "be14787d4e34115e2b6752b77c51b5de61c1805edfc8133af39cb47ad24f9322",
+            ),
+            (
+                "f4a2c7c39a812c47e569cad909a5074076a8530785b1f7c10a4b6ffdcf3c7c96",
+                1_000_000_000,
+                1,
+                "32f0d22777439fa85cd3fd04c3afa03295848c08b1eadd805844f3fa81752ab2",
+                "d75053df4bac3290830cc0eb0f8ce1c461d1583e6c23a2ec01f2dfcd66f882e6",
+            ),
+        ];
+        for (pk, amount, asset, r, cm) in cases {
+            let note = Note {
+                pk: word8_from_hex(pk).unwrap(),
+                from: [0; 8],
+                amount,
+                asset,
+                time: 0,
+                r: word8_from_hex(r).unwrap(),
+            };
+            assert_eq!(word8_to_hex(&note.commitment()), cm);
+        }
+    }
+
+    /// The 86 round constants are circuits' committed table (`research/src/poseidon2_constants.rs`
+    /// at 224960c): SHA-256 over INITIAL (4×8), INTERNAL (22), TERMINAL (4×8), each value
+    /// little-endian, computed from that file, not from this crate's copy.
+    #[test]
+    fn the_constants_are_the_circuits_table() {
+        use crate::poseidon2_constants::{INITIAL, INTERNAL, TERMINAL};
+        use sha2::{Digest, Sha256};
+        let values: Vec<u64> = INITIAL.iter().flatten().chain(INTERNAL.iter()).chain(TERMINAL.iter().flatten()).copied().collect();
+        assert_eq!(values.len(), 86);
+        let mut h = Sha256::new();
+        for v in values {
+            h.update(v.to_le_bytes());
+        }
+        assert_eq!(hex::encode(h.finalize()), "e551d3944d88218c8c4cacb6cb6d8ae4bc2034adc155a6139b0ac77fcc5c24ac");
     }
 
     #[test]

@@ -18,8 +18,6 @@
 use p3_field::{PrimeCharacteristicRing, PrimeField64};
 use p3_goldilocks::{Goldilocks, Poseidon2Goldilocks};
 use p3_symmetric::{CryptographicHasher, PaddingFreeSponge, Permutation};
-use rand::rngs::StdRng;
-use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 use wasm_bindgen::prelude::*;
@@ -28,13 +26,15 @@ pub type Word8 = [u32; 8];
 type Val = Goldilocks;
 type Perm = Poseidon2Goldilocks<8>;
 
-/// `machine::PERM_SEED` in the fullnode: the seed every node draws the Poseidon2 round
-/// constants from ("RandZK").
-const PERM_SEED: u64 = 0x5261_6e64_5a4b;
+/// The width-8 Goldilocks round constants: circuits' committed table (audit ZKV-2), the one copy
+/// `randscan-core` also hashes with.
+#[path = "../../randscan-core/src/poseidon2_constants.rs"]
+#[allow(dead_code)] // `PERM_SEED` is read only by the table's own test
+mod poseidon2_constants;
 
 fn perm() -> &'static Perm {
     static PERM: OnceLock<Perm> = OnceLock::new();
-    PERM.get_or_init(|| Perm::new_from_rng_128(&mut StdRng::seed_from_u64(PERM_SEED)))
+    PERM.get_or_init(poseidon2_constants::permutation)
 }
 
 fn split_digest(elems: [Val; 4]) -> Word8 {

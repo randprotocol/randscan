@@ -5,6 +5,7 @@
 pub mod amount;
 pub mod error;
 pub mod notecommit;
+pub mod poseidon2_constants;
 pub mod types;
 
 pub use error::*;
