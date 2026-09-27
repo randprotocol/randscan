@@ -228,6 +228,42 @@ impl Note {
     }
 }
 
+/// The memo field: `len` (u16 LE) ‖ text ‖ zero padding, 512 bytes fixed so its presence and
+/// length never show on chain (fullnode spec 2026-09-26 §2.3).
+pub const MEMO_FIELD_BYTES: usize = 512;
+/// `len` (u16 LE) ‖ text ‖ zero padding: at most 510 bytes of UTF-8.
+pub const MEMO_TEXT_MAX_BYTES: usize = MEMO_FIELD_BYTES - 2;
+
+/// The text a field carries: `None` for an empty field and for any malformed one — a bad
+/// length, invalid UTF-8, or non-zero padding. A malformed memo never costs the payee the note.
+///
+/// Copied verbatim (semantics, not syntax — this crate's `Word8`/error handling differ) from
+/// `research/src/viewing.rs`'s `memo_text`, the fullnode's own note layer, which is the
+/// authority on this wire format.
+fn memo_text(field: &[u8]) -> Option<String> {
+    if field.len() != MEMO_FIELD_BYTES {
+        return None;
+    }
+    let len = u16::from_le_bytes([field[0], field[1]]) as usize;
+    if len == 0 || len > MEMO_TEXT_MAX_BYTES {
+        return None;
+    }
+    if field[2 + len..].iter().any(|&b| b != 0) {
+        return None;
+    }
+    String::from_utf8(field[2..2 + len].to_vec()).ok()
+}
+
+/// The body plaintext: the note alone (112 bytes, the original layout) or the note and a memo
+/// field (112 + 512 = 624 bytes). Copied from `research/src/viewing.rs`'s `body_parts`.
+fn body_parts(pt: &[u8]) -> Option<(Note, Option<&[u8]>)> {
+    match pt.len() {
+        n if n == 4 * Note::WORDS => Some((Note::from_bytes(pt)?, None)),
+        n if n == 4 * Note::WORDS + MEMO_FIELD_BYTES => Some((Note::from_bytes(&pt[..4 * Note::WORDS])?, Some(&pt[4 * Note::WORDS..]))),
+        _ => None,
+    }
+}
+
 fn aead_open(key: &[u8; 32], aad: &[u8], ct: &[u8]) -> Option<Vec<u8>> {
     use chacha20poly1305::aead::{Aead, KeyInit, Payload};
     use chacha20poly1305::{ChaCha20Poly1305, Key, Nonce};
@@ -277,22 +313,44 @@ impl Envelope {
         [tag, &words_to_bytes(cm)].concat()
     }
 
+    /// The note and its memo (if any), if `key` is the per-transaction key this envelope was
+    /// sealed under and the plaintext really commits to `cm`. The body is 112 bytes (the note
+    /// alone, the pre-memo layout) or 624 bytes (the note plus a 512-byte memo field);
+    /// anything else does not parse. A memo field that fails to parse (`memo_text`) still
+    /// yields the note — a malformed memo never costs the payee the note.
+    pub fn open_with_tx_key_and_memo(&self, cm: &Word8, key: &[u8; 32]) -> Option<(Note, Option<String>)> {
+        let pt = aead_open(key, &Self::aad(b"rand-envelope-body", cm), &self.body)?;
+        let (note, memo_field) = body_parts(&pt)?;
+        if note.commitment() != *cm {
+            return None;
+        }
+        Some((note, memo_field.and_then(memo_text)))
+    }
     /// The note, if `key` is the per-transaction key this envelope was sealed under and the
     /// plaintext really commits to `cm`.
     pub fn open_with_tx_key(&self, cm: &Word8, key: &[u8; 32]) -> Option<Note> {
-        let note = Note::from_bytes(&aead_open(key, &Self::aad(b"rand-envelope-body", cm), &self.body)?)?;
-        (note.commitment() == *cm).then_some(note)
+        self.open_with_tx_key_and_memo(cm, key).map(|(note, _)| note)
+    }
+    /// As the receiver: decapsulate, unwrap the transaction key, open the body and its memo.
+    pub fn open_as_receiver_with_memo(&self, cm: &Word8, vk: &ViewingKey) -> Option<([u8; 32], Note, Option<String>)> {
+        let ss = decapsulate(vk, &self.kem_ct)?;
+        let key: [u8; 32] = aead_open(&ss, &Self::aad(b"rand-envelope-receiver", cm), &self.to_receiver)?.try_into().ok()?;
+        let (note, memo) = self.open_with_tx_key_and_memo(cm, &key)?;
+        Some((key, note, memo))
     }
     /// As the receiver: decapsulate, unwrap the transaction key, open the body.
     pub fn open_as_receiver(&self, cm: &Word8, vk: &ViewingKey) -> Option<([u8; 32], Note)> {
-        let ss = decapsulate(vk, &self.kem_ct)?;
-        let key: [u8; 32] = aead_open(&ss, &Self::aad(b"rand-envelope-receiver", cm), &self.to_receiver)?.try_into().ok()?;
-        Some((key, self.open_with_tx_key(cm, &key)?))
+        self.open_as_receiver_with_memo(cm, vk).map(|(k, n, _)| (k, n))
+    }
+    /// As the sender, through the outgoing viewing key, with its memo.
+    pub fn open_as_sender_with_memo(&self, cm: &Word8, vk: &ViewingKey) -> Option<([u8; 32], Note, Option<String>)> {
+        let key: [u8; 32] = aead_open(&vk.ovk(), &Self::aad(b"rand-envelope-sender", cm), &self.to_sender)?.try_into().ok()?;
+        let (note, memo) = self.open_with_tx_key_and_memo(cm, &key)?;
+        Some((key, note, memo))
     }
     /// As the sender, through the outgoing viewing key.
     pub fn open_as_sender(&self, cm: &Word8, vk: &ViewingKey) -> Option<([u8; 32], Note)> {
-        let key: [u8; 32] = aead_open(&vk.ovk(), &Self::aad(b"rand-envelope-sender", cm), &self.to_sender)?.try_into().ok()?;
-        Some((key, self.open_with_tx_key(cm, &key)?))
+        self.open_as_sender_with_memo(cm, vk).map(|(k, n, _)| (k, n))
     }
 }
 
@@ -404,9 +462,13 @@ struct OpenedNote {
     /// True when the opened plaintext recomputes to the on-chain commitment (always, or the
     /// opening would have failed): stated so the page can say the row is verified.
     verified: bool,
+    /// The memo text, when the body carried one (624 bytes) and it parsed (`memo_text`):
+    /// `null` for a pre-memo (112-byte) body, an absent memo, or a malformed field — a
+    /// malformed memo never costs the payee the note.
+    memo: Option<String>,
 }
 
-fn opened(role: &str, key: [u8; 32], note: Note, nullifier: Option<Word8>) -> OpenedNote {
+fn opened(role: &str, key: [u8; 32], note: Note, nullifier: Option<Word8>, memo: Option<String>) -> OpenedNote {
     OpenedNote {
         role: role.into(),
         tx_key: hex::encode(key),
@@ -418,6 +480,7 @@ fn opened(role: &str, key: [u8; 32], note: Note, nullifier: Option<Word8>) -> Op
         r: word8_to_hex(&note.r),
         nullifier: nullifier.map(|n| word8_to_hex(&n)),
         verified: true,
+        memo,
     }
 }
 
@@ -432,16 +495,16 @@ pub fn open_note(cm_hex: &str, envelope_json: &str, key_kind: &str, key: &str) -
     let result = match key_kind {
         "tx" => {
             let k = key32_from_hex(key).ok_or("a transaction key is 32 bytes of hex")?;
-            env.open_with_tx_key(&cm, &k).map(|n| opened("tx_key", k, n, None))
+            env.open_with_tx_key_and_memo(&cm, &k).map(|(n, memo)| opened("tx_key", k, n, None, memo))
         }
         _ => {
             let vk = viewing_key_from(key_kind, key)?;
-            if let Some((k, n)) = env.open_as_receiver(&cm, &vk) {
+            if let Some((k, n, memo)) = env.open_as_receiver_with_memo(&cm, &vk) {
                 let nf = vk.nullifier(&cm);
-                Some(opened("received", k, n, Some(nf)))
-            } else if let Some((k, n)) = env.open_as_sender(&cm, &vk) {
+                Some(opened("received", k, n, Some(nf), memo))
+            } else if let Some((k, n, memo)) = env.open_as_sender_with_memo(&cm, &vk) {
                 // A change note is both sent and received; the receiver path above wins.
-                Some(opened("sent", k, n, None))
+                Some(opened("sent", k, n, None, memo))
             } else {
                 None
             }
