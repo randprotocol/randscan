@@ -70,7 +70,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
   // key or the wallet key file. A transaction key is also tried as the call key (above).
   return (
     <KeyPanel kinds={['viewing', 'tx']} onOpen={run} busy={busy}>
-      {error && <p className="border-t border-border-soft py-3 text-sm text-accent-3">{error}</p>}
+      {error && <p className="border-t border-border-soft py-3 text-sm text-negative">{error}</p>}
       {rows && rows.length === 0 && (
         <p className="border-t border-border-soft py-3 text-sm text-mute">
           This transaction created no notes with an envelope (nothing a key could open).

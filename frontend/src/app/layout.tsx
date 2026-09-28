@@ -1,25 +1,29 @@
 import type { Metadata } from 'next';
-import { Inter, JetBrains_Mono, Source_Serif_4 } from 'next/font/google';
+import localFont from 'next/font/local';
 import { Header } from '@/components/Header';
 import { Footer } from '@/components/Footer';
 import './globals.css';
 
-const sans = Inter({
-  subsets: ['latin'],
+// The wallet's three faces, self-hosted (src/fonts/SOURCES.txt): Inter for text, JetBrains Mono
+// for hashes and keys, Departure Mono for the wordmark and the big figures.
+const sans = localFont({
+  src: '../fonts/Inter-Variable.woff2',
+  weight: '100 900',
   variable: '--font-sans',
   display: 'swap',
 });
 
-const serif = Source_Serif_4({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
-  variable: '--font-serif',
+const mono = localFont({
+  src: '../fonts/JetBrainsMono-Variable.woff2',
+  weight: '100 800',
+  variable: '--font-mono',
   display: 'swap',
 });
 
-const mono = JetBrains_Mono({
-  subsets: ['latin'],
-  variable: '--font-mono',
+const display = localFont({
+  src: '../fonts/DepartureMono-Regular.woff2',
+  weight: '400',
+  variable: '--font-display',
   display: 'swap',
 });
 
@@ -31,19 +35,20 @@ export const metadata: Metadata = {
 };
 
 /**
- * Applies the stored (or system) theme before first paint so the light default
- * never flashes for someone who chose dark.
+ * Applies the stored theme before first paint, or follows the operating system when nothing is
+ * stored (the wallet does the same), so the wrong theme never flashes.
  */
-const themeScript = `(function(){try{var t=localStorage.getItem('randscan-theme');if(t!=='dark'&&t!=='light'){t='light';}document.documentElement.setAttribute('data-theme',t);}catch(e){document.documentElement.setAttribute('data-theme','light');}})();`;
+const themeScript = `(function(){var d=document.documentElement;try{var t=localStorage.getItem('randscan-theme');if(t!=='dark'&&t!=='light'){t=window.matchMedia('(prefers-color-scheme: light)').matches?'light':'dark';}d.setAttribute('data-theme',t);}catch(e){d.setAttribute('data-theme','dark');}})();`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <meta name="color-scheme" content="dark light" />
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body
-        className={`${sans.variable} ${serif.variable} ${mono.variable} min-h-screen bg-bg font-sans text-text`}
+        className={`${sans.variable} ${mono.variable} ${display.variable} min-h-screen bg-bg font-sans text-text`}
       >
         <div className="flex min-h-screen flex-col">
           <Header />

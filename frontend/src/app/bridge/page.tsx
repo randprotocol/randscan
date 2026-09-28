@@ -168,7 +168,7 @@ function SourceChainPanel({
   return (
     <section className="space-y-3">
       <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
-        <h3 className="font-serif text-lg text-strong">{name}</h3>
+        <h3 className="text-lg text-strong">{name}</h3>
         <p className="text-xs text-mute">
           {emitter ? (
             <>

@@ -23,7 +23,7 @@ export function StatsCard({ title, value, subtitle, trend, className }: StatsCar
       <p className="stat-label">{title}</p>
       {subtitle && <p className="stat-sub">{subtitle}</p>}
       {trend && (
-        <p className={cn('stat-sub', trend.isPositive ? 'text-accent' : 'text-accent-3')}>
+        <p className={cn('stat-sub', trend.isPositive ? 'text-positive' : 'text-negative')}>
           {trend.isPositive ? '+' : '−'}
           {Math.abs(trend.value)}%
         </p>

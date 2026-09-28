@@ -140,7 +140,7 @@ export default function NodesPage() {
       <NodeMap nodes={nodes ?? []} />
 
       <div className="flex flex-wrap items-center gap-4 text-xs text-mute">
-        <LegendDot varName="--color-accent-3" label="This node" />
+        <LegendDot varName="--color-negative" label="This node" />
         <LegendDot varName="--color-accent" label="Validator" />
         <LegendDot varName="--color-accent-2" label="Peer" />
       </div>

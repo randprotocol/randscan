@@ -125,7 +125,7 @@ export function OpenedCallBlock({ call, hIn }: { call: OpenedCall | null | undef
         {call.faithful ? (
           <span className="text-accent">faithful to H_IN ✓ {hIn ? <Hash value={hIn} start={8} end={6} /> : null}</span>
         ) : (
-          <span className="text-accent-3">does NOT match H_IN: the caller published a false transcript</span>
+          <span className="text-negative">does NOT match H_IN: the caller published a false transcript</span>
         )}
       </DetailRow>
     </div>

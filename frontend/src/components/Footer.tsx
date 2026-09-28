@@ -1,8 +1,13 @@
+import { Mark } from './Brand';
+
 export function Footer() {
   return (
-    <footer className="border-t border-border">
+    <footer className="border-t border-border-soft">
       <div className="mx-auto flex max-w-6xl flex-col items-start justify-between gap-3 px-6 py-8 text-[0.8125rem] text-mute sm:flex-row sm:items-center lg:px-8">
-        <p>RandScan — explorer for Rand Protocol</p>
+        <p className="brand gap-2">
+          <Mark size={14} />
+          <span>RandScan is the explorer for Rand Protocol.</span>
+        </p>
         <div className="flex items-center gap-5">
           <a
             href="https://randprotocol.org"

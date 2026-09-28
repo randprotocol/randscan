@@ -151,9 +151,9 @@ export default function NodeMap({ nodes }: NodeMapProps) {
   }, []);
 
   const colorFor = useCallback((node: NodeInfo) => {
-    if (node.is_self) return themeColor('--color-accent-3', '#8c2f39');
-    if (node.role === 'validator') return themeColor('--color-accent', '#1b4b8f');
-    return themeColor('--color-accent-2', '#4a6fa5');
+    if (node.is_self) return themeColor('--color-negative', '#ff7a59');
+    if (node.role === 'validator') return themeColor('--color-accent', '#ff5c9d');
+    return themeColor('--color-accent-2', '#ff8fbd');
   }, []);
 
   // Create the map once.

@@ -115,12 +115,12 @@ export function KeyPanel({
           </label>
         </div>
         {secret && (
-          <p className="text-xs text-accent-3">
+          <p className="text-xs text-negative">
             Prefer a viewing key: a spend key can move funds. This page derives the viewing key
             locally and keeps only that in memory.
           </p>
         )}
-        {error && <p className="text-xs text-accent-3">{error}</p>}
+        {error && <p className="text-xs text-negative">{error}</p>}
       </form>
       {children}
     </Panel>

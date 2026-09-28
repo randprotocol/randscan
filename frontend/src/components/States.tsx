@@ -19,7 +19,7 @@ export function SectionHeading({ label, title, actions, className }: SectionHead
       <div>
         <SectionLabel>{label}</SectionLabel>
         {title && (
-          <h2 className="mt-1.5 font-serif text-2xl font-medium tracking-tight text-strong">
+          <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-strong">
             {title}
           </h2>
         )}
@@ -42,7 +42,7 @@ export function PageHeader({ title, label, subtitle, actions, className }: PageH
     <div className={cn('mb-8 flex flex-wrap items-start justify-between gap-4', className)}>
       <div className="min-w-0">
         {label && <SectionLabel className="mb-2">{label}</SectionLabel>}
-        <h1 className="font-serif text-4xl font-medium tracking-tight text-strong">{title}</h1>
+        <h1 className="text-4xl font-semibold tracking-tight text-strong">{title}</h1>
         {subtitle && <div className="mt-2 text-sm text-soft">{subtitle}</div>}
       </div>
       {actions && <div className="flex items-center gap-3">{actions}</div>}
@@ -65,7 +65,7 @@ export function NotFoundState({
 }: NotFoundStateProps) {
   return (
     <div className="card-padded py-16 text-center">
-      <h2 className="font-serif text-2xl font-medium tracking-tight text-strong">{title}</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-strong">{title}</h2>
       <p className="mx-auto mt-3 max-w-md break-all text-sm text-soft">{message}</p>
       <Link href={backHref} className="btn-secondary mt-7">
         {backLabel}
@@ -87,7 +87,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   return (
     <div className="card-padded py-16 text-center">
-      <h2 className="font-serif text-2xl font-medium tracking-tight text-accent-3">{title}</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-negative">{title}</h2>
       <p className="mx-auto mt-3 max-w-md text-sm text-soft">{message}</p>
       {onRetry && (
         <button type="button" onClick={onRetry} className="btn-primary mt-7">

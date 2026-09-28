@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { SearchBar } from './SearchBar';
 import { ThemeToggle } from './ThemeToggle';
+import { Brand } from './Brand';
 import { cn } from '@/lib/utils';
 import { useMe } from '@/hooks/useApi';
 
@@ -46,18 +47,11 @@ export function Header() {
     href === '/' ? pathname === '/' : pathname.startsWith(href);
 
   return (
-    <header className="border-b border-border bg-bg">
+    <header className="border-b border-border-soft bg-bg">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-5">
-          <Link href="/" className="flex flex-shrink-0 items-center gap-2.5">
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded font-serif text-sm leading-none text-bg"
-              style={{ background: 'var(--color-text-strong)' }}
-              aria-hidden="true"
-            >
-              R
-            </span>
-            <span className="font-serif text-lg text-strong">RandScan</span>
+          <Link href="/" className="flex flex-shrink-0 items-center rounded-md">
+            <Brand />
           </Link>
 
           <nav className="hidden items-center gap-4 lg:flex">
@@ -74,10 +68,7 @@ export function Header() {
                 >
                   {link.label}
                   {active && (
-                    <span
-                      className="absolute -bottom-px left-0 h-0.5 w-full"
-                      style={{ background: 'var(--color-text-strong)' }}
-                    />
+                    <span className="absolute -bottom-px left-0 h-0.5 w-full rounded-full bg-accent" />
                   )}
                 </Link>
               );

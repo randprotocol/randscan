@@ -48,7 +48,7 @@ export function SearchBar({
         autoFocus={autoFocus}
         spellCheck={false}
         aria-label="Search the explorer"
-        className="w-full rounded border border-border bg-surface py-1.5 pl-8 pr-3 text-sm text-text placeholder-mute transition-colors focus:border-accent focus:outline-none"
+        className="input rounded-sm py-1.5 pl-8 pr-3"
       />
     </form>
   );

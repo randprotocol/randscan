@@ -51,7 +51,7 @@ function supplyColumns(decimals: number, symbol: string): Column<TokenSupplyEven
         const negative = e.delta.startsWith('-');
         const magnitude = negative ? e.delta.slice(1) : e.delta;
         return (
-          <span className={`font-mono ${negative ? 'text-accent-3' : 'text-accent'}`}>
+          <span className={`font-mono ${negative ? 'text-negative' : 'text-accent'}`}>
             {negative ? '-' : '+'}
             {formatUnits(magnitude, decimals)} {symbol}
           </span>

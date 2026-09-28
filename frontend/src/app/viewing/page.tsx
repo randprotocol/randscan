@@ -169,7 +169,7 @@ export default function ViewingPage() {
             {busy ? '…' : ''}
           </p>
         )}
-        {error && <p className="border-t border-border-soft py-3 text-sm text-accent-3">{error}</p>}
+        {error && <p className="border-t border-border-soft py-3 text-sm text-negative">{error}</p>}
       </KeyPanel>
 
       {info && rows && (

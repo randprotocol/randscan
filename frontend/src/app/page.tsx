@@ -70,7 +70,7 @@ export default function DashboardPage() {
     <div className="space-y-8">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-serif text-4xl font-medium tracking-tight text-strong">
+          <h1 className="text-4xl font-semibold tracking-tight text-strong">
             Rand Protocol Explorer
           </h1>
           <p className="mt-2 text-sm text-soft">

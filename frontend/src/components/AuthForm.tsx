@@ -53,7 +53,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="font-serif text-3xl font-medium tracking-tight text-strong">{text.title}</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-strong">{text.title}</h1>
       <p className="mt-2 text-sm text-soft">
         An account lets you create API keys with a higher request quota.
       </p>

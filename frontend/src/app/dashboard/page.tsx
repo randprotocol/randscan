@@ -172,7 +172,7 @@ export default function DashboardPage() {
                   {formatNumber(k.request_count)} requests
                 </span>
               </div>
-              <button type="button" onClick={() => onRevoke(k)} className="btn-secondary text-accent-3">
+              <button type="button" onClick={() => onRevoke(k)} className="btn-secondary text-negative">
                 Revoke
               </button>
             </div>

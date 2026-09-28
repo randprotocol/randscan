@@ -33,7 +33,7 @@ export function ForgotPasswordForm() {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="font-serif text-3xl font-medium tracking-tight text-strong">Forgot your password?</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-strong">Forgot your password?</h1>
       <p className="mt-2 text-sm text-soft">
         Enter your account email and we will send a link to choose a new password. The link works
         for one hour.
@@ -115,7 +115,7 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="mx-auto max-w-md">
-        <h1 className="font-serif text-3xl font-medium tracking-tight text-strong">Reset password</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-strong">Reset password</h1>
         <div className="card-padded mt-6 space-y-3">
           <p className="text-sm text-text">This link is missing its token. Open the link from the email, or request a new one.</p>
           <Link href="/forgot" className="link text-sm">
@@ -128,7 +128,7 @@ export function ResetPasswordForm() {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="font-serif text-3xl font-medium tracking-tight text-strong">Choose a new password</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-strong">Choose a new password</h1>
       <p className="mt-2 text-sm text-soft">You will be signed out of every other device.</p>
       <form onSubmit={onSubmit} className="card-padded mt-6 space-y-4">
         <div>
@@ -247,7 +247,7 @@ export function ChangePasswordForm() {
           {error}
         </div>
       )}
-      {done && <p className="text-sm text-live">Password changed. Other devices have been signed out.</p>}
+      {done && <p className="text-sm text-positive">Password changed. Other devices have been signed out.</p>}
       <button type="submit" disabled={busy} className="btn-secondary disabled:opacity-60">
         {busy ? 'Please wait…' : 'Change password'}
       </button>

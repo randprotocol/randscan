@@ -650,7 +650,7 @@ function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {receipt.outputs.map((output, index) => (
             <div key={index} className="rounded border border-border bg-bg-soft px-3 py-2">
-              <div className="text-[10px] font-medium uppercase tracking-wide text-mute">
+              <div className="text-xs font-semibold text-soft">
                 out {index}
               </div>
               <div className="truncate font-mono text-sm text-text" title={String(output)}>
