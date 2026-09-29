@@ -148,6 +148,13 @@ pub struct Bundle {
     pub time: i64,
     pub proof_len: i64,
     pub envelope_len: [i64; 4],
+    /// Split authorisation (chain 17+, bundle guest v3 with an auth guest): the commitment
+    /// `c = H(AUTH, nk, salt)` the bundle proof publishes, which a second proof over the spend key
+    /// must match, hex. All zeros on a chain without an auth guest; `None` when the node did not
+    /// report the field at all.
+    pub auth_commit: Option<String>,
+    /// The auth proof's size in bytes; 0 on a chain without an auth guest.
+    pub auth_proof_len: i64,
 }
 
 /// Transaction as shown in lists and pushed over WebSocket. Amounts are strings of units.
@@ -455,6 +462,8 @@ mod tests {
             time: 5,
             proof_len: 302857,
             envelope_len: [1380, 1380, 1380, 1380],
+            auth_commit: Some("c0".into()),
+            auth_proof_len: 1_360_000,
         });
         let v = serde_json::to_value(&d).unwrap();
         assert_eq!(v["kind"], "transfer");
@@ -480,6 +489,8 @@ mod tests {
             time: 5,
             proof_len: 1,
             envelope_len: [1, 1, 1, 1],
+            auth_commit: None,
+            auth_proof_len: 0,
         });
         let v = serde_json::to_value(&d).unwrap();
         let dump = v.to_string();

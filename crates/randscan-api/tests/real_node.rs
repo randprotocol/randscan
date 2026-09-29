@@ -69,6 +69,16 @@ async fn rpc(client: &reqwest::Client, url: &str, method: &str, params: Value) -
     v["result"].clone()
 }
 
+/// An amount as the node renders it: a JSON integer in older builds, a decimal string since the
+/// amounts on `tx_json` moved to strings (v0.6). Either way, its decimal text.
+fn units(v: &Value) -> String {
+    match v {
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => s.clone(),
+        other => panic!("not an amount: {other}"),
+    }
+}
+
 /// The hash after `submitted <what> ` in the wallet's output.
 fn submitted_hash(out: &str, what: &str) -> String {
     out.lines()
@@ -107,23 +117,41 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     } else {
         key.to_str().unwrap().to_string()
     };
-    run(
-        bin,
-        &[
-            "genesis",
-            "--chain-id",
-            &CHAIN_ID.to_string(),
-            "--validator",
-            &validator,
-            "--faucet",
-            "--fri-profile",
-            "test",
-            "--alloc",
-            &format!("{wallet_addr}=1000"),
-            "--out",
-            genesis.to_str().unwrap(),
-        ],
-    );
+    let mut args = vec![
+        "genesis",
+        "--chain-id",
+        &CHAIN_ID.to_string(),
+        "--validator",
+        &validator,
+        "--faucet",
+        "--fri-profile",
+        "test",
+        "--alloc",
+        &format!("{wallet_addr}=1000"),
+        "--out",
+        genesis.to_str().unwrap(),
+    ]
+    .into_iter()
+    .map(str::to_string)
+    .collect::<Vec<_>>();
+    // A chain-18 build (v0.6.6, constraint set 8) gets chain 18's genesis: the v0.6 rules, bundle
+    // guest v3 with its auth guest, the encrypted memo (every envelope 1 860 B) and the gas
+    // section with the dynamic controller — `deploy/cut-chain18-genesis.sh`'s flags, so this is
+    // the shape the explorer meets after the cut. An older node keeps the plain genesis.
+    if help.contains("--gas-price") && help.contains("--auth-guest") {
+        args.extend(
+            [
+                "--hardening-v6", "--bundle-guest", "v3", "--auth-guest",
+                "--max-proof-bytes", "4194304", "--max-block-bytes", "20971520",
+                "--envelope-bytes", "1860",
+                "--gas-price", "100", "--byte-price", "800", "--bundle-gas-limit", "20479",
+                "--gas-dynamic", "10485760,262144,1250",
+            ]
+            .into_iter()
+            .map(str::to_string),
+        );
+    }
+    run(bin, &args.iter().map(String::as_str).collect::<Vec<_>>());
     run(
         bin,
         &[
@@ -238,18 +266,12 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let wallet2_addr = run(&cli, &["address", "--key", wallet2.to_str().unwrap()])
         .trim()
         .to_string();
-    let out = run(
-        &cli,
-        &[
-            "send",
-            &wallet2_addr,
-            "1.25",
-            "--key",
-            wallet,
-            "--rpc",
-            &node.url,
-        ],
-    );
+    // Since v0.5.10 `rand send` confirms first and refuses a non-terminal stdin without `--yes`.
+    let mut send = vec!["send", &wallet2_addr, "1.25", "--key", wallet, "--rpc", &node.url];
+    if run(&cli, &["send", "--help"]).contains("--yes") {
+        send.push("--yes");
+    }
+    let out = run(&cli, &send);
     let transfer_hash = submitted_hash(&out, "transfer");
 
     let Some(live) = live_app(test_config(), &node.url).await else {
@@ -281,11 +303,8 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(transfer["bundle"]["anchor"], nb["anchor"]);
     assert_eq!(transfer["bundle"]["nullifiers"], nb["nullifiers"]);
     assert_eq!(transfer["bundle"]["commitments"], nb["commitments"]);
-    assert_eq!(
-        transfer["bundle"]["fee"],
-        nb["fee"].as_u64().unwrap().to_string()
-    );
-    assert_eq!(transfer["fee"], nb["fee"].as_u64().unwrap().to_string());
+    assert_eq!(transfer["bundle"]["fee"], units(&nb["fee"]));
+    assert_eq!(transfer["fee"], units(&nb["fee"]));
     assert_eq!(transfer["bundle"]["proof_len"], nb["proof_len"]);
     assert_eq!(transfer["bundle"]["time"], nb["time"]);
     assert_eq!(transfer["height"], node_transfer["height"]);
@@ -340,11 +359,12 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(block["state_root"], node_block["state_root"]);
     assert_eq!(block["proposer"], validator_addr);
 
-    // The tree: one genesis note, one mint note, two transfer outputs; every leaf served.
+    // The tree: one genesis note, one mint note, the transfer's four output slots (dummies
+    // included, since chain 14's hidden-asset bundle); every leaf served.
     let tree = rpc(&client, &node.url, "rand_getTreeInfo", json!([])).await;
-    assert_eq!(tree["next_index"], 4, "{tree}");
+    assert_eq!(tree["next_index"], 6, "{tree}");
     let notes = live
-        .wait_for("/api/v1/notes", WAIT, |n| n["pagination"]["total"] == 4)
+        .wait_for("/api/v1/notes", WAIT, |n| n["pagination"]["total"] == 6)
         .await;
     let cm_out: Vec<&str> = nb["commitments"]
         .as_array()
@@ -364,7 +384,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let (_, _, genesis_note) =
         call(&live.app, json_req("GET", "/api/v1/notes/0", None, None)).await;
     assert!(genesis_note["tx_hash"].is_null(), "{genesis_note}");
-    assert_eq!(notes["data"].as_array().unwrap().len(), 4);
+    assert_eq!(notes["data"].as_array().unwrap().len(), 6);
     for nf in nb["nullifiers"].as_array().unwrap() {
         let (status, _, n) = call(
             &live.app,
@@ -383,11 +403,38 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     let node_status = rpc(&client, &node.url, "rand_status", json!([])).await;
     let stats = live
         .wait_for("/api/v1/stats", WAIT, |s| {
-            s["chain_id"] == CHAIN_ID && s["notes"] == 4
+            s["chain_id"] == CHAIN_ID && s["notes"] == 6
         })
         .await;
     assert_eq!(stats["nullifiers"], node_status["nullifiers"]);
     assert_eq!(stats["hc_bundle"], node_status["hc_bundle"]);
+    // Chain 17+/18+: the auth guest and the tip's live gas prices come off `rand_status` as the
+    // node serves them (`null` on a node or chain without), and the limits carry the genesis'
+    // envelope format, auth guest and gas section. A chain-18 build got that genesis above.
+    let null = json!(null);
+    assert_eq!(stats["hc_auth"], *node_status.get("hc_auth").unwrap_or(&null), "{stats}");
+    assert_eq!(stats["gas_prices"], *node_status.get("gas_prices").unwrap_or(&null), "{stats}");
+    let node_limits = rpc(&client, &node.url, "rand_getLimits", json!([])).await;
+    if node_limits["gas_metering"] == "circuit" {
+        let l = &stats["limits"];
+        assert_eq!(l["gas_metering"], "circuit", "{l}");
+        assert_eq!(l["bundle_gas_limit"], 20479);
+        assert_eq!(l["adjust_bps"], 1250);
+        assert_eq!(l["envelope_bytes"], 1860);
+        assert_eq!(l["hardening_v6"], true);
+        assert_eq!(l["hc_auth"], node_status["hc_auth"]);
+        assert!(l["hc_auth"].is_string(), "a v3 chain pins an auth guest: {l}");
+        assert!(stats["gas_prices"]["gas_price"].is_string(), "{stats}");
+        // The genesis prices are the floors; the tip's cannot be below them.
+        let floor: u64 = node_limits["gas_price"].as_str().unwrap().parse().unwrap();
+        let tip: u64 = stats["gas_prices"]["gas_price"].as_str().unwrap().parse().unwrap();
+        assert!(tip >= floor, "{tip} < {floor}");
+        // Under `hc_auth` every bundle carries an auth proof and every envelope is 1 860 B.
+        assert_eq!(transfer["bundle"]["auth_commit"], nb["auth_commit"]);
+        assert!(nb["auth_proof_bytes"].as_u64().unwrap() > 0, "{nb}");
+        assert_eq!(transfer["bundle"]["auth_proof_len"], nb["auth_proof_bytes"]);
+        assert_eq!(transfer["bundle"]["envelope_len"], json!([1860, 1860, 1860, 1860]));
+    }
     assert_eq!(stats["validator_count"], 1);
     assert_eq!(stats["faucet"], true);
     assert_eq!(stats["symbol"], "RAND");
@@ -400,7 +447,7 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     assert_eq!(list[0]["active"], true);
     // The proposer earned the transfer's fee (and the deploy/call fees below, later).
     let rewards: u128 = list[0]["rewards"].as_str().unwrap().parse().unwrap();
-    assert!(rewards >= nb["fee"].as_u64().unwrap() as u128, "{list:?}");
+    assert!(rewards >= units(&nb["fee"]).parse::<u128>().unwrap(), "{list:?}");
 
     let (status, _, found) = call(
         &live.app,

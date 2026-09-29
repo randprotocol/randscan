@@ -9,7 +9,8 @@ description = "Opens shielded-chain envelopes with a viewing key or a per-transa
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-# The exact versions the fullnode's vendored zkVM (crates/randprotocol-zkvm, commit e2aae20) pins.
+# The exact versions the fullnode's vendored zkVM (crates/randprotocol-zkvm, checked at commit
+# d40fb94 = v0.6.6, the chain-18 / constraint-set-8 build) pins.
 # The Poseidon2 round constants are circuits' committed table (../randscan-core/src/
 # poseidon2_constants.rs by #[path], audit ZKV-2), no longer a seeded rand StdRng draw; rand is a
 # dev-dependency only, for the table's test that re-runs the old draw.

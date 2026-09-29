@@ -364,10 +364,24 @@ pub struct NodeStatus {
     pub tree_root: String,
     #[serde(default)]
     pub hc_bundle: String,
+    /// The genesis auth guest (split authorisation, chain 17+), hex; absent or `null` without.
+    #[serde(default)]
+    pub hc_auth: Option<String>,
     #[serde(default)]
     pub address: Option<String>,
     #[serde(default)]
     pub peer_id: String,
+    /// The tip ledger's live gas prices under a `gas` section (chain 18+), refreshed every
+    /// commit; absent or `null` without one.
+    #[serde(default)]
+    pub gas_prices: Option<RpcGasPrices>,
+}
+
+/// `rand_status.gas_prices`: decimal strings on the wire, like every other amount.
+#[derive(Debug, Clone, Deserialize, PartialEq, Eq)]
+pub struct RpcGasPrices {
+    pub gas_price: Units,
+    pub byte_price: Units,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -423,6 +437,13 @@ pub struct RpcBundle {
     pub proof_len: u64,
     #[serde(default)]
     pub envelope_len: [u64; 4],
+    /// Split authorisation (chain 17+): the commitment the bundle proof publishes, hex; zeros on
+    /// a chain without an auth guest, absent on a node that predates the field.
+    #[serde(default)]
+    pub auth_commit: Option<String>,
+    /// The auth proof, by length; 0 without an auth guest.
+    #[serde(default)]
+    pub auth_proof_bytes: u64,
 }
 
 /// Actions as the node serialises them. Kinds this client does not know become
@@ -1010,6 +1031,69 @@ mod tests {
         assert_eq!(l.max_proof_bytes, 8 << 20);
         assert_eq!(l.max_block_bytes, 20 << 20);
         assert_eq!(l.max_program_public_words, 32768);
+        assert_eq!(l.envelope_bytes, None);
+        assert!(!l.hardening_v6 && l.hc_auth.is_none() && !l.has_gas_section());
+    }
+
+    /// Chain 18 (fullnode v0.6.6, constraint set 8; `docs/rpc.md` "rand_getLimits", "rand_status",
+    /// "rand_getTransaction"): the memo envelope, the v0.6 switch, the auth guest and the `gas`
+    /// section with the tip's moving prices — prices are decimal strings on the wire.
+    #[test]
+    fn parses_the_chain_18_limits_status_and_bundle() {
+        let l: randscan_core::ChainLimits = serde_json::from_str(
+            r#"{ "max_program_words": 65535, "max_proof_bytes": 4194304, "max_block_bytes": 20971520,
+                 "max_call_envelope_bytes": 65536, "max_program_public_words": 32768, "envelope_bytes": 1860,
+                 "hardening_v6": true, "hc_auth": "60af094acfe65d85fdb18fb3d06cf9085dcf28c96e59e87f1ee527226e6e3fce",
+                 "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
+                 "bundle_gas_limit": 20479, "adjust_bps": 1250 }"#,
+        )
+        .unwrap();
+        assert_eq!(l.envelope_bytes, Some(1860));
+        assert!(l.hardening_v6);
+        assert_eq!(l.hc_auth.as_deref().map(str::len), Some(64));
+        assert_eq!((l.gas_price.as_deref(), l.byte_price.as_deref()), (Some("100"), Some("800")));
+        assert!(l.has_gas_section());
+        assert_eq!((l.bundle_gas_limit, l.adjust_bps), (Some(20479), Some(1250)));
+        // A node's own policy (Phase 0, no section) and a chain with none: both read as no section.
+        let l: randscan_core::ChainLimits = serde_json::from_str(
+            r#"{ "max_program_words": 4096, "max_proof_bytes": 2097152, "max_block_bytes": 4194304,
+                 "max_call_envelope_bytes": 18432, "max_program_public_words": 0, "envelope_bytes": null,
+                 "hardening_v6": false, "hc_auth": null, "gas_price": "100", "byte_price": "800",
+                 "gas_metering": "header", "bundle_gas_limit": null, "adjust_bps": null }"#,
+        )
+        .unwrap();
+        assert!(!l.has_gas_section() && l.gas_price.as_deref() == Some("100"));
+        // The limits round-trip through the stats row's JSONB column as this crate serialises them.
+        let back: randscan_core::ChainLimits =
+            serde_json::from_value(serde_json::to_value(&l).unwrap()).unwrap();
+        assert_eq!(back, l);
+
+        let s: NodeStatus = serde_json::from_str(
+            r#"{ "height": 3020, "head_hash": "ab", "view": 3030, "hc_bundle": "60af", "hc_auth": "1a2b",
+                 "gas_prices": { "gas_price": "112", "byte_price": "900" }, "peer_id": "12D3" }"#,
+        )
+        .unwrap();
+        assert_eq!(s.hc_auth.as_deref(), Some("1a2b"));
+        assert_eq!(
+            s.gas_prices,
+            Some(RpcGasPrices { gas_price: Units("112".into()), byte_price: Units("900".into()) })
+        );
+        let s: NodeStatus =
+            serde_json::from_str(r#"{ "height": 1, "hc_bundle": "60af", "hc_auth": null, "gas_prices": null }"#)
+                .unwrap();
+        assert!(s.hc_auth.is_none() && s.gas_prices.is_none());
+
+        let mut b = bundle_json();
+        b["auth_commit"] = serde_json::json!("c0".repeat(32));
+        b["auth_proof_bytes"] = serde_json::json!(1_360_512);
+        b["envelope_len"] = serde_json::json!([1860, 1860, 1860, 1860]);
+        let b: RpcBundle = serde_json::from_value(b).unwrap();
+        assert_eq!(b.auth_commit.as_deref().map(str::len), Some(64));
+        assert_eq!(b.auth_proof_bytes, 1_360_512);
+        assert_eq!(b.envelope_len, [1860; 4]);
+        // A pre-v3 node reports neither field.
+        let b: RpcBundle = serde_json::from_value(bundle_json()).unwrap();
+        assert!(b.auth_commit.is_none() && b.auth_proof_bytes == 0);
     }
 
     fn bundle_json() -> serde_json::Value {

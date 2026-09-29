@@ -12,7 +12,7 @@ pub const TX_DETAIL_COLS: &str = "hash, block_hash, height, tx_index, kind, fee:
     envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
     words_len, call_proof_len, input_envelope_len, cm, registered, action_nonce, attestation_len, recipient, note_time,
     relayer_fee::text AS relayer_fee, to_chain, bridge_to, bridge_token, deposit_r, derived_cm, pq_signers,
-    token_action, bridge_governance";
+    token_action, bridge_governance, auth_commit, auth_proof_len";
 
 /// The public fields of one hidden-asset bundle (chain 14: four input slots, four output slots,
 /// dummies included; no public `asset` field — see `randscan_core::Bundle`'s doc comment).
@@ -28,6 +28,11 @@ pub struct NewBundle {
     pub time: i64,
     pub proof_len: i64,
     pub envelope_len: [i64; 4],
+    /// Split authorisation (chain 17+): the bundle proof's `auth_commit`, hex; `None` when the
+    /// node reported none.
+    pub auth_commit: Option<String>,
+    /// Bytes of the auth proof; 0 without an auth guest.
+    pub auth_proof_len: i64,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -85,14 +90,16 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
              proof_len, envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
              program_id, words_len, call_proof_len, input_envelope_len, amount, cm, validator, registered,
              action_nonce, attestation_len, recipient, note_time, asset_index, relayer_fee, to_chain, bridge_to,
-             bridge_token, deposit_r, derived_cm, pq_signers, token_action, bridge_governance)
+             bridge_token, deposit_r, derived_cm, pq_signers, token_action, bridge_governance,
+             auth_commit, auth_proof_len)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric,
              $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
              $19::numeric, $20::numeric, $21, $22,
              $23, $24, $25, $26, $27,
              $28, $29, $30, $31, $32::numeric, $33, $34, $35,
              $36, $37, $38, $39, $40, $41::numeric, $42, $43,
-             $44, $45, $46, $47, $48, $49)",
+             $44, $45, $46, $47, $48, $49,
+             $50, $51)",
     )
     .bind(t.hash)
     .bind(t.block_hash)
@@ -143,6 +150,8 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(t.pq_signers.as_deref())
     .bind(t.token_action.as_ref())
     .bind(t.bridge_governance.as_ref())
+    .bind(b.and_then(|b| b.auth_commit.as_deref()))
+    .bind(b.map(|b| b.auth_proof_len).unwrap_or(0))
     .execute(&mut *conn)
     .await?;
 

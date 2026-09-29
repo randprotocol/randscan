@@ -152,6 +152,9 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(d["bundle"]["commitments"][3], h("cm4-t"));
     assert_eq!(d["bundle"]["proof_len"], 302857);
     assert_eq!(d["bundle"]["envelope_len"], json!([1380, 1380, 1380, 1380]));
+    // Chain 17+: split authorisation's commitment and the auth proof, by length.
+    assert_eq!(d["bundle"]["auth_commit"], h("auth-t"));
+    assert_eq!(d["bundle"]["auth_proof_len"], 1360512);
     assert!(d["bundle"].get("asset").is_none(), "a transfer's asset must never be served: {d}");
     assert!(d["amount"].is_null() && d["validator"].is_null() && d["program"].is_null(), "{d}");
     assert!(d.get("sender").is_none() && d.get("nonce").is_none() && d.get("to").is_none(), "no account fields: {d}");
@@ -415,8 +418,17 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(stats["node_version"], "0.1.0");
     assert_eq!(stats["node_git_sha"], MOCK_GIT_SHA);
     assert_eq!(stats["fri_profile"], "test");
+    // Chain 18's `rand_getLimits`, served whole: the caps, the memo envelope, the v0.6 switch, the
+    // auth guest and the gas section's genesis parameters (prices as decimal strings).
     assert_eq!(stats["limits"], json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
-        "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 }));
+        "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
+        "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
+        "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
+        "bundle_gas_limit": 20479, "adjust_bps": 1250 }));
+    // Off `rand_status`, refreshed every commit: the auth guest, and the tip's live prices (one
+    // 12.5% step above the genesis prices the limits report — a dynamic chain moves them).
+    assert_eq!(stats["hc_auth"], h("hc_auth"));
+    assert_eq!(stats["gas_prices"], json!({ "gas_price": "112", "byte_price": "900" }));
     assert_eq!(stats["notes"], expected_leaves);
     // 2014 bundle-carrying transactions (2000 transfers, 1 mint's bundle-less action aside, plus
     // deploy/call/bond/attest/rotation/burn/future/register_token/token_mint/set_authority/
@@ -614,6 +626,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // A node older than v0.3 / v0.4 has none of the three methods; the old chain's answers must
     // not linger. The FRI profile still comes from `rand_status`.
     assert!(stats["limits"].is_null() && stats["genesis_hash"].is_null() && stats["node_git_sha"].is_null(), "{stats}");
+    assert!(stats["hc_auth"].is_null() && stats["gas_prices"].is_null(), "no auth guest, no gas section: {stats}");
     assert_eq!(stats["fri_profile"], "test");
     assert_eq!(stats["total_supply"], "0");
     assert_eq!(stats["active_validator_count"], 1, "every register entry is active before S2");

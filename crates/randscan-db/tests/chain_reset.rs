@@ -50,6 +50,8 @@ async fn reset_chain_data_truncates_chain_tables_and_keeps_users() {
         time: 0,
         proof_len: 302857,
         envelope_len: [1380, 1380, 1380, 1380],
+        auth_commit: Some("c0".repeat(32)),
+        auth_proof_len: 1_360_000,
     };
     insert_transaction(
         &mut conn,

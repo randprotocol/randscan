@@ -193,6 +193,43 @@ export default function DashboardPage() {
               ? `${formatNumber(stats.limits.max_program_public_words)} words`
               : 'off'}
           </span>
+          <span>
+            · note envelopes{' '}
+            {stats.limits.envelope_bytes
+              ? `${formatNumber(stats.limits.envelope_bytes)} B (memo)`
+              : '1,348 B (no memo)'}
+          </span>
+          <span>· v0.6 rules {stats.limits.hardening_v6 ? 'on' : 'off'}</span>
+          <span className="inline-flex items-center gap-1">
+            · auth guest{' '}
+            {stats.limits.hc_auth ? <Hash value={stats.limits.hc_auth} start={8} end={6} /> : 'none'}
+          </span>
+        </p>
+      )}
+
+      {stats?.limits && stats.limits.gas_metering && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
+          <span>
+            Gas:{' '}
+            {stats.limits.gas_metering === 'circuit'
+              ? "the chain's own section, metered in-circuit"
+              : "this node's policy, priced off the proof header"}
+          </span>
+          <span>
+            · {formatAmount((stats.gas_prices ?? stats.limits).gas_price ?? '0')} per gas
+          </span>
+          <span>
+            · {formatAmount((stats.gas_prices ?? stats.limits).byte_price ?? '0')} per KiB
+          </span>
+          {stats.limits.bundle_gas_limit !== null && (
+            <span>· every bundle declares {formatNumber(stats.limits.bundle_gas_limit)} gas</span>
+          )}
+          <span>
+            · prices{' '}
+            {stats.limits.adjust_bps !== null
+              ? `move ${(stats.limits.adjust_bps / 100).toFixed(2).replace(/\.?0+$/, '')}% a block by fullness`
+              : 'fixed'}
+          </span>
         </p>
       )}
 

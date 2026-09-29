@@ -35,6 +35,15 @@ pub struct NetworkStats {
     pub tree_root: Option<String>,
     /// The bundle guest every proof on this chain is checked against.
     pub hc_bundle: Option<String>,
+    /// The auth guest the genesis pins (split authorisation, chain 17+): every bundle then
+    /// carries an `auth_commit` and an auth proof over the spend key. `None` on a chain without
+    /// one, and on a node too old to report it.
+    pub hc_auth: Option<String>,
+    /// The tip ledger's current gas prices (`rand_status.gas_prices`), refreshed every commit:
+    /// under a `gas` section whose prices move per block by fullness these are the live ones,
+    /// not the genesis snapshot `limits` was read with. `None` on a chain without a `gas`
+    /// section.
+    pub gas_prices: Option<GasPrices>,
     pub epoch: Option<i64>,
     pub epoch_blocks: Option<i64>,
     /// Block 0's hash as the node reports it (`rand_getGenesisHash`); a chain id alone does not
@@ -49,9 +58,23 @@ pub struct NetworkStats {
     pub updated_at: String,
 }
 
-/// The size caps a chain's genesis sets (`rand_getLimits`, v0.4). They were constants before
-/// chain 13; chain 14 runs 65 535 words, 8 MiB proofs, 20 MiB blocks, 64 KiB call envelopes and
-/// 32 768 public words.
+/// The tip's gas prices under a chain's `gas` section (fullnode spec 2026-09-28 §7.1, §8):
+/// RAND units per gas and per KiB of call proof plus input envelope, decimal strings like every
+/// other amount on this API.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GasPrices {
+    #[serde(deserialize_with = "crate::amount::amount")]
+    pub gas_price: String,
+    #[serde(deserialize_with = "crate::amount::amount")]
+    pub byte_price: String,
+}
+
+/// What a wallet needs from the chain's genesis to build a transaction (`rand_getLimits`): the
+/// size caps (v0.4; constants before chain 13 — chain 14 runs 65 535 words, 8 MiB proofs, 20 MiB
+/// blocks, 64 KiB call envelopes and 32 768 public words), and since chain 16/17/18 the envelope
+/// format, the v0.6 switch, the auth guest and the gas section. Every field past the five caps is
+/// absent on a node that predates it, which serde reads as `None` / `false`; a JSON `null` from
+/// a newer node means the chain has no such setting.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChainLimits {
     /// The most code words a program may have.
@@ -64,6 +87,48 @@ pub struct ChainLimits {
     pub max_call_envelope_bytes: u64,
     /// The most public words a deploy may fix; 0 means no program has a public input.
     pub max_program_public_words: u64,
+    /// The exact size every note envelope must have (fullnode spec 2026-09-26 §2.4): `1860` on a
+    /// chain whose notes carry an encrypted memo (chain 18); `None` where wallets seal the
+    /// legacy 1 348-byte form and a memo is merely tolerated.
+    #[serde(default)]
+    pub envelope_bytes: Option<u64>,
+    /// The v0.6 validity rules (the pc window, canonical proof shapes, the call binding, the
+    /// program-table floor) as consensus rules rather than pool policy. Chains 16+.
+    #[serde(default)]
+    pub hardening_v6: bool,
+    /// The auth guest the genesis pins (split authorisation; chain 17+), hex, or `None`. Set,
+    /// `hc_bundle` is bundle guest v3 and every bundle carries `auth_commit` and an auth proof.
+    #[serde(default)]
+    pub hc_auth: Option<String>,
+    /// RAND units per gas: the chain's own `gas` section's current price (`gas_metering`
+    /// `"circuit"`), or the node's own policy (`"header"`), or `None` with neither.
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub gas_price: Option<String>,
+    /// RAND units per KiB (or part of one) of call proof and input envelope, from byte 0.
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub byte_price: Option<String>,
+    /// `"circuit"` on a chain whose genesis carries a `gas` section (the in-circuit meter; the
+    /// prices above are consensus state and every node answers the same), `"header"` while only
+    /// this node's policy prices a call's `gas_max` off its proof header (two nodes may answer
+    /// differently), `None` with neither.
+    #[serde(default)]
+    pub gas_metering: Option<String>,
+    /// The bundle guest's flat declared gas every bundle proof must publish (`20479` on chain 18,
+    /// the tier-14 hash-free ceiling); `None` without a `gas` section.
+    #[serde(default)]
+    pub bundle_gas_limit: Option<u64>,
+    /// The dynamic controller's per-block step in basis points (`1250` = 12.5% on chain 18);
+    /// `None` on a chain whose prices never move, a `gas` section without `dynamic` included.
+    #[serde(default)]
+    pub adjust_bps: Option<u32>,
+}
+
+impl ChainLimits {
+    /// Whether the chain's genesis carries a `gas` section: prices are consensus state, every
+    /// call pays its declared limit, every bundle declares `bundle_gas_limit`.
+    pub fn has_gas_section(&self) -> bool {
+        self.gas_metering.as_deref() == Some("circuit")
+    }
 }
 
 /// The node's supply audit (`rand_getSupply`, phase S2): every crossing of the pool boundary is
@@ -81,4 +146,16 @@ pub struct Supply {
     pub register_total: String,
     pub total_supply: String,
     pub invariant_holds: bool,
+    /// Genesis vesting (chain 17+, fullnode `docs/vesting.md`): what genesis issued into the
+    /// vesting register, what claims and revokes released into the pool, what the register still
+    /// holds, and what of that has not unlocked yet at the head. `None` on a node that predates
+    /// the fields; `"0"` on a chain without a `vesting` section.
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub vesting_issued: Option<String>,
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub vesting_released: Option<String>,
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub vesting_in_register: Option<String>,
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub vesting_locked: Option<String>,
 }

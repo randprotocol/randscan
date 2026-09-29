@@ -326,6 +326,8 @@ fn new_bundle(b: &RpcBundle) -> NewBundle {
             b.envelope_len[2] as i64,
             b.envelope_len[3] as i64,
         ],
+        auth_commit: b.auth_commit.clone(),
+        auth_proof_len: b.auth_proof_bytes as i64,
     }
 }
 
@@ -714,6 +716,8 @@ mod tests {
             time: 9,
             proof_len: 1,
             envelope_len: [1, 1, 1, 1],
+            auth_commit: None,
+            auth_proof_bytes: 0,
         }
     }
 

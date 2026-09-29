@@ -504,6 +504,10 @@ impl IndexerService {
                     .filter(|s| non_empty(s))
                     .map(|s| s.as_str()),
                 limits: limits.as_ref().and_then(|l| serde_json::to_value(l).ok()),
+                hc_auth: status.hc_auth.as_deref().filter(|s| !s.is_empty()),
+                gas_prices: status.gas_prices.as_ref().map(|p| {
+                    serde_json::json!({ "gas_price": p.gas_price.0, "byte_price": p.byte_price.0 })
+                }),
             },
         )
         .await?;

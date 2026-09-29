@@ -107,6 +107,14 @@ export interface Bundle {
   time: number;
   proof_len: number;
   envelope_len: [number, number, number, number];
+  /**
+   * Split authorisation (chain 17+): the commitment the bundle proof publishes and a second proof
+   * over the spend key must match, hex. All zeros on a chain without an auth guest; `null` when
+   * the node reported none.
+   */
+  auth_commit: string | null;
+  /** The auth proof's size in bytes; 0 without an auth guest. */
+  auth_proof_len: number;
 }
 
 /**
@@ -511,6 +519,11 @@ export interface Supply {
   register_total: string;
   total_supply: string;
   invariant_holds: boolean;
+  /** Genesis vesting (chain 17+); `null` on an older node, "0" on a chain without a vesting section. */
+  vesting_issued: string | null;
+  vesting_released: string | null;
+  vesting_in_register: string | null;
+  vesting_locked: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -599,6 +612,10 @@ export interface NetworkStats {
   current_leader: string | null;
   tree_root: string | null;
   hc_bundle: string | null;
+  /** The genesis auth guest (split authorisation, chain 17+); `null` without one. */
+  hc_auth: string | null;
+  /** The tip's live gas prices, refreshed every commit; `null` on a chain without a gas section. */
+  gas_prices: GasPrices | null;
   epoch: number | null;
   epoch_blocks: number | null;
   /** Block 0's hash: a chain id alone does not tell two cuts apart. */
@@ -612,7 +629,12 @@ export interface NetworkStats {
   updated_at: string;
 }
 
-/** The size caps a chain's genesis sets (`rand_getLimits`); constants before chain 13. */
+/**
+ * What a wallet needs from the chain's genesis (`rand_getLimits`): the size caps (constants
+ * before chain 13) and, since chains 16–18, the envelope format, the v0.6 switch, the auth guest
+ * and the gas section. The fields past the five caps are `null`/`false` on a chain without the
+ * setting and on a node too old to report it.
+ */
 export interface ChainLimits {
   max_program_words: number;
   max_proof_bytes: number;
@@ -620,6 +642,28 @@ export interface ChainLimits {
   max_call_envelope_bytes: number;
   /** 0 means no program on this chain can have a public input. */
   max_program_public_words: number;
+  /** Every note envelope's exact size: 1860 where notes carry an encrypted memo (chain 18). */
+  envelope_bytes: number | null;
+  /** The v0.6 validity rules as consensus rules (chains 16+). */
+  hardening_v6: boolean;
+  /** The auth guest the genesis pins (split authorisation, chain 17+), hex. */
+  hc_auth: string | null;
+  /** RAND units per gas, decimal string: the chain's section (`circuit`) or this node's policy (`header`). */
+  gas_price: string | null;
+  /** RAND units per KiB of call proof and input envelope, decimal string. */
+  byte_price: string | null;
+  /** `circuit` under a chain's own gas section, `header` under a node's policy, `null` with neither. */
+  gas_metering: 'circuit' | 'header' | null;
+  /** The flat gas every bundle proof declares (20 479 on chain 18); `null` without a section. */
+  bundle_gas_limit: number | null;
+  /** The dynamic controller's per-block step in basis points; `null` when prices never move. */
+  adjust_bps: number | null;
+}
+
+/** The tip's live gas prices under a chain's gas section, decimal strings. */
+export interface GasPrices {
+  gas_price: string;
+  byte_price: string;
 }
 
 export interface IndexerHealth {

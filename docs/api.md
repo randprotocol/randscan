@@ -162,8 +162,13 @@ unreachable. Check `indexer.lag` before trusting "latest" data during an outage.
   "genesis_hash": "1cff3b7d…c7ff",
   "node_version": "0.1.0", "node_git_sha": "b3c594cd5872bbc132cfafcd7314614436e6131a",
   "fri_profile": "production",
-  "limits": { "max_program_words": 65535, "max_proof_bytes": 8388608, "max_block_bytes": 20971520,
-              "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 },
+  "limits": { "max_program_words": 65535, "max_proof_bytes": 4194304, "max_block_bytes": 20971520,
+              "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
+              "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": "60af…3fce",
+              "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
+              "bundle_gas_limit": 20479, "adjust_bps": 1250 },
+  "hc_auth": "60af…3fce",
+  "gas_prices": { "gas_price": "112", "byte_price": "900" },
   "updated_at": "2026-09-12T05:20:38.591804+00:00"
 }
 ```
@@ -185,17 +190,48 @@ most public words a deploy may fix (`0` means no program on the chain has a publ
 of the five is `null` on a node too old to serve it, and they are re-read on every stats refresh,
 so a same-chain node update shows up here without a re-index.
 
+The fields after the five caps came with chains 16, 17 and 18 and are `null`/`false` both on a
+chain without the setting and on a node too old to report it:
+
+- `envelope_bytes` — the exact size of every note envelope. `1860` on a chain whose notes carry an
+  encrypted memo (chain 18: `note ‖ 512-byte memo field`); `null` where wallets seal the legacy
+  1 348-byte form and a memo-carrying envelope from elsewhere is merely tolerated.
+- `hardening_v6` — the v0.6 rules (the pc window, canonical proof shapes, the call binding, the
+  program-table floor) as validity rules rather than pool policy (chains 16+).
+- `hc_auth` — the auth guest the genesis pins (split authorisation, chains 17+), hex. Set, the
+  chain's `hc_bundle` is bundle guest v3 and every bundle publishes an `auth_commit` with a second
+  proof over the spend key beside it (see the bundle below).
+- `gas_price`, `byte_price`, `gas_metering` — how a confidential call is priced. `gas_metering`
+  is `"circuit"` on a chain whose genesis carries a `gas` section (chain 18: every call pays
+  `BUNDLE_BASE + gas_price · declared_gas + byte_price · ⌈bytes / 1024⌉`, the meter runs inside
+  the proof, and the prices are consensus state every node reports alike), `"header"` while only
+  the explorer's node prices `gas_max` of a proof's header as its own admission policy (two nodes
+  may answer differently), `null` with neither. Prices are RAND units, decimal strings.
+- `bundle_gas_limit` — the flat gas every bundle proof must declare (`20479` on chain 18);
+  `adjust_bps` — the dynamic controller's per-block step in basis points (`1250` = 12.5%), `null`
+  when the prices never move. Both `null` without a `gas` section.
+
+`hc_auth` (top level) is the same guest as `rand_status` reports it, and `gas_prices` are the
+**tip's** live prices, refreshed every commit: under a dynamic `gas` section they move per block
+by fullness and can differ from the genesis prices `limits` reports; `null` on a chain without a
+`gas` section. A call's own declared gas limit is not on the node's RPC (it is a public value of
+the proof, not a field of the receipt), so the explorer cannot show it per transaction.
+
 `GET /supply` returns the audit verbatim (all units strings):
 
 ```json
 { "height": 1998,
   "genesis_deposited": "…", "genesis_staked": "…", "faucet_minted": "…",
   "withdraw_deposited": "…", "fees_paid": "…", "burned": "…",
-  "pool_value": "…", "register_total": "…", "total_supply": "…", "invariant_holds": true }
+  "pool_value": "…", "register_total": "…", "total_supply": "…", "invariant_holds": true,
+  "vesting_issued": "…", "vesting_released": "…", "vesting_in_register": "…", "vesting_locked": "…" }
 ```
 
 Note values are hidden, but every crossing of the pool boundary is public, so these are exact.
-`invariant_holds` false would be a chain bug, never a legitimate state.
+`invariant_holds` false would be a chain bug, never a legitimate state. The four `vesting_*`
+fields are genesis vesting (chains 17+): what genesis issued into the vesting register, what
+claims and revokes released into the pool, what the register still holds, and what of that has
+not unlocked yet; `"0"` on a chain without a `vesting` section and `null` on an older node.
 
 `GET /bridge`:
 
@@ -446,9 +482,18 @@ slots, dummies included, **with no public asset field**:
   "nullifiers": ["8c04…d1", "5e77…20", "03aa…6f", "e19b…42"],
   "commitments": ["2a9f…07", "b310…88", "77c1…0e", "5d20…b3"],
   "fee": "1000000", "burn_a": "0", "burn_r": "0", "burn_asset": 0, "time": 5,
-  "proof_len": 302857, "envelope_len": [1380, 1380, 1380, 1380]
+  "proof_len": 302857, "envelope_len": [1860, 1860, 1860, 1860],
+  "auth_commit": "c0f1…9a", "auth_proof_len": 1360512
 }
 ```
+
+`auth_commit` and `auth_proof_len` are split authorisation (chains 17+, `limits.hc_auth` set):
+the bundle proof is made from the viewing key and publishes `c = H(AUTH, nk, salt)`; a second,
+small proof over the spend key, bound to the same transaction, must match it — which is what lets
+a delegated prover make the bundle proof without ever holding the spend key. On a chain without
+an auth guest the commit is all zeros and the length `0`; `auth_commit` is `null` for a
+transaction indexed from a node that predates the field. The auth proof, like the bundle proof,
+is reported by length only.
 
 `anchor` is the tree root the proof was made against; `nullifiers` mark the four spent notes
 (a dummy input still publishes one, so every bundle looks alike, and slots 1–2 carry a private

@@ -238,6 +238,10 @@ impl MockChain {
                     "notes": self.leaves.len(), "nullifiers": self.nullifier_count(),
                     "tree_root": h(&format!("root-{}", self.leaves.len())),
                     "hc_bundle": h("hc_bundle"),
+                    // Chain 17+: the auth guest; chain 18+: the tip's live gas prices, moved one
+                    // 12.5% step above the genesis prices the limits below report.
+                    "hc_auth": if self.pre_s2 { Value::Null } else { json!(h("hc_auth")) },
+                    "gas_prices": if self.pre_s2 { Value::Null } else { json!({ "gas_price": "112", "byte_price": "900" }) },
                     "address": null,
                     "peer_id": "12D3KooWmockmockmockmockmockmockmockmockmock"
                 })
@@ -396,8 +400,13 @@ impl MockChain {
             "rand_getVersion" if !self.pre_s2 => json!({ "version": "0.1.0", "git_sha": MOCK_GIT_SHA,
                 "chain_id": self.chain_id, "hc_bundle": h("hc_bundle"), "fri_profile": "test" }),
             "rand_getGenesisHash" if !self.pre_s2 => self.blocks.first().map(|b| b["hash"].clone()).unwrap_or(Value::Null),
+            // Chain 18's shape (fullnode v0.6.6): the caps, the memo envelope, the v0.6 switch,
+            // the auth guest and the gas section with its genesis prices (decimal strings).
             "rand_getLimits" if !self.pre_s2 => json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
-                "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768 }),
+                "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
+                "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
+                "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
+                "bundle_gas_limit": 20479, "adjust_bps": 1250 }),
             other => return Err((-32601, format!("unknown method {other}"))),
         })
     }
@@ -429,7 +438,10 @@ pub fn bundle(seed: &str) -> Value {
         "nullifiers": [h(&format!("nf1-{seed}")), h(&format!("nf2-{seed}")), h(&format!("nf3-{seed}")), h(&format!("nf4-{seed}"))],
         "commitments": [h(&format!("cm1-{seed}")), h(&format!("cm2-{seed}")), h(&format!("cm3-{seed}")), h(&format!("cm4-{seed}"))],
         "fee": 1000000, "burn_a": 0, "burn_r": 0, "burn_asset": 0, "time": 1,
-        "proof_len": 302857, "envelope_len": [1380, 1380, 1380, 1380]
+        "proof_len": 302857, "envelope_len": [1380, 1380, 1380, 1380],
+        // Chain 17+ (split authorisation): the commitment the auth proof must match, and that
+        // proof by length.
+        "auth_commit": h(&format!("auth-{seed}")), "auth_proof_bytes": 1360512
     })
 }
 

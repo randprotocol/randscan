@@ -165,11 +165,27 @@ function BundlePanel({ bundle, tokens }: { bundle: Bundle; tokens: TokenInfo[] }
           {bundle.envelope_len.map((n) => formatBytes(n)).join(' · ')}
         </span>
       </DetailRow>
+      {bundle.auth_proof_len > 0 && bundle.auth_commit ? (
+        <>
+          <DetailRow label="Auth commitment">
+            <Hash value={bundle.auth_commit} full />
+          </DetailRow>
+          <DetailRow label="Auth proof size">
+            <span className="font-mono">{formatBytes(bundle.auth_proof_len)}</span>
+          </DetailRow>
+        </>
+      ) : (
+        <DetailRow label="Authorisation">
+          <span className="text-mute">Inside the bundle proof (no separate auth proof on this chain)</span>
+        </DetailRow>
+      )}
       <p className="px-4 py-3 text-xs text-mute">
         Four slots, dummies included: slots 1–2 carry a private asset (RAND or any RPL token) and
         slots 3–4 always RAND. There is no public asset field — a transfer of RAND and a transfer
         of any RPL token are the same shape, field for field. The proof and the envelopes are
         reported by size only.
+        {bundle.auth_proof_len > 0 &&
+          ' Split authorisation: the bundle proof was made from the viewing key and publishes the auth commitment; a second, small proof over the spend key must match it, so a delegated prover never holds the spend key.'}
       </p>
     </Panel>
   );

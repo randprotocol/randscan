@@ -115,6 +115,8 @@ pub struct TxDetailRow {
     pub pq_signers: Option<Vec<i32>>,
     pub token_action: Option<serde_json::Value>,
     pub bridge_governance: Option<serde_json::Value>,
+    pub auth_commit: Option<String>,
+    pub auth_proof_len: i64,
 }
 
 impl TxDetailRow {
@@ -149,6 +151,8 @@ impl TxDetailRow {
                 self.envelope_len_3.unwrap_or(0),
                 self.envelope_len_4.unwrap_or(0),
             ],
+            auth_commit: self.auth_commit.clone(),
+            auth_proof_len: self.auth_proof_len,
         })
     }
 
@@ -377,6 +381,8 @@ pub struct NetworkStatsRow {
     pub node_git_sha: Option<String>,
     pub fri_profile: Option<String>,
     pub limits: Option<serde_json::Value>,
+    pub hc_auth: Option<String>,
+    pub gas_prices: Option<serde_json::Value>,
     pub updated_at: DateTime<Utc>,
 }
 
@@ -406,6 +412,9 @@ impl From<NetworkStatsRow> for NetworkStats {
             current_leader: s.current_leader,
             tree_root: s.tree_root,
             hc_bundle: s.hc_bundle,
+            hc_auth: s.hc_auth,
+            // Stored verbatim off `rand_status`; a shape this build cannot read is absent.
+            gas_prices: s.gas_prices.and_then(|v| serde_json::from_value(v).ok()),
             epoch: s.epoch,
             epoch_blocks: s.epoch_blocks,
             genesis_hash: s.genesis_hash,

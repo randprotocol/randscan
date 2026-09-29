@@ -32,6 +32,8 @@ pub struct StatsUpdate<'a> {
     pub node_git_sha: Option<&'a str>,
     pub fri_profile: Option<&'a str>,
     pub limits: Option<serde_json::Value>,
+    pub hc_auth: Option<&'a str>,
+    pub gas_prices: Option<serde_json::Value>,
 }
 
 pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<()> {
@@ -43,7 +45,7 @@ pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<
             mempool_size = $17, node_syncing = $18, faucet = $19, confidential = $20, current_leader = $21,
             tree_root = $22, hc_bundle = $23, epoch = $24, epoch_blocks = $25,
             genesis_hash = $26, node_version = $27, node_git_sha = $28, fri_profile = $29,
-            limits = $30, updated_at = NOW()
+            limits = $30, hc_auth = $31, gas_prices = $32, updated_at = NOW()
          WHERE id = 1",
     )
     .bind(s.chain_id)
@@ -76,6 +78,8 @@ pub async fn update_network_stats(pool: &PgPool, s: &StatsUpdate<'_>) -> Result<
     .bind(s.node_git_sha)
     .bind(s.fri_profile)
     .bind(&s.limits)
+    .bind(s.hc_auth)
+    .bind(&s.gas_prices)
     .execute(pool)
     .await?;
     Ok(())
@@ -88,7 +92,7 @@ pub async fn get_network_stats(pool: &PgPool) -> Result<NetworkStatsRow> {
                 total_supply::text AS total_supply, pool_value::text AS pool_value, program_count,
                 avg_block_time_ms, peer_count, mempool_size, node_syncing, faucet, confidential,
                 current_leader, tree_root, hc_bundle, epoch, epoch_blocks, genesis_hash,
-                node_version, node_git_sha, fri_profile, limits, updated_at
+                node_version, node_git_sha, fri_profile, limits, hc_auth, gas_prices, updated_at
          FROM network_stats WHERE id = 1",
     )
     .fetch_one(pool)
