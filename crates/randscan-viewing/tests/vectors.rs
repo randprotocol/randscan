@@ -1,6 +1,7 @@
 //! Opens envelopes sealed by the fullnode's own crate (`tests/vectors.json`, produced with
-//! `randprotocol-zkvm` at commit d40fb94 — v0.6.6, the chain-18 / constraint-set-8 build; first
-//! produced at e2aae20, and every deterministic value has been the same since): the only thing
+//! `randprotocol-zkvm` at commit d40fb94 — v0.6.6, the chain-18 / constraint-set-8 build, whose
+//! `src/` is unchanged at 86941a1 = v0.6.7, chain 19's build too; first produced at e2aae20,
+//! and every deterministic value has been the same since): the only thing
 //! that pins this re-implementation to the wire format the chain uses.
 
 use randscan_viewing::*;

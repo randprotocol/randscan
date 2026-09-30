@@ -134,10 +134,13 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     .into_iter()
     .map(str::to_string)
     .collect::<Vec<_>>();
-    // A chain-18 build (v0.6.6, constraint set 8) gets chain 18's genesis: the v0.6 rules, bundle
-    // guest v3 with its auth guest, the encrypted memo (every envelope 1 860 B) and the gas
-    // section with the dynamic controller — `deploy/cut-chain18-genesis.sh`'s flags, so this is
-    // the shape the explorer meets after the cut. An older node keeps the plain genesis.
+    // A chain-18 build (v0.6.6 / v0.6.7, constraint set 8) gets chain 18's genesis: the v0.6
+    // rules, bundle guest v3 with its auth guest, the encrypted memo (every envelope 1 860 B) and
+    // the gas section with the dynamic controller — `deploy/cut-chain18-genesis.sh`'s flags, so
+    // this is the shape the explorer meets after the cut. Chain 19 is the same build and the same
+    // flags (`deploy/cut-chain19-genesis.sh` asserts every field outside the bridge section equal
+    // to chain 18's); its bridge section is spliced in by that script, not by a flag, and is
+    // covered by the mock node. An older node keeps the plain genesis.
     if help.contains("--gas-price") && help.contains("--auth-guest") {
         args.extend(
             [
@@ -165,7 +168,10 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     let port = free_port();
     let url = format!("http://127.0.0.1:{port}");
     // 500 ms blocks: a bundle's anchor is valid for 256 blocks, so the wallet has about two
-    // minutes to prove under the test profile before an honest transfer would be refused.
+    // minutes to prove under the test profile before an honest transfer would be refused
+    // (`time N is outside […]`). On a machine busy enough to prove slower than that,
+    // `RAND_BLOCK_INTERVAL_MS` widens the window: 1000 gives four minutes.
+    let block_interval = std::env::var("RAND_BLOCK_INTERVAL_MS").unwrap_or_else(|_| "500".into());
     let child = Command::new(bin)
         .args([
             "run",
@@ -180,7 +186,7 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
             "--validator",
             "--no-mdns",
             "--block-interval-ms",
-            "500",
+            &block_interval,
             "--view-timeout-ms",
             "2000",
         ])

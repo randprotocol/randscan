@@ -16,7 +16,7 @@ uuid = { workspace = true }
 # indexer can recompute the ONE commitment a `token_mint` / a `register_token` initial mint does
 # not publish directly (unlike a `bridge_attest`'s deposit, whose `commitment` field the node
 # already serves) and link that leaf to its transaction. Pinned to the *exact* versions
-# `crates/randscan-viewing` uses (fullnode's vendored zkVM, checked at d40fb94 = v0.6.6, chain 18). The Poseidon2 round
+# `crates/randscan-viewing` uses (fullnode's vendored zkVM, checked at d40fb94 = v0.6.6, chain 18; unchanged at 86941a1 = v0.6.7, chains 18 and 19). The Poseidon2 round
 # constants are circuits' committed table (`src/poseidon2_constants.rs`, audit ZKV-2), no longer a
 # seeded `rand` `StdRng` draw, so `rand` is only a dev-dependency now: the table's own test re-runs
 # the old draw to prove the two equal. Deliberately not a dependency on `crates/randscan-viewing`

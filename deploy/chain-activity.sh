@@ -131,6 +131,10 @@ if [ -n "$built" ]; then
   fi
 fi
 
+# Since v0.5.10 `rand send` asks before it sends, and refuses a stdin that is not a terminal
+# unless told `--yes`; an older wallet does not know the flag.
+yes=; "$BIN/rand" send --help 2>&1 | grep -q -- '--yes' && yes=--yes
+
 n=$(cat "$STATE_DIR/n" 2>/dev/null || echo 0); n=$((n+1)); echo "$n" > "$STATE_DIR/n"
 # ROTATION can drop a step, e.g. "transfer deploy" while a node build refuses calls.
 read -r -a rotation <<<"${ROTATION:-transfer deploy call}"
@@ -150,7 +154,7 @@ case $step in
       if [ -n "$h" ] && explorer_tx "$h" mint >/dev/null; then log "step $n mint ok $h (wallet 1 had $bal RAND)"; else log "step $n mint FAIL ${h:-nohash}: $(tail -1 <<<"$out")"; fi
     fi
     to=$("$BIN/rand" --key "$W2" address | tail -1)
-    out=$($NICE "$BIN/rand" send "$to" 1.5 --key "$W1" --rpc "$RPC" 2>&1); h=$(submitted "$out" transfer)
+    out=$($NICE "$BIN/rand" send "$to" 1.5 $yes --key "$W1" --rpc "$RPC" 2>&1); h=$(submitted "$out" transfer)
     if [ -n "$h" ] && body=$(explorer_tx "$h" transfer); then
       log "step $n transfer ok $h block $(grep -o '"height":[0-9]*' <<<"$body" | head -1 | cut -d: -f2) ($(( $(date +%s) - t0 )) s)"
     else log "step $n transfer FAIL ${h:-nohash}: $(tail -1 <<<"$out")"; exit 1; fi ;;
