@@ -77,6 +77,9 @@ fn backing_rows(
                 locked: a.locked.clone(),
                 minted_today: a.minted_today.clone(),
                 mint_cap_per_day: a.mint_cap_per_day.clone(),
+                minted_in_window: a.minted_in_window.clone(),
+                mint_window_secs: a.mint_window_secs,
+                mint_headroom: a.mint_headroom.clone(),
             }
         })
         .collect()

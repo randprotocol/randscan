@@ -327,12 +327,16 @@ impl MockChain {
                 "pause_key": "dd".repeat(1312), "registration_fee": self.registration_fee,
                 "burn_sequence": 1,
                 "rotation_nonce": 0,
-                "rules_v2": { "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400 },
+                // Audit v6 (BRG-19, after v0.6.7): the window's count and headroom, on the
+                // group and on the first backing row; the other rows are an older node's.
+                "rules_v2": { "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400,
+                              "global_minted_in_window": "1000", "global_mint_headroom": "399999999000" },
                 "min_inbound_sequence": { "2": 1, "3": 1, "4": 1, "5": 4 },
                 "assets": [
                     { "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1"),
                       "decimals": 8, "locked": 600,
-                      "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 1_000, "mint_day": 0 },
+                      "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 1_000, "mint_day": 0,
+                      "minted_in_window": "1000", "mint_window_secs": 86_400, "mint_headroom": "999000" },
                     // Chain 14's shape: one bridged token, several backings. This second coin of
                     // token 1 was never deposited or redeemed.
                     { "index": 1, "chain": 3, "token": "ce".repeat(32), "asset_id": h("asset-1-bsc"),

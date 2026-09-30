@@ -9,7 +9,7 @@ import { DetailSkeleton } from '@/components/Loading';
 import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/components/States';
 import { isNotFound, useToken } from '@/hooks/useApi';
-import { formatBridgeChain, formatNumber, formatUnits } from '@/lib/utils';
+import { formatBridgeChain, formatMintWindow, formatNumber, formatUnits } from '@/lib/utils';
 import type { TokenSupplyEvent } from '@/types';
 
 function EventKindBadge({ kind }: { kind: TokenSupplyEvent['kind'] }) {
@@ -180,7 +180,13 @@ export default function TokenDetailPage() {
               <DetailRow label="Locked">
                 <span className="font-mono text-strong">{formatUnits(b.locked, token.decimals)} {token.symbol}</span>
               </DetailRow>
-              <DetailRow label="Minted today / cap">
+              <DetailRow
+                label={
+                  typeof b.mint_window_secs === 'number'
+                    ? `Minted in ${formatMintWindow(b.mint_window_secs)} / cap`
+                    : 'Minted today / cap'
+                }
+              >
                 <span className="font-mono">
                   {b.minted_today === null ? '—' : formatUnits(b.minted_today, token.decimals)}
                   {b.mint_cap_per_day !== null && (
@@ -189,6 +195,16 @@ export default function TokenDetailPage() {
                   {token.symbol}
                 </span>
               </DetailRow>
+              {b.mint_headroom != null && (
+                <DetailRow label="Room to mint">
+                  <span
+                    className="font-mono"
+                    title="The largest deposit the caps admit to this coin right now: its own cap less what it minted, and no more than every token together has left in the window."
+                  >
+                    {formatUnits(b.mint_headroom, token.decimals)} {token.symbol}
+                  </span>
+                </DetailRow>
+              )}
             </div>
           ))}
         </Panel>

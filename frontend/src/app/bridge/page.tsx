@@ -20,6 +20,7 @@ import {
   formatBridgeChain,
   bridgeTokenTotals,
   formatBridgeUnits,
+  formatMintWindow,
   formatNumber,
 } from "@/lib/utils";
 import type {
@@ -167,16 +168,38 @@ const activityColumns: Column<BridgeAssetActivity>[] = [
   },
   {
     key: "minted_today",
-    header: "Minted today / cap",
+    header: "Minted / cap",
     render: (a) =>
       a.minted_today === null && a.mint_cap_per_day === null ? (
         <span className="text-mute">—</span>
       ) : (
-        <span className="font-mono">
-          {formatBridgeUnits(a.minted_today, a.symbol)}
-          {a.mint_cap_per_day !== null && (
-            <span className="text-mute"> / {formatBridgeUnits(a.mint_cap_per_day, a.symbol)}</span>
-          )}
+        <span className="flex flex-col">
+          <span className="font-mono">
+            {formatBridgeUnits(a.minted_today, a.symbol)}
+            {a.mint_cap_per_day !== null && (
+              <span className="text-mute"> / {formatBridgeUnits(a.mint_cap_per_day, a.symbol)}</span>
+            )}
+          </span>
+          <span className="text-xs text-mute">
+            {typeof a.mint_window_secs === "number"
+              ? `in the last ${formatMintWindow(a.mint_window_secs)}`
+              : "today"}
+          </span>
+        </span>
+      ),
+  },
+  {
+    key: "headroom",
+    header: "Room to mint",
+    render: (a) =>
+      a.mint_headroom == null ? (
+        <span className="text-mute" title="Served by nodes after v0.6.7.">—</span>
+      ) : (
+        <span
+          className="font-mono"
+          title="The largest deposit the caps admit to this coin right now: its own cap less what it minted, and no more than every token together has left in the window."
+        >
+          {formatBridgeUnits(a.mint_headroom, a.symbol)}
         </span>
       ),
   },
@@ -403,17 +426,6 @@ const registryColumns: Column<BridgeAssetActivity | BridgeAsset>[] = [
   },
 ];
 
-/** A cap window in the largest unit that divides it: "24 hours", "90 minutes", "45 seconds". */
-function formatWindow(secs: number): string {
-  for (const [unit, size] of [["hour", 3600], ["minute", 60]] as const) {
-    if (secs >= size && secs % size === 0) {
-      const n = secs / size;
-      return `${formatNumber(n)} ${unit}${n === 1 ? "" : "s"}`;
-    }
-  }
-  return `${formatNumber(secs)} second${secs === 1 ? "" : "s"}`;
-}
-
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -627,9 +639,23 @@ export default function BridgePage() {
                   {formatBridgeUnits(bridge.rules_v2.global_mint_cap_per_window)}
                 </span>{" "}
                 <span className="text-soft">
-                  per {formatWindow(bridge.rules_v2.cap_window_secs)}, over every backing of
+                  per {formatMintWindow(bridge.rules_v2.cap_window_secs)}, over every backing of
                   every token together
                 </span>
+                {bridge.rules_v2.global_minted_in_window != null &&
+                  bridge.rules_v2.global_mint_headroom != null && (
+                    <div className="text-xs text-mute">
+                      minted in this window{" "}
+                      <span className="font-mono">
+                        {formatBridgeUnits(bridge.rules_v2.global_minted_in_window)}
+                      </span>
+                      , room for{" "}
+                      <span className="font-mono">
+                        {formatBridgeUnits(bridge.rules_v2.global_mint_headroom)}
+                      </span>{" "}
+                      more
+                    </div>
+                  )}
               </DetailRow>
             )}
             <DetailRow label={`Trusted emitters (${emitters.length})`}>

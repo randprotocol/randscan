@@ -275,6 +275,13 @@ window (bridge units, a decimal string; `rules_v2` is `null` on a chain without 
 may carry to be minted here (`null` on a chain without one). A chain cut from a predecessor sets
 it past every lock the predecessor already minted.
 
+On a node after v0.6.7 (audit v6, BRG-19) every backing row here, in `GET /bridge/assets` and in
+a token's `backings` also carries `minted_in_window` and `mint_window_secs` (the rolling-window
+count and the window under bridge rules v2; `null` on a day-counter chain) and `mint_headroom`,
+the largest deposit the caps admit to that backing right now — read that, not
+`mint_cap_per_day − minted_today`, which ignores the registry-wide cap; and `rules_v2` gains
+`global_minted_in_window` and `global_mint_headroom`. All `null` (or absent) on an older node.
+
 `endpoints` is the explorer's own, not the node's: one row per entry of `emitters`, in chain id
 order, with the emitter as its chain prints it — `0x` + 20 bytes (lowercase) for Ethereum and BSC,
 base58check for Tron, base58 for Solana — the page of that contract or program on the chain's

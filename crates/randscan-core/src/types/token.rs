@@ -30,6 +30,19 @@ pub struct TokenBacking {
     pub mint_day: Option<i64>,
     #[serde(default, deserialize_with = "amount::amount_opt")]
     pub mint_cap_per_day: Option<String>,
+    /// Audit v6 (BRG-19, fullnode after v0.6.7): under bridge rules v2 what this backing minted
+    /// in the rolling window (`None` on a day-counter chain, and on an older node) …
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub minted_in_window: Option<String>,
+    /// … the window's length in seconds (`None` likewise) …
+    #[serde(default)]
+    pub mint_window_secs: Option<i64>,
+    /// … and the largest deposit to this backing the caps admit right now — the per-backing cap
+    /// less what it minted, and no more than the registry-wide window has left. The figure to
+    /// read, not `mint_cap_per_day - minted_today`, which ignores the global cap. `None` on a
+    /// node predating it.
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub mint_headroom: Option<String>,
 }
 
 /// A token's mint authority in full (`rand_getTokens`/`rand_getToken`'s `authority`) — contrast
@@ -166,6 +179,9 @@ mod tests {
                     minted_today: Some("100".into()),
                     mint_day: Some(20345),
                     mint_cap_per_day: Some("10000000000".into()),
+                    minted_in_window: None,
+                    mint_window_secs: None,
+                    mint_headroom: None,
                 }],
             },
             mint_nonce: 1,
@@ -221,6 +237,30 @@ mod tests {
         assert_eq!(backing.locked, "600");
         assert_eq!(backing.minted_today.as_deref(), Some("1000"));
         assert_eq!(backing.mint_cap_per_day.as_deref(), Some("10000000000000"));
+        assert_eq!((backing.minted_in_window, backing.mint_window_secs, backing.mint_headroom), (None, None, None));
+    }
+
+    /// A backing row from a node after v0.6.7 (audit v6, BRG-19), the literals of the node's own
+    /// test: the rolling-window count and length under rules v2, and the headroom; on a
+    /// day-counter chain the first two are `null` and the headroom is the cap less the day's.
+    #[test]
+    fn a_backing_row_carries_the_mint_window_and_headroom_when_the_node_serves_them() {
+        let v = serde_json::json!({
+            "chain": 2, "token": "aa".repeat(32), "decimals": 6, "locked": "600",
+            "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": "1000", "mint_day": 0,
+            "minted_in_window": "1000", "mint_window_secs": 86_400, "mint_headroom": "999000",
+        });
+        let backing: TokenBacking = serde_json::from_value(v).unwrap();
+        assert_eq!(backing.minted_in_window.as_deref(), Some("1000"));
+        assert_eq!(backing.mint_window_secs, Some(86_400));
+        assert_eq!(backing.mint_headroom.as_deref(), Some("999000"));
+        let day_counter: TokenBacking = serde_json::from_value(serde_json::json!({
+            "chain": 2, "token": "aa".repeat(32), "decimals": 6, "locked": "600",
+            "minted_in_window": null, "mint_window_secs": null, "mint_headroom": (100_000u64 * 100_000_000 - 1_000).to_string(),
+        }))
+        .unwrap();
+        assert_eq!((day_counter.minted_in_window, day_counter.mint_window_secs), (None, None));
+        assert_eq!(day_counter.mint_headroom.as_deref(), Some("9999999999000"));
     }
 
     /// `rand_getTokens`' `total_supply` and `registration_fee` in the node's own pinned shape:

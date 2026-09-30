@@ -474,7 +474,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // redeployed Ethereum/BSC/Tron endpoints and the unchanged Solana program, in chain order,
     // each with its floor.
     assert_eq!(bridge["rotation_nonce"], 0);
-    assert_eq!(bridge["rules_v2"], json!({ "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400 }));
+    assert_eq!(bridge["rules_v2"], json!({ "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400,
+                                           "global_minted_in_window": "1000", "global_mint_headroom": "399999999000" }));
+    assert_eq!(bridge["assets"][0]["mint_headroom"], "999000");
+    assert_eq!(bridge["assets"][1]["mint_headroom"], Value::Null, "an older row has no headroom");
     assert_eq!(bridge["min_inbound_sequence"], json!({ "2": 1, "3": 1, "4": 1, "5": 4 }));
     assert_eq!(bridge["emitters"]["4"], "0000000000000000000000006410797df959987a5baf65b5fab97edeb34d5163");
     assert_eq!(
@@ -529,6 +532,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     // What a backing holds is the registry's `locked`, not a figure rebuilt from token-wide sums.
     assert_eq!(assets[0]["outstanding"], "600");
     assert_eq!(assets[1]["outstanding"], "0");
+    // Audit v6: the window's count and the headroom ride along per backing where the node
+    // serves them, and are null where it does not.
+    assert_eq!((&assets[0]["minted_in_window"], &assets[0]["mint_window_secs"], &assets[0]["mint_headroom"]), (&json!("1000"), &json!(86_400), &json!("999000")));
+    assert_eq!((&assets[1]["minted_in_window"], &assets[1]["mint_headroom"]), (&Value::Null, &Value::Null));
     // A deposit publishes the token it minted, not the coin that was locked for it, so with
     // several backings it cannot be laid at one of them: per backing it is null, and the whole
     // token's figure is served under its own name, the same on each of the token's rows.

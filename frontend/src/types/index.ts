@@ -346,6 +346,13 @@ export interface BridgeAsset {
   locked: string | null;
   minted_today: string | null;
   mint_day: number | null;
+  /** Audit v6 (a node after v0.6.7): under bridge rules v2, what this backing minted in the
+   * rolling window and the window's length (`null` on a day-counter chain), and `mint_headroom`,
+   * the largest deposit the caps admit to it right now — the per-backing cap less what it
+   * minted, and no more than the registry-wide window has left. Absent on an older API. */
+  minted_in_window?: string | null;
+  mint_window_secs?: number | null;
+  mint_headroom?: string | null;
 }
 
 /**
@@ -396,7 +403,13 @@ export interface BridgeState {
   /** Bridge rules v2: what the next PQ-set or pause-key rotation must carry. */
   rotation_nonce?: number | null;
   /** Bridge rules v2: the cap on what every backing of every token together may mint per window. */
-  rules_v2?: { global_mint_cap_per_window: string; cap_window_secs: number } | null;
+  rules_v2?: {
+    global_mint_cap_per_window: string;
+    cap_window_secs: number;
+    /** Audit v6: what every backing together minted in the window, and what it has left. */
+    global_minted_in_window?: string | null;
+    global_mint_headroom?: string | null;
+  } | null;
   /** The genesis replay floor: source chain id -> the lowest sequence a lock may carry. */
   min_inbound_sequence?: Record<string, number> | null;
   assets: BridgeAsset[];
@@ -456,6 +469,13 @@ export interface TokenBacking {
   minted_today: string | null;
   mint_day: number | null;
   mint_cap_per_day: string | null;
+  /** Audit v6 (a node after v0.6.7): under bridge rules v2, what this backing minted in the
+   * rolling window and the window's length (`null` on a day-counter chain), and `mint_headroom`,
+   * the largest deposit the caps admit to it right now — the per-backing cap less what it
+   * minted, and no more than the registry-wide window has left. Absent on an older API. */
+  minted_in_window?: string | null;
+  mint_window_secs?: number | null;
+  mint_headroom?: string | null;
 }
 
 /** A token's mint authority in full (contrast `AuthorityKind`, the bare tag on an action). */

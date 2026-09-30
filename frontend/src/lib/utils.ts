@@ -465,6 +465,20 @@ export function formatBridgeUnits(
   return `${formatUnits(units, BRIDGED_DECIMALS)} ${symbol ?? 'units'}`;
 }
 
+/** A mint-cap window in the largest unit that divides it: "24 hours", "90 minutes", "45 seconds". */
+export function formatMintWindow(secs: number): string {
+  for (const [unit, size] of [
+    ['hour', 3600],
+    ['minute', 60],
+  ] as const) {
+    if (secs >= size && secs % size === 0) {
+      const n = secs / size;
+      return `${formatNumber(n)} ${unit}${n === 1 ? '' : 's'}`;
+    }
+  }
+  return `${formatNumber(secs)} second${secs === 1 ? '' : 's'}`;
+}
+
 /** "Ethereum (2)" for a known bridge chain id, "chain 9" otherwise. */
 export function formatBridgeChain(id: number | null | undefined): string {
   if (id === null || id === undefined) return '—';

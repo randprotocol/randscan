@@ -30,6 +30,19 @@ pub struct BridgeAsset {
     /// The daily mint cap for this backing (bridge hardening B1).
     #[serde(default, deserialize_with = "amount::amount_opt")]
     pub mint_cap_per_day: Option<String>,
+    /// Audit v6 (BRG-19, fullnode after v0.6.7): under bridge rules v2 what this backing minted
+    /// in the rolling window (`None` on a day-counter chain, and on an older node) …
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub minted_in_window: Option<String>,
+    /// … the window's length in seconds (`None` likewise) …
+    #[serde(default)]
+    pub mint_window_secs: Option<i64>,
+    /// … and the largest deposit to this backing the caps admit right now — the per-backing cap
+    /// less what it minted, and no more than the registry-wide window has left. The figure to
+    /// read, not `mint_cap_per_day - minted_today`, which ignores the global cap. `None` on a
+    /// node predating it.
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub mint_headroom: Option<String>,
 }
 
 /// The bridge's public state (`rand_getBridgeState`). Bridged value is notes, so there are no
@@ -110,6 +123,12 @@ pub struct BridgeRulesV2 {
     #[serde(deserialize_with = "amount::amount")]
     pub global_mint_cap_per_window: String,
     pub cap_window_secs: i64,
+    /// Audit v6 (BRG-19): what every backing together minted in the current window, and what
+    /// the window has left; `None` on a node predating them.
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub global_minted_in_window: Option<String>,
+    #[serde(default, deserialize_with = "amount::amount_opt")]
+    pub global_mint_headroom: Option<String>,
 }
 
 /// One source-chain endpoint the chain mints from: a row of `emitters`, readable. The node and
@@ -250,6 +269,11 @@ pub struct BridgeAssetActivity {
     pub locked: Option<String>,
     pub minted_today: Option<String>,
     pub mint_cap_per_day: Option<String>,
+    /// Audit v6: the rolling-window count, its length, and the largest deposit the caps admit
+    /// to this backing now (see `BridgeAsset`); `None` on a node predating them.
+    pub minted_in_window: Option<String>,
+    pub mint_window_secs: Option<i64>,
+    pub mint_headroom: Option<String>,
 }
 
 #[cfg(test)]
@@ -360,6 +384,29 @@ mod tests {
         let numeric: BridgeRulesV2 =
             serde_json::from_value(serde_json::json!({ "global_mint_cap_per_window": 50_000_000_000_000u64, "cap_window_secs": 3600 })).unwrap();
         assert_eq!(numeric.global_mint_cap_per_window, "50000000000000");
+        assert_eq!((numeric.global_minted_in_window, numeric.global_mint_headroom), (None, None));
+    }
+
+    /// The same reply from a node after v0.6.7 (audit v6, BRG-19): rules v2 says what the whole
+    /// registry minted in the window and what is left, and every asset row carries its rolling
+    /// count and headroom — the node's own test's literals.
+    #[test]
+    fn a_post_v067_node_adds_the_windows_and_headroom() {
+        let state: BridgeState = serde_json::from_value(serde_json::json!({
+            "enabled": true,
+            "rules_v2": { "global_mint_cap_per_window": "1000000", "cap_window_secs": 86400,
+                          "global_minted_in_window": "1000", "global_mint_headroom": "999000" },
+            "assets": [{
+                "index": 1, "chain": 2, "token": "aa".repeat(32), "asset_id": "bb".repeat(32),
+                "decimals": 8, "locked": 600, "mint_cap_per_day": 100_000u64 * 100_000_000, "minted_today": 1_000, "mint_day": 0,
+                "minted_in_window": "1000", "mint_window_secs": 86_400, "mint_headroom": "999000",
+            }],
+        }))
+        .unwrap();
+        let rules = state.rules_v2.unwrap();
+        assert_eq!((rules.global_minted_in_window.as_deref(), rules.global_mint_headroom.as_deref()), (Some("1000"), Some("999000")));
+        let a = &state.assets[0];
+        assert_eq!((a.minted_in_window.as_deref(), a.mint_window_secs, a.mint_headroom.as_deref()), (Some("1000"), Some(86_400), Some("999000")));
     }
 
     /// Every address is the bridge repository's own record of the deployment
