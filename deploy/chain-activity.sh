@@ -120,9 +120,12 @@ echo "$identity" > "$STATE_DIR/chain"
 # CPU (the fleet builds for baseline x86-64; the prover's AVX2 field code only compiles in with
 # RUSTFLAGS="-C target-cpu=x86-64-v3", and on node E that is 185 s a bundle proof instead of 309 s
 # — the difference between landing inside the 256-block time window at ~1.15 s blocks and
-# missing it). Such a copy does not follow the fleet's updates, so it records the commit it was
-# built from in BIN/.git-rev, and a node on another build gets a loud line here rather than
-# proofs of a wire format the chain no longer takes.
+# missing it; on v0.6.7, where a transfer is a bundle proof and an auth proof, 193 blocks
+# against more than 300). Such a copy does not follow the fleet's updates, so it records the
+# build it was made from in BIN/.git-rev — the `git_sha` exactly as `rand_getVersion` reports
+# it, short on a release binary — and a node on another build gets a loud line here rather than
+# proofs of a wire format the chain no longer takes. That line was logged every five minutes
+# from chain 16 to chain 18 while every proved step failed: after a fleet update, read this log.
 built=$(cat "$BIN/.git-rev" 2>/dev/null || true)
 if [ -n "$built" ]; then
   node_sha=$(rpc rand_getVersion '[]' | grep -o '"git_sha":"[0-9a-f]*' | cut -d'"' -f4)
