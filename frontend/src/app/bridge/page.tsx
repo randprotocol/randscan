@@ -22,7 +22,53 @@ import {
   formatBridgeUnits,
   formatNumber,
 } from "@/lib/utils";
-import type { ApprovedToken, BridgeAsset, BridgeAssetActivity } from "@/types";
+import type {
+  ApprovedToken,
+  BridgeAsset,
+  BridgeAssetActivity,
+  BridgeEndpoint,
+} from "@/types";
+
+// ---------------------------------------------------------------------------
+// A source chain's bridge contract
+// ---------------------------------------------------------------------------
+
+const FLOOR_TITLE =
+  "The replay floor set at genesis. A lock with a lower sequence was already minted on the chain this one was cut from, or is the operator's own on a redeployed contract, and is never minted here.";
+
+/**
+ * The contract (or program) a source chain's locks must come from, as that chain's own explorer
+ * prints it. Falls back to the node's 32-byte word when the API did not derive an address.
+ */
+function EndpointAddress({
+  endpoint,
+  emitter,
+  className,
+}: {
+  endpoint: BridgeEndpoint | undefined;
+  emitter: string;
+  className?: string;
+}) {
+  if (!endpoint?.address) return <Hash value={emitter} full className={className} />;
+  return (
+    <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
+      {endpoint.explorer_url ? (
+        <a
+          href={endpoint.explorer_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="break-all font-mono text-text hover:text-strong hover:underline"
+          title={`Open on the ${endpoint.chain_name ?? "chain"} explorer`}
+        >
+          {endpoint.address}
+        </a>
+      ) : (
+        <span className="break-all font-mono text-soft">{endpoint.address}</span>
+      )}
+      <CopyButton value={endpoint.address} />
+    </span>
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Bridged tokens, one table per source chain
@@ -75,6 +121,9 @@ function FlowCell({
     </span>
   );
 }
+
+/** A registry index is a token; its backings share it, so a row's key is the backing. */
+const backingKey = (a: BridgeAsset) => `${a.index}-${a.chain}-${a.token}`;
 
 const activityColumns: Column<BridgeAssetActivity>[] = [
   { key: "token", header: "Token", render: (a) => <TokenCell asset={a} /> },
@@ -152,11 +201,13 @@ function SourceChainPanel({
   chain,
   name,
   emitter,
+  endpoint,
   assets,
 }: {
   chain: number;
   name: string;
   emitter: string | undefined;
+  endpoint: BridgeEndpoint | undefined;
   assets: BridgeAssetActivity[];
 }) {
   // Burns name their coin, so they add up per source chain. Deposits do only when every row here
@@ -173,10 +224,15 @@ function SourceChainPanel({
           {emitter ? (
             <>
               bridge contract{" "}
-              <Hash value={emitter} start={8} end={6} className="text-xs" />
+              <EndpointAddress endpoint={endpoint} emitter={emitter} className="text-xs" />
             </>
           ) : (
             "no bridge contract registered for this chain"
+          )}
+          {typeof endpoint?.min_inbound_sequence === "number" && (
+            <span title={FLOOR_TITLE}>
+              {" · "}locks from sequence {formatNumber(endpoint.min_inbound_sequence)}
+            </span>
           )}
           {assets.length > 0 && (
             <>
@@ -190,7 +246,7 @@ function SourceChainPanel({
       <DataTable
         columns={activityColumns}
         data={assets}
-        keyExtractor={(a) => String(a.index)}
+        keyExtractor={backingKey}
         emptyMessage={`Nothing has been bridged from ${name} yet · chain id ${chain}`}
       />
     </section>
@@ -347,6 +403,17 @@ const registryColumns: Column<BridgeAssetActivity | BridgeAsset>[] = [
   },
 ];
 
+/** A cap window in the largest unit that divides it: "24 hours", "90 minutes", "45 seconds". */
+function formatWindow(secs: number): string {
+  for (const [unit, size] of [["hour", 3600], ["minute", 60]] as const) {
+    if (secs >= size && secs % size === 0) {
+      const n = secs / size;
+      return `${formatNumber(n)} ${unit}${n === 1 ? "" : "s"}`;
+    }
+  }
+  return `${formatNumber(secs)} second${secs === 1 ? "" : "s"}`;
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -373,7 +440,11 @@ export default function BridgePage() {
     );
   }
 
-  const emitters = Object.entries(bridge.emitters);
+  const emitters = Object.entries(bridge.emitters).sort(
+    ([a], [b]) => Number(a) - Number(b),
+  );
+  const endpointOf = (chain: number | string) =>
+    bridge.endpoints?.find((e) => e.chain === Number(chain));
   const assets = activity ?? [];
   const byChain = new Map<number, BridgeAssetActivity[]>();
   for (const a of assets) {
@@ -442,6 +513,7 @@ export default function BridgePage() {
             chain={c.id}
             name={c.name}
             emitter={bridge.emitters[String(c.id)]}
+            endpoint={endpointOf(c.id)}
             assets={byChain.get(c.id) ?? []}
           />
         ))}
@@ -451,6 +523,7 @@ export default function BridgePage() {
             chain={id}
             name={bridgeChainName(id)}
             emitter={bridge.emitters[String(id)]}
+            endpoint={endpointOf(id)}
             assets={byChain.get(id) ?? []}
           />
         ))}
@@ -543,22 +616,56 @@ export default function BridgePage() {
                   : formatNumber(bridge.next_index)}
               </span>
             </DetailRow>
+            {bridge.rotation_nonce != null && (
+              <DetailRow label="Rotation nonce">
+                <span className="font-mono">{formatNumber(bridge.rotation_nonce)}</span>
+              </DetailRow>
+            )}
+            {bridge.rules_v2 && (
+              <DetailRow label="Mint cap, all tokens">
+                <span className="font-mono">
+                  {formatBridgeUnits(bridge.rules_v2.global_mint_cap_per_window)}
+                </span>{" "}
+                <span className="text-soft">
+                  per {formatWindow(bridge.rules_v2.cap_window_secs)}, over every backing of
+                  every token together
+                </span>
+              </DetailRow>
+            )}
             <DetailRow label={`Trusted emitters (${emitters.length})`}>
               {emitters.length === 0 ? (
                 <span className="text-mute">—</span>
               ) : (
-                <ul className="space-y-1.5">
-                  {emitters.map(([chain, address]) => (
-                    <li
-                      key={chain}
-                      className="flex flex-wrap items-center gap-2"
-                    >
-                      <span className="text-soft">
-                        {formatBridgeChain(Number(chain))}
-                      </span>
-                      <Hash value={address} full />
-                    </li>
-                  ))}
+                <ul className="space-y-3">
+                  {emitters.map(([chain, word]) => {
+                    const endpoint = endpointOf(chain);
+                    const floor = endpoint?.min_inbound_sequence;
+                    return (
+                      <li key={chain} className="space-y-0.5">
+                        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <span className="text-soft">
+                            {formatBridgeChain(Number(chain))}
+                          </span>
+                          <EndpointAddress endpoint={endpoint} emitter={word} />
+                        </div>
+                        {(endpoint?.address || typeof floor === "number") && (
+                          <div className="flex flex-wrap items-center gap-x-4 text-xs text-mute">
+                            {endpoint?.address && (
+                              <span className="inline-flex items-center gap-x-2">
+                                as the chain stores it
+                                <Hash value={word} start={26} end={8} className="text-xs" />
+                              </span>
+                            )}
+                            {typeof floor === "number" && (
+                              <span title={FLOOR_TITLE}>
+                                locks minted from sequence {formatNumber(floor)}
+                              </span>
+                            )}
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </DetailRow>
@@ -569,7 +676,7 @@ export default function BridgePage() {
             <DataTable
               columns={registryColumns}
               data={activity ?? bridge.assets}
-              keyExtractor={(a) => String(a.index)}
+              keyExtractor={backingKey}
               emptyMessage="No bridged asset registered yet"
             />
             <p className="text-xs text-mute">

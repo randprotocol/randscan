@@ -349,6 +349,25 @@ export interface BridgeAsset {
 }
 
 /**
+ * One source-chain endpoint the chain mints from: a row of `emitters` as its own chain prints
+ * it. Derived by the explorer, not sent by the node. Since the 2026-09-30 endpoint redeploy
+ * (chain 19) there are two generations of bridge contracts, and the 32-byte word alone cannot
+ * be compared with what Etherscan or Tronscan shows.
+ */
+export interface BridgeEndpoint {
+  /** bridge chain id (2 Ethereum, 3 BSC, 4 Tron, 5 Solana) */
+  chain: number;
+  chain_name: string | null;
+  /** the emitter as the node serves it: 32 bytes, hex */
+  emitter: string;
+  /** `0x…`, Tron base58check or Solana base58; `null` when the word is not such an address */
+  address: string | null;
+  explorer_url: string | null;
+  /** The lowest sequence a lock from this endpoint may carry to be minted (the replay floor). */
+  min_inbound_sequence: number | null;
+}
+
+/**
  * `mint_paused`/`pause_nonce`/`list_nonce`/`pause_key`/`pq_guardians`/`registration_fee` are
  * bridge hardening B1/B3/B4 — defaulted/empty on a node predating them.
  */
@@ -374,7 +393,15 @@ export interface BridgeState {
   registration_fee: number | null;
   burn_sequence: number | null;
   next_index: number | null;
+  /** Bridge rules v2: what the next PQ-set or pause-key rotation must carry. */
+  rotation_nonce?: number | null;
+  /** Bridge rules v2: the cap on what every backing of every token together may mint per window. */
+  rules_v2?: { global_mint_cap_per_window: string; cap_window_secs: number } | null;
+  /** The genesis replay floor: source chain id -> the lowest sequence a lock may carry. */
+  min_inbound_sequence?: Record<string, number> | null;
   assets: BridgeAsset[];
+  /** `emitters`, readable; absent from an API older than chain 19's. */
+  endpoints?: BridgeEndpoint[];
 }
 
 /**

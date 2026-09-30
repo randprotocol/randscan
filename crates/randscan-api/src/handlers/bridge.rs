@@ -3,29 +3,14 @@ use axum::{extract::State, Json};
 use randscan_core::{approved_token, ApprovedToken, BridgeAsset, BridgeAssetActivity, BridgeState, Supply, APPROVED_TOKENS};
 use randscan_db::{BridgeAssetFlowRow, BridgeBackingBurnRow};
 
-/// GET /api/v1/bridge — the bridge's public state as last read from the node.
+/// GET /api/v1/bridge — the bridge's public state as last read from the node, plus `endpoints`:
+/// each trusted emitter as its own chain prints it, with its replay floor.
 pub async fn get_bridge(State(state): State<AppState>) -> ApiResult<Json<BridgeState>> {
-    match state.indexer.bridge().await {
-        Some(b) => Ok(Json(b)),
-        // Not refreshed yet (the indexer has not reached the node): report a disabled bridge
-        // rather than an error, which is also what a chain without one reports.
-        None => Ok(Json(BridgeState {
-            enabled: false,
-            emitter: None,
-            emitters: Default::default(),
-            guardian_set_index: None,
-            guardians: vec![],
-            pq_guardians: vec![],
-            mint_paused: false,
-            pause_nonce: None,
-            list_nonce: None,
-            pause_key: None,
-            registration_fee: None,
-            burn_sequence: None,
-            next_index: None,
-            assets: vec![],
-        })),
-    }
+    // Not refreshed yet (the indexer has not reached the node): report a disabled bridge rather
+    // than an error, which is also what a chain without one reports.
+    let mut bridge = state.indexer.bridge().await.unwrap_or_default();
+    bridge.endpoints = bridge.derive_endpoints();
+    Ok(Json(bridge))
 }
 
 /// GET /api/v1/bridge/assets — every backing of every bridged token with what the chain has seen

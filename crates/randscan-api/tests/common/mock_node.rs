@@ -309,13 +309,26 @@ impl MockChain {
             // the token RPC's `backing_json` for the same conceptual fields — see
             // `push_token`'s zUSD fixture in the test itself). `next_index` is gone from
             // `rand_getBridgeState` since the bridge's own registry no longer predicts an index.
+            // The emitters, the replay floor and rules v2 are chain 19's genesis as a v0.6.7
+            // node serves it: the Ethereum, BSC and Tron endpoints redeployed on 2026-09-30,
+            // Solana's unchanged, each redeployed endpoint's floor past the operator's
+            // sequence-0 lock and Solana's past every lock chain 18 minted.
             "rand_getBridgeState" => json!({
-                "enabled": true, "emitter": "01".repeat(32), "emitters": { "2": "02".repeat(32) },
+                "enabled": true, "emitter": "01".repeat(32),
+                "emitters": {
+                    "2": "0000000000000000000000007af6b17047c1db6cb54347fdea45cf9179075bfa",
+                    "3": "0000000000000000000000007af6b17047c1db6cb54347fdea45cf9179075bfa",
+                    "4": "0000000000000000000000006410797df959987a5baf65b5fab97edeb34d5163",
+                    "5": "d3e58f1e9317bbc3c69b63fadff558ea82ba5d00765f1f1e483d705d209b413a",
+                },
                 "guardian_set_index": 0, "guardians": ["aa".repeat(20)],
                 "pq_guardians": self.pq_guardians, "mint_paused": self.mint_paused,
                 "pause_nonce": self.pause_nonce, "list_nonce": self.list_nonce,
                 "pause_key": "dd".repeat(1312), "registration_fee": self.registration_fee,
                 "burn_sequence": 1,
+                "rotation_nonce": 0,
+                "rules_v2": { "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400 },
+                "min_inbound_sequence": { "2": 1, "3": 1, "4": 1, "5": 4 },
                 "assets": [
                     { "index": 1, "chain": 2, "token": "cc".repeat(32), "asset_id": h("asset-1"),
                       "decimals": 8, "locked": 600,

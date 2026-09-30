@@ -27,7 +27,9 @@ p3-field = "=0.7.0"
 p3-symmetric = "=0.7.0"
 bs58 = "0.5"
 hex = "0.4"
+# A Tron address is base58check: the bridge page prints each trusted emitter the way its own
+# chain's explorer does (`types/bridge.rs`, `emitter_address`).
+sha2 = { workspace = true }
 
 [dev-dependencies]
 rand = { version = "=0.10.2", features = ["std_rng"] }
-sha2 = { workspace = true }

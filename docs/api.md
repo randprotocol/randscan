@@ -242,9 +242,19 @@ not unlocked yet; `"0"` on a chain without a `vesting` section and `null` on an 
   "pq_guardians": ["…", "…"],
   "mint_paused": false, "pause_nonce": 0, "list_nonce": 0, "pause_key": "dd…",
   "registration_fee": 1000000000,
-  "burn_sequence": 1, "next_index": 2,
+  "burn_sequence": 1, "next_index": null,
+  "rotation_nonce": 0,
+  "rules_v2": { "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400 },
+  "min_inbound_sequence": { "2": 1, "3": 1, "4": 1, "5": 4 },
   "assets": [{ "index": 1, "chain": 2, "token": "aaaa…", "asset_id": "…",
-               "decimals": 6, "locked": "600", "minted_today": "0", "mint_day": 20345 }]
+               "decimals": 6, "locked": "600", "minted_today": "0", "mint_day": 20345 }],
+  "endpoints": [{
+    "chain": 4, "chain_name": "Tron",
+    "emitter": "0000000000000000000000006410797df959987a5baf65b5fab97edeb34d5163",
+    "address": "TK6JJv55CCkFjNHq7WwoU91GKaZEiC93me",
+    "explorer_url": "https://tronscan.org/#/contract/TK6JJv55CCkFjNHq7WwoU91GKaZEiC93me",
+    "min_inbound_sequence": 1
+  }]
 }
 ```
 
@@ -255,7 +265,25 @@ balances: bridged value is notes. A chain without a bridge reports `{ "enabled":
 `null`/empty on a node predating them. `mint_paused: true` means every transfer attest is refused
 (burns and guardian-set rotations stay open); lifting the pause needs the PQ guardian quorum, the
 pause key alone can never unpause. `registration_fee` and `next_index` are the two fields served
-as plain numbers here, not decimal strings.
+as plain numbers here, not decimal strings (`next_index` is `null` since chain 14: a bridged token
+is listed before it can be deposited, so there is no index left to predict).
+
+`rotation_nonce` and `rules_v2` are bridge rules v2: the nonce the next PQ-set or pause-key
+rotation must carry, and the cap on what every backing of every token together may mint per
+window (bridge units, a decimal string; `rules_v2` is `null` on a chain without the group).
+`min_inbound_sequence` is the genesis replay floor: per source chain, the lowest sequence a lock
+may carry to be minted here (`null` on a chain without one). A chain cut from a predecessor sets
+it past every lock the predecessor already minted.
+
+`endpoints` is the explorer's own, not the node's: one row per entry of `emitters`, in chain id
+order, with the emitter as its chain prints it — `0x` + 20 bytes (lowercase) for Ethereum and BSC,
+base58check for Tron, base58 for Solana — the page of that contract or program on the chain's
+explorer, and the chain's replay floor. `address` and `explorer_url` are `null` when the 32-byte
+word is not a well-formed address of that chain, `chain_name` when the chain id has no name here.
+**Chain 19 (2026-10)** is chain 18 re-cut on the same build for the Ethereum, BSC and Tron bridge
+contracts redeployed on 2026-09-30; the values above are its genesis. The contracts chains 14–18
+trusted (`0xd6ebd21c…4892` on Ethereum and BSC, `TAqq2i8K…PpkU` on Tron) are not trusted by chain
+19, and a lock made there is never minted on it.
 
 `GET /bridge/assets` joins that registry with the indexed `bridge_attest` and `bridge_burn`
 transactions, **one row per backing** (source coin) in registry order (an empty array on a chain

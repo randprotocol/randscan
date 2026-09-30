@@ -469,6 +469,39 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(bridge["list_nonce"], 0);
     assert_eq!(bridge["registration_fee"], 1_000_000_000u64);
     assert!(bridge["pause_key"].as_str().is_some());
+    // Chain 19: bridge rules v2 and the genesis replay floor come through as the node sent
+    // them, and each trusted emitter is also served the way its own chain prints it — the
+    // redeployed Ethereum/BSC/Tron endpoints and the unchanged Solana program, in chain order,
+    // each with its floor.
+    assert_eq!(bridge["rotation_nonce"], 0);
+    assert_eq!(bridge["rules_v2"], json!({ "global_mint_cap_per_window": "400000000000", "cap_window_secs": 86400 }));
+    assert_eq!(bridge["min_inbound_sequence"], json!({ "2": 1, "3": 1, "4": 1, "5": 4 }));
+    assert_eq!(bridge["emitters"]["4"], "0000000000000000000000006410797df959987a5baf65b5fab97edeb34d5163");
+    assert_eq!(
+        bridge["endpoints"],
+        json!([
+            { "chain": 2, "chain_name": "Ethereum",
+              "emitter": "0000000000000000000000007af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "address": "0x7af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "explorer_url": "https://etherscan.io/address/0x7af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "min_inbound_sequence": 1 },
+            { "chain": 3, "chain_name": "BSC",
+              "emitter": "0000000000000000000000007af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "address": "0x7af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "explorer_url": "https://bscscan.com/address/0x7af6b17047c1db6cb54347fdea45cf9179075bfa",
+              "min_inbound_sequence": 1 },
+            { "chain": 4, "chain_name": "Tron",
+              "emitter": "0000000000000000000000006410797df959987a5baf65b5fab97edeb34d5163",
+              "address": "TK6JJv55CCkFjNHq7WwoU91GKaZEiC93me",
+              "explorer_url": "https://tronscan.org/#/contract/TK6JJv55CCkFjNHq7WwoU91GKaZEiC93me",
+              "min_inbound_sequence": 1 },
+            { "chain": 5, "chain_name": "Solana",
+              "emitter": "d3e58f1e9317bbc3c69b63fadff558ea82ba5d00765f1f1e483d705d209b413a",
+              "address": "FGA3kY3RjfDKjUszJESMYtYXAbsnkFhhoxM3Mb34vycu",
+              "explorer_url": "https://solscan.io/account/FGA3kY3RjfDKjUszJESMYtYXAbsnkFhhoxM3Mb34vycu",
+              "min_inbound_sequence": 4 },
+        ])
+    );
     // decimals 8 / locked 600 / mint_cap_per_day 1e13 / minted_today 1000 are the node's own
     // pinned test's literal values (rpc.rs's `bridge_state_reports_guardians_emitters_and_the_
     // registry`), sent as JSON numbers on the wire — this API's own `/bridge` output still
