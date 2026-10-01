@@ -168,6 +168,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(d["kind"], "transfer");
     assert_eq!(d["has_bundle"], true);
     assert_eq!(d["fee"], "1000000");
+    // /tx/:hash is an alias of /transactions/:hash, with or without 0x.
+    let (status, _, alias) = call_api(&live.app, &format!("/api/v1/tx/0x{transfer_hash}")).await;
+    assert_eq!(status, 200, "{alias}");
+    assert_eq!(alias, d);
     assert_eq!(d["bundle"]["nullifiers"], json!([h("nf1-t"), h("nf2-t"), h("nf3-t"), h("nf4-t")]));
     assert_eq!(d["bundle"]["commitments"][0], h("cm1-t"));
     assert_eq!(d["bundle"]["commitments"][3], h("cm4-t"));

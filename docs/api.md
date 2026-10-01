@@ -473,6 +473,7 @@ need `height`.
 | `GET /transactions?page&limit&kind&height&validator&program` | paginated `TransactionSummary`, newest first |
 | `GET /transactions/latest?limit=10` | array of the newest `TransactionSummary` |
 | `GET /transactions/:hash` | `TransactionDetail` |
+| `GET /tx/:hash` | alias of the above; the hash may carry a `0x` prefix. The page `/tx/:hash` redirects (308) to `/transactions/:hash` the same way |
 
 Filters: `kind` is one of `transfer`, `mint`, `deploy`, `call`, `bond`, `unbond`, `withdraw`,
 `bridge_attest`, `bridge_burn`, `register_token`, `token_mint`, `set_authority`, `token_burn`,

@@ -36,6 +36,8 @@ pub fn create_router(state: AppState) -> Router {
         .route("/transactions", get(handlers::list_transactions))
         .route("/transactions/latest", get(handlers::latest_transactions))
         .route("/transactions/:hash", get(handlers::get_transaction))
+        // The short form wallets link to; same handler, same answer.
+        .route("/tx/:hash", get(handlers::get_transaction))
         .route(
             "/transactions/:hash/envelopes",
             get(handlers::transaction_envelopes),
