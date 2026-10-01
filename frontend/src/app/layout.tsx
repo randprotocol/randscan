@@ -27,11 +27,23 @@ const display = localFont({
   display: 'swap',
 });
 
+// metadataBase makes the link-preview card (app/opengraph-image.png, drawn by randprotocol.org's
+// design/og/make.mjs) an absolute URL, which scrapers require.
 export const metadata: Metadata = {
+  metadataBase: new URL('https://randscan.org'),
   title: 'RandScan — Rand Protocol Explorer',
   description:
     'Explore blocks, transactions, accounts, validators and confidential programs on the Rand Protocol network.',
   keywords: ['Rand Protocol', 'RAND', 'blockchain', 'explorer', 'blocks', 'transactions'],
+  openGraph: {
+    type: 'website',
+    url: 'https://randscan.org/',
+    siteName: 'RandScan',
+    title: 'RandScan — Rand Protocol Explorer',
+    description:
+      'Explore blocks, transactions, accounts, validators and confidential programs on the Rand Protocol network.',
+  },
+  twitter: { card: 'summary_large_image' },
 };
 
 /**
