@@ -13,6 +13,11 @@ use serde::{Deserialize, Serialize};
 /// new: `register_token`, `token_mint`, `set_authority`, `token_burn` (RPL, spec §4/§6) and
 /// `pause_mints`, `unpause_mints`, `register_bridged_token`, `list_backing` (bridge hardening
 /// B1/B4).
+///
+/// RPL-2 (fullnode v0.6.8, genesis-gated on a `program_state` section; on no chain yet as of
+/// 2026-10-01): `invoke`, a call whose proof vouches for one declared state transition of the
+/// program — cells read and written, value into and out of the program's vault, tokens the
+/// program mints — which the ledger applies. Its receipt is a call's.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TxKind {
@@ -33,6 +38,7 @@ pub enum TxKind {
     UnpauseMints,
     RegisterBridgedToken,
     ListBacking,
+    Invoke,
     Other,
 }
 
@@ -56,6 +62,7 @@ impl TxKind {
         TxKind::UnpauseMints,
         TxKind::RegisterBridgedToken,
         TxKind::ListBacking,
+        TxKind::Invoke,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -77,6 +84,7 @@ impl TxKind {
             TxKind::UnpauseMints => "unpause_mints",
             TxKind::RegisterBridgedToken => "register_bridged_token",
             TxKind::ListBacking => "list_backing",
+            TxKind::Invoke => "invoke",
             TxKind::Other => "other",
         }
     }
@@ -97,6 +105,11 @@ impl TxKind {
             TxKind::Transfer => "none",
             other => other.as_str(),
         }
+    }
+
+    /// Kinds that carry a call proof and get a call's receipt: `call`, and the RPL-2 `invoke`.
+    pub fn has_receipt(&self) -> bool {
+        matches!(self, TxKind::Call | TxKind::Invoke)
     }
 
     /// Kinds whose `amount` is in a bridged asset's own unit rather than RAND units.
@@ -288,6 +301,50 @@ pub enum BridgeGovernanceAction {
     },
 }
 
+/// One program-state cell as an `invoke` read or wrote it (RPL-2): a `Word8` key and value, 64
+/// hex each (eight words little-endian). A written value of 64 zeros deletes the cell; a read of
+/// 64 zeros is of a cell that did not exist.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgramCell {
+    pub key: String,
+    pub value: String,
+}
+
+/// One note an `invoke` paid out of its program's vault (`pays`) or minted of a token the program
+/// is the authority of (`mints`): every word of the chain-computed note, as a `token_mint`'s, so
+/// the recipient rebuilds it with nothing decrypted. `time` is the bundle's; `cm` the leaf the
+/// chain appended, which this explorer links to the transaction.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Payout {
+    /// registry index of the asset (0 is RAND)
+    pub asset: i64,
+    /// decimal string in the asset's own units
+    pub amount: String,
+    pub recipient: String,
+    pub time: i64,
+    pub r: String,
+    pub cm: String,
+}
+
+/// The state transition an `invoke` declared and the ledger applied (RPL-2, fullnode
+/// `docs/superpowers/specs/2026-09-30-rpl2-program-state-design.md` §4). What came *in* is the
+/// bundle's and is not repeated: `burn_r` is RAND deposited into the vault, and `burn_a` of
+/// `burn_asset` is the token `inflow` names — `deposit` into the vault, `burn` destroyed (the
+/// program's own token), `none` when `burn_a` is 0.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Transition {
+    /// cells read, with the values read (the proof was made against them)
+    pub reads: Vec<ProgramCell>,
+    /// cells written
+    pub writes: Vec<ProgramCell>,
+    /// `none`, `deposit` or `burn`
+    pub inflow: String,
+    /// paid out of the vault, in tree order first
+    pub pays: Vec<Payout>,
+    /// new units of a token whose authority is this program, after the pays
+    pub mints: Vec<Payout>,
+}
+
 /// Full transaction detail.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TransactionDetail {
@@ -342,6 +399,8 @@ pub struct TransactionDetail {
     pub token_action: Option<TokenAction>,
     /// pause_mints / unpause_mints / register_bridged_token / list_backing.
     pub bridge_governance: Option<BridgeGovernanceAction>,
+    /// invoke (RPL-2): the state transition the proof vouched for and the ledger applied.
+    pub transition: Option<Transition>,
 }
 
 #[cfg(test)]
@@ -363,6 +422,27 @@ mod tests {
         assert_eq!(TxKind::Transfer.node_tag(), "none");
         assert_eq!(TxKind::Withdraw.node_tag(), "withdraw");
         assert_eq!(TxKind::RegisterBridgedToken.as_str(), "register_bridged_token");
+    }
+
+    #[test]
+    fn invoke_is_a_filterable_kind_with_a_receipt() {
+        assert_eq!(TxKind::parse("invoke"), Some(TxKind::Invoke));
+        assert_eq!(TxKind::Invoke.node_tag(), "invoke");
+        assert!(TxKind::Invoke.has_receipt() && TxKind::Call.has_receipt());
+        assert!(!TxKind::Deploy.has_receipt() && !TxKind::TokenMint.has_receipt());
+        assert!(!TxKind::Invoke.amount_is_bridged() && !TxKind::Invoke.has_pq_signers());
+        // The node's own rendering (its pinned test in `crates/randprotocol-node/src/rpc.rs`).
+        let t: Transition = serde_json::from_value(serde_json::json!({
+            "reads": [{ "key": format!("01{}", "00".repeat(31)), "value": "00".repeat(32) }],
+            "writes": [{ "key": format!("01{}", "00".repeat(31)), "value": format!("05{}", "00".repeat(31)) }],
+            "inflow": "deposit",
+            "pays": [{ "asset": 0, "amount": "300", "recipient": "rand1abc", "time": 41, "r": "aa".repeat(32), "cm": "bb".repeat(32) }],
+            "mints": [{ "asset": 2, "amount": "40", "recipient": "rand1abc", "time": 41, "r": "cc".repeat(32), "cm": "dd".repeat(32) }],
+        }))
+        .unwrap();
+        assert_eq!((t.reads.len(), t.writes.len(), t.inflow.as_str()), (1, 1, "deposit"));
+        assert_eq!((t.pays[0].asset, t.pays[0].amount.as_str(), t.mints[0].asset), (0, "300", 2));
+        assert_eq!(serde_json::to_value(&t).unwrap()["pays"][0]["cm"], "bb".repeat(32));
     }
 
     #[test]
@@ -445,6 +525,7 @@ mod tests {
             pq_signers: None,
             token_action: None,
             bridge_governance: None,
+            transition: None,
         }
     }
 

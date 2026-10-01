@@ -26,6 +26,8 @@ struct Node {
     child: Child,
     url: String,
     dir: tempfile::TempDir,
+    /// The genesis has a `program_state` section (a build with `--program-state-cell-fee`).
+    rpl2: bool,
 }
 
 impl Drop for Node {
@@ -154,6 +156,23 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
             .map(str::to_string),
         );
     }
+    // RPL-2 (fullnode v0.6.8, `feat/rpl2`): a build that knows the `program_state` section gets
+    // one, with the token registry it stands on, so the explorer meets an `invoke`, a program's
+    // cells and its vault — the shape of the chain the feature is cut on, not chain 19's.
+    let rpl2 = help.contains("--program-state-cell-fee");
+    let tokens_json = dir.path().join("tokens.json");
+    if rpl2 {
+        std::fs::write(
+            &tokens_json,
+            r#"{"registration_fee":1000000000,"tokens":[],"mint_cap_per_day":10000000000000,"max_tokens":null,"burn_registration_fee":null,"bound_note_value":null}"#,
+        )
+        .unwrap();
+        args.extend(
+            ["--tokens", tokens_json.to_str().unwrap(), "--program-state-cell-fee", "10000000"]
+                .into_iter()
+                .map(str::to_string),
+        );
+    }
     run(bin, &args.iter().map(String::as_str).collect::<Vec<_>>());
     run(
         bin,
@@ -170,7 +189,8 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
     // 500 ms blocks: a bundle's anchor is valid for 256 blocks, so the wallet has about two
     // minutes to prove under the test profile before an honest transfer would be refused
     // (`time N is outside […]`). On a machine busy enough to prove slower than that,
-    // `RAND_BLOCK_INTERVAL_MS` widens the window: 1000 gives four minutes.
+    // `RAND_BLOCK_INTERVAL_MS` widens the window: 1000 gives four minutes, 1500 six. Keep it
+    // under the 2 000 ms view timeout below, or the lone validator never commits a block.
     let block_interval = std::env::var("RAND_BLOCK_INTERVAL_MS").unwrap_or_else(|_| "500".into());
     let child = Command::new(bin)
         .args([
@@ -199,6 +219,7 @@ async fn start_node(bin: &PathBuf, cli: &PathBuf) -> (Node, String, String) {
         child,
         url: url.clone(),
         dir,
+        rpl2,
     };
     let client = reqwest::Client::new();
     let start = std::time::Instant::now();
@@ -606,5 +627,129 @@ async fn explorer_agrees_with_a_real_shielded_node() {
     )
     .await;
     assert_eq!(notes["pagination"]["total"], tree["next_index"]);
+
+    if node.rpl2 {
+        invoke_round_trip(&live, &client, &node, &cli, wallet, &wallet2_addr).await;
+    }
     drop(node);
+}
+
+/// RPL-2 on a chain with the `program_state` section: deploy the counter guest, register its
+/// program token, and make ONE invoke that reads the counter's cell (absent), writes it to 1,
+/// deposits 0.5 RAND into the vault, pays 0.2 of it to the second wallet and mints one unit of
+/// the program token — three proofs. Then the explorer's view against the node's: the invoke
+/// with its transition, a call's receipt, both payout leaves linked to it, the program's cells
+/// and vault, the limits' `program_state` group and the supply's vault counters.
+async fn invoke_round_trip(live: &LiveApp, client: &reqwest::Client, node: &Node, cli: &PathBuf, wallet: &str, payee: &str) {
+    let dir = node.dir.path();
+    let counter_json = dir.join("counter.json");
+    run(cli, &["program", "build", "--guest", "rpl2_counter", "--out", counter_json.to_str().unwrap()]);
+    let out = run(cli, &["program", "deploy", counter_json.to_str().unwrap(), "--rpc", &node.url, "--key", wallet]);
+    let counter = out
+        .lines()
+        .find_map(|l| l.strip_prefix("program id: "))
+        .and_then(|r| r.split(' ').next())
+        .unwrap_or_else(|| panic!("no program id in deploy output: {out}"))
+        .to_string();
+    let out = run(
+        cli,
+        &["token", "create", "--name", "Counter Share", "--symbol", "CTR", "--decimals", "0", "--program", &counter, "--rpc", &node.url, "--key", wallet],
+    );
+    // The wallet reports it as "submitted token registration <hash>".
+    let register_hash = submitted_hash(&out, "token registration");
+    let registered = live
+        .wait_for(&format!("/api/v1/transactions/{register_hash}"), WAIT, |t| t["kind"] == "register_token")
+        .await;
+    let share_index = registered["asset_index"].as_i64().expect("the registration's index");
+    assert_eq!(registered["token_action"]["authority"], "program", "{registered}");
+
+    // The counter accepts exactly a transition that reads one cell and writes its first word
+    // plus one; everything else rides along (`docs/cli.md`, "A stateful program").
+    let cell_key = format!("01{}", "00".repeat(31));
+    let transition = dir.join("step.json");
+    std::fs::write(
+        &transition,
+        json!({
+            "reads": [{ "key": cell_key, "value": "00".repeat(32) }],
+            "writes": [{ "key": cell_key, "value": cell_key }],
+            "deposit": { "rand": "500000000", "kind": "none" },
+            "pays": [{ "asset": 0, "amount": "200000000", "to": payee }],
+            "mints": [{ "asset": share_index, "amount": "1" }],
+        })
+        .to_string(),
+    )
+    .unwrap();
+    let out = run(cli, &["program", "invoke", &counter, "--transition", transition.to_str().unwrap(), "--rpc", &node.url, "--key", wallet]);
+    let invoke_hash = submitted_hash(&out, "invoke");
+
+    let node_tx = rpc(client, &node.url, "rand_getTransaction", json!([invoke_hash])).await;
+    assert_eq!(node_tx["tx"]["action"]["kind"], "invoke", "{node_tx}");
+    let node_receipt = rpc(client, &node.url, "rand_getReceipt", json!([invoke_hash])).await;
+    assert!(node_receipt.is_object(), "node has no receipt for {invoke_hash}: {node_receipt}");
+    let tx = live
+        .wait_for(&format!("/api/v1/transactions/{invoke_hash}"), WAIT, |t| t["receipt"].is_object())
+        .await;
+    assert_eq!(tx["kind"], "invoke");
+    assert_eq!(tx["program"], counter);
+    assert_eq!(tx["call_proof_len"], node_tx["tx"]["action"]["proof_len"]);
+    assert_eq!(tx["bundle"]["burn_r"], "500000000", "the RAND the transition deposited is the bundle's burn: {tx}");
+    let t = &tx["transition"];
+    let nt = &node_tx["tx"]["action"]["transition"];
+    assert_eq!(t["inflow"], "none");
+    assert_eq!(t["reads"], nt["reads"]);
+    assert_eq!(t["writes"], nt["writes"]);
+    assert_eq!(t["writes"][0]["value"], cell_key);
+    assert_eq!(t["pays"].as_array().map(Vec::len), Some(1));
+    assert_eq!(t["mints"].as_array().map(Vec::len), Some(1));
+    for side in ["pays", "mints"] {
+        let (ours, theirs) = (&t[side][0], &nt[side][0]);
+        assert_eq!(ours["cm"], theirs["cm"], "{side}: {tx}");
+        assert_eq!(ours["recipient"], theirs["recipient"]);
+        assert_eq!(ours["amount"], units(&theirs["amount"]));
+        assert_eq!(ours["time"], node_tx["tx"]["bundle"]["time"], "a payout note's time is the bundle's");
+    }
+    assert_eq!(t["pays"][0]["recipient"], payee);
+    assert_eq!(t["mints"][0]["asset"], share_index);
+    assert_eq!(tx["receipt"]["outputs"], node_receipt["outputs"]);
+    assert_eq!(tx["receipt"]["outputs"][0], 1, "the counter's new count");
+
+    // Both payout leaves are the chain's, linked to the invoke, among its notes.
+    let head = rpc(client, &node.url, "rand_getHead", json!([])).await["height"].as_i64().unwrap();
+    live.wait_for("/api/v1/health", WAIT, |h| h["indexer"]["current_height"].as_i64().unwrap_or(-1) >= head).await;
+    let tree = rpc(client, &node.url, "rand_getTreeInfo", json!([])).await;
+    live.wait_for("/api/v1/stats", WAIT, |s| s["notes"] == tree["next_index"]).await;
+    for cm in [t["pays"][0]["cm"].as_str().unwrap(), t["mints"][0]["cm"].as_str().unwrap()] {
+        let (status, _, n) = call(&live.app, json_req("GET", &format!("/api/v1/notes/{cm}"), None, None)).await;
+        assert_eq!(status, 200, "{n}");
+        assert_eq!(n["tx_hash"], invoke_hash, "{n}");
+    }
+    let (_, _, env) = call(&live.app, json_req("GET", &format!("/api/v1/transactions/{invoke_hash}/envelopes"), None, None)).await;
+    assert_eq!(env["notes"].as_array().map(Vec::len), Some(6), "four slots and two payouts: {env}");
+
+    // The program: counted as an invoke, its cell and its vault as the node serves them.
+    let program = live
+        .wait_for(&format!("/api/v1/programs/{counter}"), WAIT, |p| p["invoke_count"] == 1)
+        .await;
+    assert_eq!(program["call_count"], 0);
+    assert_eq!(program["recent_calls"][0]["hash"], invoke_hash);
+    let node_cells = rpc(client, &node.url, "rand_getProgramCells", json!([counter, { "limit": 10 }])).await;
+    let node_vault = rpc(client, &node.url, "rand_getProgramVault", json!([counter])).await;
+    assert_eq!(program["program_state"]["cells"], node_cells["cells"]);
+    assert_eq!(program["program_state"]["cells"][0], json!({ "key": cell_key, "value": cell_key }));
+    assert_eq!(program["program_state"]["vault"], node_vault);
+    assert_eq!(program["program_state"]["vault"][0], json!({ "asset": 0, "amount": "300000000" }), "0.5 in, 0.2 out");
+    let (status, _, page) = call(&live.app, json_req("GET", &format!("/api/v1/programs/{counter}/cells?limit=1"), None, None)).await;
+    assert_eq!(status, 200, "{page}");
+    assert_eq!(page["cells"], node_cells["cells"]);
+
+    // The limits' group and the supply's vault counters, both the node's own figures.
+    let node_limits = rpc(client, &node.url, "rand_getLimits", json!([])).await;
+    let stats = live.wait_for("/api/v1/stats", WAIT, |s| s["limits"]["program_state"].is_object()).await;
+    assert_eq!(stats["limits"]["program_state"], node_limits["program_state"]);
+    assert_eq!(stats["limits"]["program_state"]["cell_fee"], "10000000");
+    let node_supply = rpc(client, &node.url, "rand_getSupply", json!([])).await;
+    let supply = live.wait_for("/api/v1/supply", WAIT, |s| s["program_rand_held"] == json!("300000000")).await;
+    assert_eq!(supply["program_rand_out"], units(&node_supply["program_rand_out"]));
+    assert_eq!(supply["program_rand_out"], "200000000");
+    assert_eq!(supply["invariant_holds"], true, "{supply}");
 }

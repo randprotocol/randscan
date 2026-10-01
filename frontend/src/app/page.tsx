@@ -230,6 +230,14 @@ export default function DashboardPage() {
               ? `move ${(stats.limits.adjust_bps / 100).toFixed(2).replace(/\.?0+$/, '')}% a block by fullness`
               : 'fixed'}
           </span>
+          {stats.limits.program_state && (
+            <span>
+              · program state on: {formatAmount(stats.limits.program_state.cell_fee)} a cell
+              created, at most {formatNumber(stats.limits.program_state.max_reads)} reads,{' '}
+              {formatNumber(stats.limits.program_state.max_writes)} writes and{' '}
+              {formatNumber(stats.limits.program_state.max_payouts)} payouts an invoke
+            </span>
+          )}
         </p>
       )}
 

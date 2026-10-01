@@ -27,6 +27,7 @@ export type TransactionKind =
   | 'unpause_mints'
   | 'register_bridged_token'
   | 'list_backing'
+  | 'invoke'
   | 'other';
 
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
@@ -220,6 +221,36 @@ export type BridgeGovernanceAction =
       pq_signers: number[];
     };
 
+/** One program-state cell as an invoke read or wrote it (RPL-2): Word8 key and value, 64 hex
+ * each; a written value of 64 zeros deletes the cell, a read of 64 zeros is of none. */
+export interface ProgramCell {
+  key: string;
+  value: string;
+}
+
+/** One note an invoke paid out of its program's vault (`pays`) or minted of the program's own
+ * token (`mints`): every word of the chain-computed note, `time` the bundle's, `cm` the leaf. */
+export interface Payout {
+  /** registry index of the asset (0 is RAND) */
+  asset: number;
+  /** decimal string in the asset's own units */
+  amount: string;
+  recipient: string;
+  time: number;
+  r: string;
+  cm: string;
+}
+
+/** The state transition an invoke declared and the ledger applied (RPL-2). What came in is the
+ * bundle's: `burn_r` RAND into the vault, `burn_a` of `burn_asset` what `inflow` names. */
+export interface Transition {
+  reads: ProgramCell[];
+  writes: ProgramCell[];
+  inflow: 'none' | 'deposit' | 'burn';
+  pays: Payout[];
+  mints: Payout[];
+}
+
 export interface TransactionDetail extends TransactionSummary {
   chain_id: number;
   /** The bundle; null for a bundle-less signed action. */
@@ -269,6 +300,8 @@ export interface TransactionDetail extends TransactionSummary {
   token_action: TokenAction | null;
   /** pause_mints / unpause_mints / register_bridged_token / list_backing. */
   bridge_governance: BridgeGovernanceAction | null;
+  /** invoke (RPL-2): the transition the proof vouched for and the ledger applied. */
+  transition?: Transition | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -571,6 +604,10 @@ export interface Supply {
   vesting_released: string | null;
   vesting_in_register: string | null;
   vesting_locked: string | null;
+  /** RPL-2: RAND invokes paid out of program vaults (pool side) and what the vaults hold
+   * (register side); "0" without the section, absent on an older API. */
+  program_rand_out?: string | null;
+  program_rand_held?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -622,10 +659,36 @@ export interface ProgramSummary {
   public_digest: string | null;
   call_count: number;
   last_called_height: number | null;
+  /** RPL-2: invokes that moved this program's state, and the last height one did. */
+  invoke_count?: number;
+  last_invoked_height?: number | null;
+}
+
+/** One row of a program's vault (RPL-2): what it holds of one asset, in that asset's units. */
+export interface VaultRow {
+  asset: number;
+  amount: string;
+}
+
+/** A program's public state on a chain with the `program_state` section, live from the node. */
+export interface ProgramState {
+  vault: VaultRow[];
+  /** the program's cells in key order, first page */
+  cells: ProgramCell[];
+  /** the last key served when more follow (`GET /programs/:id/cells?after=`), else null */
+  cells_next: string | null;
+}
+
+export interface ProgramCellsPage {
+  cells: ProgramCell[];
+  next: string | null;
 }
 
 export interface ProgramDetail extends ProgramSummary {
+  /** the latest calls and invokes */
   recent_calls: TransactionSummary[];
+  /** null on a chain without a `program_state` section (and on an older API). */
+  program_state?: ProgramState | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -705,6 +768,14 @@ export interface ChainLimits {
   bundle_gas_limit: number | null;
   /** The dynamic controller's per-block step in basis points; `null` when prices never move. */
   adjust_bps: number | null;
+  /** RPL-2 (a v0.6.8 node): the `program_state` section's invoke limits; `null` without it. */
+  program_state?: {
+    /** RAND units an invoke's fee floor gains per cell it creates, decimal string */
+    cell_fee: string;
+    max_reads: number;
+    max_writes: number;
+    max_payouts: number;
+  } | null;
 }
 
 /** The tip's live gas prices under a chain's gas section, decimal strings. */

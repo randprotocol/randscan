@@ -3,7 +3,7 @@
 use chrono::{DateTime, Utc};
 use randscan_core::{
     BlockSummary, BridgeGovernanceAction, Bundle, GeoInfo, NetworkStats, Note, Nullifier,
-    PendingStake, ProgramSummary, Receipt, TokenAction, TransactionDetail, TransactionSummary,
+    PendingStake, ProgramSummary, Receipt, TokenAction, TransactionDetail, TransactionSummary, Transition,
     TxKind, Validator,
 };
 use sqlx::FromRow;
@@ -117,6 +117,7 @@ pub struct TxDetailRow {
     pub bridge_governance: Option<serde_json::Value>,
     pub auth_commit: Option<String>,
     pub auth_proof_len: i64,
+    pub transition: Option<serde_json::Value>,
 }
 
 impl TxDetailRow {
@@ -184,6 +185,7 @@ impl TxDetailRow {
         let pq_signers = self
             .pq_signers
             .map(|v| v.into_iter().map(i64::from).collect());
+        let transition: Option<Transition> = self.transition.and_then(|v| serde_json::from_value(v).ok());
         TransactionDetail {
             chain_id: self.chain_id,
             bundle,
@@ -206,6 +208,7 @@ impl TxDetailRow {
             pq_signers,
             token_action,
             bridge_governance,
+            transition,
             summary: self.tx.into(),
         }
     }
@@ -330,6 +333,8 @@ pub struct ProgramRow {
     pub public_digest: Option<String>,
     pub call_count: i64,
     pub last_called_height: Option<i64>,
+    pub invoke_count: i64,
+    pub last_invoked_height: Option<i64>,
 }
 
 impl From<ProgramRow> for ProgramSummary {
@@ -345,6 +350,8 @@ impl From<ProgramRow> for ProgramSummary {
             public_digest: p.public_digest,
             call_count: p.call_count,
             last_called_height: p.last_called_height,
+            invoke_count: p.invoke_count,
+            last_invoked_height: p.last_invoked_height,
         }
     }
 }

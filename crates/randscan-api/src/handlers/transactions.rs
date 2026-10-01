@@ -74,7 +74,7 @@ pub async fn get_transaction(
     let row = db::get_transaction(pool, &hash)
         .await?
         .ok_or_else(|| AppError::NotFound("transaction".into()))?;
-    let receipt = if row.tx.kind == "call" {
+    let receipt = if TxKind::parse(&row.tx.kind).is_some_and(|k| k.has_receipt()) {
         db::get_receipt(pool, &hash).await?.map(Into::into)
     } else {
         None

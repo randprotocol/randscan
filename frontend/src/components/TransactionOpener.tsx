@@ -52,7 +52,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
       setRows(out);
       setHIn(env.h_in);
       setHasCallEnvelope(!!env.call_envelope);
-      if (env.kind === 'call' && env.call_envelope && env.h_in) {
+      if ((env.kind === 'call' || env.kind === 'invoke') && env.call_envelope && env.h_in) {
         const callKind = keyKind === 'tx' ? 'call' : keyKind;
         setCall(await openCall(env.h_in, env.call_envelope, callKind, key));
       } else {
@@ -79,7 +79,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
       {rows?.map((row) => (
         <OpenedNoteBlock key={row.cm} row={row} tokens={tokenList?.tokens} />
       ))}
-      {rows && kind === 'call' && (hasCallEnvelope ? <OpenedCallBlock call={call} hIn={hIn} /> : <OpenedCallBlock call={undefined} hIn={hIn} />)}
+      {rows && (kind === 'call' || kind === 'invoke') && (hasCallEnvelope ? <OpenedCallBlock call={call} hIn={hIn} /> : <OpenedCallBlock call={undefined} hIn={hIn} />)}
     </KeyPanel>
   );
 }

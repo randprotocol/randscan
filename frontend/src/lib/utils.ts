@@ -276,6 +276,7 @@ export const TRANSACTION_KINDS: TransactionKind[] = [
   'unpause_mints',
   'register_bridged_token',
   'list_backing',
+  'invoke',
 ];
 
 const KIND_LABELS: Record<TransactionKind, string> = {
@@ -296,6 +297,7 @@ const KIND_LABELS: Record<TransactionKind, string> = {
   unpause_mints: 'Bridge mints unpaused',
   register_bridged_token: 'Bridged token listed',
   list_backing: 'Backing listed',
+  invoke: 'Invoke (program state)',
   other: 'Other',
 };
 
@@ -317,6 +319,7 @@ const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
   unpause_mints: 'Unpause mints',
   register_bridged_token: 'List token',
   list_backing: 'List backing',
+  invoke: 'Invoke',
   other: 'Other',
 };
 
@@ -338,6 +341,7 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   unpause_mints: 'badge badge-neutral',
   register_bridged_token: 'badge badge-bridge',
   list_backing: 'badge badge-bridge',
+  invoke: 'badge badge-call',
   other: 'badge badge-neutral',
 };
 

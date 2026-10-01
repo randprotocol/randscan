@@ -24,7 +24,7 @@ pub async fn insert_notes(conn: &mut PgConnection, rows: &[NewNote]) -> Result<(
              VALUES ($1, $2, $3,
                 (SELECT hash FROM transactions
                  WHERE commitment_1 = $2 OR commitment_2 = $2 OR commitment_3 = $2 OR commitment_4 = $2
-                    OR cm = $2 OR derived_cm = $2 LIMIT 1), $4)
+                    OR cm = $2 OR derived_cm = $2 OR $2 = ANY(payout_cms) LIMIT 1), $4)
              ON CONFLICT (leaf_index) DO UPDATE SET envelope = COALESCE(notes.envelope, EXCLUDED.envelope)",
         )
         .bind(n.leaf_index)
@@ -48,9 +48,10 @@ pub struct NoteEnvelopeRow {
 }
 
 /// The leaves whose commitments the transaction `hash` published: the bundle's four output slots
-/// (dummies included), a mint's note, or the one chain-computed note a `bridge_attest` deposit /
-/// `token_mint` / `register_token` initial mint appends (`derived_cm`) — with their envelopes.
-/// This is the "4 slots plus a chain-computed note" list a transaction's opener works from.
+/// (dummies included), a mint's note, the one chain-computed note a `bridge_attest` deposit /
+/// `token_mint` / `register_token` initial mint appends (`derived_cm`), or an invoke's payout
+/// notes (`payout_cms`) — with their envelopes. This is the "4 slots plus the chain-computed
+/// notes" list a transaction's opener works from.
 pub async fn get_note_envelopes_for_tx(pool: &PgPool, hash: &str) -> Result<Vec<NoteEnvelopeRow>> {
     Ok(sqlx::query_as::<_, NoteEnvelopeRow>(
         "SELECT n.leaf_index, n.cm, n.height, n.tx_hash, n.envelope FROM notes n
@@ -60,7 +61,8 @@ pub async fn get_note_envelopes_for_tx(pool: &PgPool, hash: &str) -> Result<Vec<
                         UNION SELECT commitment_3 FROM transactions WHERE hash = $1 AND commitment_3 IS NOT NULL
                         UNION SELECT commitment_4 FROM transactions WHERE hash = $1 AND commitment_4 IS NOT NULL
                         UNION SELECT cm FROM transactions WHERE hash = $1 AND cm IS NOT NULL
-                        UNION SELECT derived_cm FROM transactions WHERE hash = $1 AND derived_cm IS NOT NULL)
+                        UNION SELECT derived_cm FROM transactions WHERE hash = $1 AND derived_cm IS NOT NULL
+                        UNION SELECT unnest(payout_cms) FROM transactions WHERE hash = $1 AND payout_cms IS NOT NULL)
          ORDER BY n.leaf_index",
     )
     .bind(hash)
@@ -86,7 +88,7 @@ pub async fn link_notes_at(conn: &mut PgConnection, height: i64) -> Result<()> {
         "UPDATE notes n SET tx_hash = t.hash FROM transactions t
          WHERE n.height = $1 AND n.tx_hash IS NULL AND t.height = $1
            AND (t.commitment_1 = n.cm OR t.commitment_2 = n.cm OR t.commitment_3 = n.cm OR t.commitment_4 = n.cm
-                OR t.cm = n.cm OR t.derived_cm = n.cm)",
+                OR t.cm = n.cm OR t.derived_cm = n.cm OR n.cm = ANY(t.payout_cms))",
     )
     .bind(height)
     .execute(conn)

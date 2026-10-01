@@ -121,6 +121,24 @@ pub struct ChainLimits {
     /// `None` on a chain whose prices never move, a `gas` section without `dynamic` included.
     #[serde(default)]
     pub adjust_bps: Option<u32>,
+    /// RPL-2 (fullnode v0.6.8): the genesis `program_state` section and the `invoke` limits that
+    /// come with it; `None` on a chain without the section (every `invoke` refused) and on a node
+    /// predating the field.
+    #[serde(default)]
+    pub program_state: Option<ProgramStateLimits>,
+}
+
+/// The `program_state` group of `rand_getLimits` (RPL-2).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgramStateLimits {
+    /// RAND units an invoke's fee floor gains per cell it creates (a non-zero write to a cell
+    /// that read as zeros), decimal string.
+    #[serde(deserialize_with = "crate::amount::amount")]
+    pub cell_fee: String,
+    pub max_reads: u32,
+    pub max_writes: u32,
+    /// pays and mints together
+    pub max_payouts: u32,
 }
 
 impl ChainLimits {
@@ -158,4 +176,11 @@ pub struct Supply {
     pub vesting_in_register: Option<String>,
     #[serde(default, deserialize_with = "crate::amount::amount_opt")]
     pub vesting_locked: Option<String>,
+    /// RPL-2 (program state): RAND that invokes have paid out of program vaults as notes (pool
+    /// side, beside `withdraw_deposited`), and what the vaults still hold (register side, inside
+    /// `total_supply`). `"0"` on a chain without the section, `None` on a node predating them.
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub program_rand_out: Option<String>,
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub program_rand_held: Option<String>,
 }

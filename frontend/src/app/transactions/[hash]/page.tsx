@@ -20,7 +20,7 @@ import {
   getKindLabel,
   resolveToken,
 } from '@/lib/utils';
-import type { Bundle, Receipt, TokenInfo, TransactionDetail } from '@/types';
+import type { Bundle, Payout, ProgramCell, Receipt, TokenInfo, TransactionDetail } from '@/types';
 
 export default function TransactionDetailPage() {
   const params = useParams<{ hash: string }>();
@@ -111,10 +111,129 @@ export default function TransactionDetailPage() {
 
       <KindPanel tx={tx} tokens={tokens} />
 
-      {tx.kind === 'call' && <ReceiptPanel receipt={tx.receipt} />}
+      {(tx.kind === 'call' || tx.kind === 'invoke') && <ReceiptPanel receipt={tx.receipt} />}
 
       {tx.kind !== 'other' && <TransactionOpener hash={tx.hash} kind={tx.kind} />}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Invoke (RPL-2): a call plus the state transition it vouched for
+// ---------------------------------------------------------------------------
+
+function CellTable({ cells, written }: { cells: ProgramCell[]; written: boolean }) {
+  const zero = '0'.repeat(64);
+  return (
+    <ul className="space-y-1.5">
+      {cells.map((c) => (
+        <li key={c.key} className="flex flex-col gap-0.5 text-xs">
+          <span className="inline-flex items-center gap-2">
+            <span className="w-10 flex-shrink-0 text-mute">key</span>
+            <Hash value={c.key} start={10} end={8} className="text-xs" />
+          </span>
+          <span className="inline-flex items-center gap-2">
+            <span className="w-10 flex-shrink-0 text-mute">{written ? 'wrote' : 'read'}</span>
+            {c.value === zero ? (
+              <span className="text-mute">{written ? 'zeros — the cell is deleted' : 'zeros — the cell did not exist'}</span>
+            ) : (
+              <Hash value={c.value} start={10} end={8} className="text-xs" />
+            )}
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function PayoutList({ payouts, tokens }: { payouts: Payout[]; tokens: TokenInfo[] }) {
+  return (
+    <ul className="space-y-2">
+      {payouts.map((p, i) => (
+        <li key={p.cm} className="flex flex-col gap-0.5">
+          <span>
+            <span className="font-semibold text-strong">{formatTokenAmount(p.amount, p.asset, tokens)}</span>
+            {p.asset !== 0 && (
+              <span className="text-xs text-mute">
+                {' '}· <AssetLink index={p.asset} tokens={tokens} />
+              </span>
+            )}
+            <span className="text-xs text-mute"> · payout {i + 1}</span>
+          </span>
+          <span className="inline-flex items-center gap-2 text-xs">
+            <span className="w-14 flex-shrink-0 text-mute">to</span>
+            <Hash value={p.recipient} start={12} end={8} className="text-xs" />
+          </span>
+          <span className="inline-flex items-center gap-2 text-xs">
+            <span className="w-14 flex-shrink-0 text-mute">note</span>
+            <Hash value={p.cm} href={`/notes/${p.cm}`} start={10} end={8} className="text-xs" />
+          </span>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function InvokePanel({ tx, tokens, title }: { tx: TransactionDetail; tokens: TokenInfo[]; title: string }) {
+  const t = tx.transition ?? null;
+  const bundle = tx.bundle;
+  const inflow = t?.inflow ?? 'none';
+  return (
+    <Panel title={title}>
+      <DetailRow label="Program">
+        {tx.program ? (
+          <Hash value={tx.program} href={`/programs/${tx.program}`} full />
+        ) : (
+          <span className="text-mute">—</span>
+        )}
+      </DetailRow>
+      <DetailRow label="Call proof size">
+        <span className="font-mono">{formatBytes(tx.call_proof_len)}</span>
+      </DetailRow>
+      <DetailRow label="Input transcript">
+        {tx.input_envelope_len === null ? (
+          <span className="text-mute">None published</span>
+        ) : (
+          <span className="font-mono">{formatBytes(tx.input_envelope_len)} sealed</span>
+        )}
+      </DetailRow>
+      <DetailRow label="Into the vault">
+        {bundle && bundle.burn_r !== '0' ? (
+          <span className="font-semibold text-strong">{formatAmount(bundle.burn_r)}</span>
+        ) : (
+          <span className="text-mute">no RAND</span>
+        )}
+        {bundle && bundle.burn_a !== '0' && (
+          <span>
+            {bundle.burn_r !== '0' ? ' and ' : ''}
+            <span className="font-semibold text-strong">
+              {formatTokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}
+            </span>{' '}
+            <span className="text-mute">
+              {inflow === 'burn' ? "— destroyed (the program's own token)" : '— deposited'}
+            </span>
+          </span>
+        )}
+      </DetailRow>
+      <DetailRow label={`Cells read (${t?.reads.length ?? 0})`}>
+        {t && t.reads.length > 0 ? <CellTable cells={t.reads} written={false} /> : <span className="text-mute">none</span>}
+      </DetailRow>
+      <DetailRow label={`Cells written (${t?.writes.length ?? 0})`}>
+        {t && t.writes.length > 0 ? <CellTable cells={t.writes} written /> : <span className="text-mute">none</span>}
+      </DetailRow>
+      <DetailRow label={`Paid out (${t?.pays.length ?? 0})`}>
+        {t && t.pays.length > 0 ? <PayoutList payouts={t.pays} tokens={tokens} /> : <span className="text-mute">nothing left the vault</span>}
+      </DetailRow>
+      <DetailRow label={`Minted (${t?.mints.length ?? 0})`}>
+        {t && t.mints.length > 0 ? <PayoutList payouts={t.mints} tokens={tokens} /> : <span className="text-mute">nothing</span>}
+      </DetailRow>
+      <p className="px-4 py-3 text-xs text-mute">
+        A call whose proof vouches for exactly this transition, which the ledger applied: the
+        reads had to hold the values shown or the transaction was refused, and every payout is a
+        note the chain computed from the words above, so its recipient finds it as they find a
+        mint. Who paid in is private; what moved is not.
+      </p>
+    </Panel>
   );
 }
 
@@ -310,6 +429,10 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
         </p>
       </Panel>
     );
+  }
+
+  if (tx.kind === 'invoke') {
+    return <InvokePanel tx={tx} tokens={tokens} title={title} />;
   }
 
   if (tx.kind === 'bond' || tx.kind === 'unbond' || tx.kind === 'withdraw') {
@@ -630,7 +753,7 @@ function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
     return (
       <Panel title="Receipt">
         <div className="py-6 text-sm text-mute">
-          No receipt has been indexed for this call.
+          No receipt has been indexed for this call or invoke.
         </div>
       </Panel>
     );

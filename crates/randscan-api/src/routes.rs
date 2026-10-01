@@ -60,6 +60,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/validators/:address", get(handlers::get_validator))
         .route("/programs", get(handlers::list_programs))
         .route("/programs/:id", get(handlers::get_program))
+        .route("/programs/:id/cells", get(handlers::program_cells))
         .route("/nodes", get(handlers::list_nodes))
         .route("/search", get(handlers::search))
         .route("/auth/logout", post(handlers::logout))

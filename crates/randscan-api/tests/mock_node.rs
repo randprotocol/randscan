@@ -44,6 +44,27 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
         "kind": "bridge_burn", "asset": 1, "amount": 400, "relayer_fee": 100, "to_chain": 2, "token": "cc".repeat(32), "to": evm_to
     }));
     let future = tx(7, "future", Some(bundle("f")), json!({ "kind": "slash", "evidence": "opaque" }));
+    // RPL-2: an invoke of the deployed program — the shape of the node's own pinned test
+    // (`rpc.rs`, "invoke"): one cell read as absent and written, 1 000 RAND units and 500 of
+    // token 3 deposited through the bundle, 300 units of RAND paid out of the vault and 40 of
+    // token 3 minted, each a chain-computed note whose `cm` the node renders.
+    chain.program_state = true;
+    let cell_key = format!("01{}", "00".repeat(31));
+    let mut invoke_bundle = bundle("iv");
+    invoke_bundle["burn_r"] = json!(1000);
+    invoke_bundle["burn_a"] = json!("500");
+    invoke_bundle["burn_asset"] = json!(3);
+    let invoke_recipient = shielded_address("invoke-payee");
+    let invoke = tx(7, "invoke", Some(invoke_bundle), json!({
+        "kind": "invoke", "program": program, "proof_len": 268123, "input_envelope_len": null,
+        "transition": {
+            "reads": [{ "key": cell_key, "value": "00".repeat(32) }],
+            "writes": [{ "key": cell_key, "value": format!("05{}", "00".repeat(31)) }],
+            "inflow": "deposit",
+            "pays": [{ "asset": 0, "amount": "300", "recipient": invoke_recipient, "time": 2, "r": "a1".repeat(32), "cm": h("payout-0") }],
+            "mints": [{ "asset": 3, "amount": 40, "recipient": invoke_recipient, "time": 2, "r": "a2".repeat(32), "cm": h("payout-1") }],
+        }
+    }));
 
     // The RPL token standard (spec §4/§6) and bridge hardening's governance actions (B1/B4): a
     // token registered with an initial mint, a later mint, an authority change, a holder burn,
@@ -91,7 +112,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     chain.push_block(vec![
         attest.clone(), rotation.clone(), burn.clone(), future.clone(),
         register_token.clone(), token_mint.clone(), set_authority.clone(), token_burn.clone(),
-        pause.clone(), unpause.clone(), register_bridged.clone(), list_backing.clone(),
+        pause.clone(), unpause.clone(), register_bridged.clone(), list_backing.clone(), invoke.clone(),
     ]);
     // 2000 transactions per block is a consensus rule; the explorer must take a full block.
     let fat: Vec<Value> = (0..2000)
@@ -297,7 +318,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, list) = call_api(&live.app, &format!("/api/v1/transactions?validator={VALIDATOR_B}")).await;
     assert_eq!(list["pagination"]["total"], 2, "{list}");
     let (_, _, list) = call_api(&live.app, &format!("/api/v1/transactions?program={program}")).await;
-    assert_eq!(list["pagination"]["total"], 2, "{list}");
+    assert_eq!(list["pagination"]["total"], 3, "the deploy, the call and the invoke: {list}");
     let (_, _, list) = call_api(&live.app, "/api/v1/transactions?kind=transfer").await;
     assert_eq!(list["pagination"]["total"], 2001);
     for bad in ["none", "slash", "other"] {
@@ -410,7 +431,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
 
     // Stats carry the tree, the register and the supply audit.
     let stats = live.wait_for("/api/v1/stats", WAIT, |s| s["chain_id"] == 7 && s["height"] == 4 && s["validator_count"] == 2).await;
-    assert_eq!(stats["total_transactions"], 2019, "{stats}");
+    assert_eq!(stats["total_transactions"], 2020, "{stats}");
     // The chain's identity and limits, and the node's build (v0.3 / v0.4).
     let (_, _, genesis) = call_api(&live.app, "/api/v1/blocks/0").await;
     assert_eq!(stats["genesis_hash"], genesis["hash"], "{stats}");
@@ -424,17 +445,20 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
         "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
         "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
         "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
-        "bundle_gas_limit": 20479, "adjust_bps": 1250 }));
+        "bundle_gas_limit": 20479, "adjust_bps": 1250,
+        "program_state": { "cell_fee": "10000000", "max_reads": 8, "max_writes": 8, "max_payouts": 4 } }));
     // Off `rand_status`, refreshed every commit: the auth guest, and the tip's live prices (one
     // 12.5% step above the genesis prices the limits report — a dynamic chain moves them).
     assert_eq!(stats["hc_auth"], h("hc_auth"));
     assert_eq!(stats["gas_prices"], json!({ "gas_price": "112", "byte_price": "900" }));
+    // RPL-2: the `program_state` group rides inside the stored limits.
+    assert_eq!(stats["limits"]["program_state"], json!({ "cell_fee": "10000000", "max_reads": 8, "max_writes": 8, "max_payouts": 4 }));
     assert_eq!(stats["notes"], expected_leaves);
-    // 2014 bundle-carrying transactions (2000 transfers, 1 mint's bundle-less action aside, plus
+    // 2015 bundle-carrying transactions (2000 transfers, 1 mint's bundle-less action aside, plus
     // deploy/call/bond/attest/rotation/burn/future/register_token/token_mint/set_authority/
-    // token_burn/register_bridged/list_backing = 14 more), each four slots; pause_mints and
-    // unpause_mints carry none.
-    assert_eq!(stats["nullifiers"], 2014 * 4, "{stats}");
+    // token_burn/register_bridged/list_backing/invoke = 15 more), each four slots; pause_mints
+    // and unpause_mints carry none.
+    assert_eq!(stats["nullifiers"], 2015 * 4, "{stats}");
     assert_eq!(stats["active_validator_count"], 1);
     assert_eq!(stats["total_stake"], "100000000000000", "only the active set counts");
     assert_eq!(stats["total_supply"], "101100000000000");
@@ -459,6 +483,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     assert_eq!(v[1]["share_percent"], 0.0);
     let (_, _, supply) = call_api(&live.app, "/api/v1/supply").await;
     assert_eq!(supply["invariant_holds"], true);
+    assert_eq!((&supply["program_rand_out"], &supply["program_rand_held"]), (&json!("300"), &json!("700")), "RPL-2 vault counters: {supply}");
     let (_, _, bridge) = call_api(&live.app, "/api/v1/bridge").await;
     assert_eq!(bridge["enabled"], true);
     assert_eq!(bridge["assets"][0]["index"], 1);
@@ -618,6 +643,55 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
     let (_, _, p) = call_api(&live.app, &format!("/api/v1/programs/{program}")).await;
     assert_eq!(p["call_count"], 1);
     assert!(p.get("deployer").is_none(), "{p}");
+    // RPL-2: the invoke is counted apart from the calls and listed with them; the program's
+    // vault and cells come live from the node, and the cells page again.
+    assert_eq!(p["invoke_count"], 1);
+    assert_eq!(p["last_invoked_height"], 3);
+    assert_eq!(p["recent_calls"].as_array().unwrap().len(), 2, "{p}");
+    assert_eq!(p["recent_calls"][0]["kind"], "invoke");
+    assert_eq!(p["program_state"]["vault"], json!([{ "asset": 0, "amount": "700" }, { "asset": 3, "amount": "500" }]));
+    assert_eq!(p["program_state"]["cells"], json!([{ "key": cell_key, "value": format!("05{}", "00".repeat(31)) }]));
+    assert!(p["program_state"]["cells_next"].is_null());
+    let (status, _, cells) = call_api(&live.app, &format!("/api/v1/programs/{program}/cells?limit=1")).await;
+    assert_eq!(status, 200, "{cells}");
+    assert_eq!(cells["cells"][0]["key"], cell_key);
+    assert!(cells["next"].is_null());
+    let (status, _, cells) = call_api(&live.app, &format!("/api/v1/programs/{program}/cells?after={cell_key}")).await;
+    assert_eq!((status.as_u16(), cells["cells"].as_array().map(Vec::len)), (200, Some(0)), "{cells}");
+    let (status, _, _) = call_api(&live.app, &format!("/api/v1/programs/{program}/cells?after=nothex")).await;
+    assert_eq!(status, 400);
+
+    // The invoke itself: a call's fields plus the transition, served as the node sent it (amounts
+    // as decimal strings), its receipt a call's, and its two payout notes linked to it — by
+    // commitment, and in its envelope list beside the bundle's four slots.
+    let invoke_hash = invoke["hash"].as_str().unwrap();
+    let (_, _, d) = call_api(&live.app, &format!("/api/v1/transactions/{invoke_hash}")).await;
+    assert_eq!(d["kind"], "invoke");
+    assert_eq!(d["program"], program);
+    assert_eq!(d["call_proof_len"], 268123);
+    assert!(d["input_envelope_len"].is_null());
+    assert_eq!(d["bundle"]["burn_r"], "1000");
+    assert_eq!((&d["bundle"]["burn_a"], &d["bundle"]["burn_asset"]), (&json!("500"), &json!(3)));
+    assert_eq!(d["transition"]["inflow"], "deposit");
+    assert_eq!(d["transition"]["reads"], json!([{ "key": cell_key, "value": "00".repeat(32) }]));
+    assert_eq!(d["transition"]["writes"][0]["value"], format!("05{}", "00".repeat(31)));
+    assert_eq!(d["transition"]["pays"], json!([{ "asset": 0, "amount": "300", "recipient": invoke_recipient, "time": 2, "r": "a1".repeat(32), "cm": h("payout-0") }]));
+    assert_eq!(d["transition"]["mints"][0]["amount"], "40", "a numeric amount on the wire is a decimal string here");
+    assert_eq!(d["transition"]["mints"][0]["cm"], h("payout-1"));
+    assert_eq!(d["receipt"]["tier"], 14, "an invoke has a call's receipt: {d}");
+    assert_eq!(d["receipt"]["program"], program);
+    for cm in [h("payout-0"), h("payout-1")] {
+        let (_, _, note) = call_api(&live.app, &format!("/api/v1/notes/{cm}")).await;
+        assert_eq!(note["tx_hash"], invoke_hash, "a payout leaf links back to its invoke: {note}");
+    }
+    let (_, _, env) = call_api(&live.app, &format!("/api/v1/transactions/{invoke_hash}/envelopes")).await;
+    assert_eq!(env["kind"], "invoke");
+    let cms: Vec<&str> = env["notes"].as_array().unwrap().iter().map(|n| n["cm"].as_str().unwrap()).collect();
+    assert_eq!(cms.len(), 6, "four bundle slots and two payouts: {env}");
+    assert!(cms.contains(&h("payout-0").as_str()) && cms.contains(&h("payout-1").as_str()));
+    let (_, _, list) = call_api(&live.app, "/api/v1/transactions?kind=invoke").await;
+    assert_eq!(list["pagination"]["total"], 1, "{list}");
+    assert_eq!(list["data"][0]["hash"], invoke_hash);
     // The deploy-time public input (v0.4): the length is the action's, the digest the node's.
     assert_eq!(p["public_words_len"], 27151, "{p}");
     assert_eq!(p["public_digest"], public_digest(&program));
@@ -638,7 +712,7 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
         TxKind::Transfer, TxKind::Mint, TxKind::Deploy, TxKind::Call, TxKind::Bond, TxKind::Unbond,
         TxKind::Withdraw, TxKind::BridgeAttest, TxKind::BridgeBurn, TxKind::RegisterToken, TxKind::TokenMint,
         TxKind::SetAuthority, TxKind::TokenBurn, TxKind::PauseMints, TxKind::UnpauseMints,
-        TxKind::RegisterBridgedToken, TxKind::ListBacking, TxKind::Other,
+        TxKind::RegisterBridgedToken, TxKind::ListBacking, TxKind::Invoke, TxKind::Other,
     ] {
         assert!(got.contains(&k), "broadcast kinds miss {k}: {got:?}");
     }

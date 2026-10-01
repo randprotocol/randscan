@@ -24,7 +24,7 @@ fn to_wire(r: db::NoteEnvelopeRow) -> NoteEnvelope {
 }
 
 /// GET /api/v1/transactions/:hash/envelopes — the notes a transaction created, with their
-/// envelopes, plus a call's sealed input transcript and `h_in`.
+/// envelopes, plus a call's (or an invoke's) sealed input transcript and `h_in`.
 pub async fn transaction_envelopes(
     State(state): State<AppState>,
     Path(hash): Path<String>,
@@ -43,7 +43,8 @@ pub async fn transaction_envelopes(
         .into_iter()
         .map(to_wire)
         .collect();
-    let (h_in, call_envelope) = if kind == TxKind::Call {
+    // A call's transcript, and an invoke's (its proof is a call's, over the transition).
+    let (h_in, call_envelope) = if kind.has_receipt() {
         let h_in = db::get_receipt(pool, &hash).await?.map(|r| r.h_in);
         // The transcript lives on the node only (it can be large); fetched on demand.
         let env = match state.indexer.rpc().call_envelope(&hash).await {

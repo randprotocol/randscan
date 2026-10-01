@@ -4,7 +4,9 @@ use sqlx::{PgConnection, PgPool};
 const SELECT: &str = "SELECT p.id, p.deploy_tx, p.deployed_at_height, p.base_pc, p.words_len, p.code_hash,
         p.public_words_len, p.public_digest,
         (SELECT COUNT(*) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS call_count,
-        (SELECT MAX(t.height) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS last_called_height
+        (SELECT MAX(t.height) FROM transactions t WHERE t.kind = 'call' AND t.program_id = p.id) AS last_called_height,
+        (SELECT COUNT(*) FROM transactions t WHERE t.kind = 'invoke' AND t.program_id = p.id) AS invoke_count,
+        (SELECT MAX(t.height) FROM transactions t WHERE t.kind = 'invoke' AND t.program_id = p.id) AS last_invoked_height
      FROM programs p";
 
 pub struct NewProgram<'a> {

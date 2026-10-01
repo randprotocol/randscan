@@ -93,6 +93,10 @@ pub struct MockChain {
     pub pause_nonce: u64,
     pub list_nonce: u64,
     pub pq_guardians: Vec<String>,
+    /// RPL-2: whether the genesis has a `program_state` section. With it `rand_getLimits`
+    /// reports the group, `rand_getSupply` the vault counters, and the program-state methods
+    /// answer; without it they answer `{"enabled": false}`, as a v0.6.8 node on chain 18 would.
+    pub program_state: bool,
 }
 
 impl MockChain {
@@ -114,6 +118,7 @@ impl MockChain {
             pause_nonce: 0,
             list_nonce: 0,
             pq_guardians: vec![],
+            program_state: false,
         };
         c.push_block(vec![]);
         c
@@ -181,6 +186,15 @@ impl MockChain {
                         m["r"].as_str().unwrap(),
                     );
                     self.leaves.push((cm, height));
+                }
+                // RPL-2: one chain-computed note per payout, pays then mints, after the bundle's
+                // four; the node renders each payout's `cm` itself.
+                Some("invoke") => {
+                    for side in ["pays", "mints"] {
+                        for p in a["transition"][side].as_array().into_iter().flatten() {
+                            self.leaves.push((p["cm"].as_str().unwrap().to_string(), height));
+                        }
+                    }
                 }
                 _ => {}
             }
@@ -296,12 +310,21 @@ impl MockChain {
                 json!({ "epoch": height / 1000, "epoch_blocks": 1000,
                         "next_set": self.validators.iter().filter(|v| v.active).map(|v| v.address.clone()).collect::<Vec<_>>() })
             }
-            "rand_getSupply" if !self.pre_s2 => json!({
-                "height": self.head()["height"], "genesis_deposited": "1000000000000", "genesis_staked": "100000000000000",
-                "faucet_minted": "100000000000", "withdraw_deposited": "0", "fees_paid": "3000000", "burned": "0",
-                "pool_value": "1099997000000", "register_total": "100000003000000", "total_supply": "101100000000000",
-                "invariant_holds": true
-            }),
+            "rand_getSupply" if !self.pre_s2 => {
+                let mut s = json!({
+                    "height": self.head()["height"], "genesis_deposited": "1000000000000", "genesis_staked": "100000000000000",
+                    "faucet_minted": "100000000000", "withdraw_deposited": "0", "fees_paid": "3000000", "burned": "0",
+                    "pool_value": "1099997000000", "register_total": "100000003000000", "total_supply": "101100000000000",
+                    "invariant_holds": true
+                });
+                // RPL-2 (a v0.6.8 node): what invokes paid out of vaults and what vaults hold;
+                // "0" on a chain without the section.
+                if self.program_state {
+                    s["program_rand_out"] = json!("300");
+                    s["program_rand_held"] = json!("700");
+                }
+                s
+            }
             // The shape (and, critically, the *encoding*) is copied verbatim from the node's own
             // pinned test, `bridge_state_reports_guardians_emitters_and_the_registry`
             // (crates/randprotocol-node/src/rpc.rs): `asset_json` sends `locked`/
@@ -397,9 +420,12 @@ impl MockChain {
                     .unwrap_or(Value::Null)
             }
             // A call's receipt: `h_pub` is the called program's public digest, `null` without one.
+            // An invoke's receipt is a call's (RPL-2).
             "rand_getReceipt" => {
                 let hash = p(0).as_str().unwrap_or("").to_string();
-                let call = self.committed().find(|(_, _, t)| t["hash"] == hash && t["action"]["kind"] == "call");
+                let call = self
+                    .committed()
+                    .find(|(_, _, t)| t["hash"] == hash && (t["action"]["kind"] == "call" || t["action"]["kind"] == "invoke"));
                 match call {
                     None => Value::Null,
                     Some((height, index, t)) => {
@@ -419,11 +445,65 @@ impl MockChain {
             "rand_getGenesisHash" if !self.pre_s2 => self.blocks.first().map(|b| b["hash"].clone()).unwrap_or(Value::Null),
             // Chain 18's shape (fullnode v0.6.6): the caps, the memo envelope, the v0.6 switch,
             // the auth guest and the gas section with its genesis prices (decimal strings).
-            "rand_getLimits" if !self.pre_s2 => json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
-                "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
-                "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
-                "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
-                "bundle_gas_limit": 20479, "adjust_bps": 1250 }),
+            "rand_getLimits" if !self.pre_s2 => {
+                let mut l = json!({ "max_program_words": 65535, "max_proof_bytes": 8388608,
+                    "max_block_bytes": 20971520, "max_call_envelope_bytes": 65536, "max_program_public_words": 32768,
+                    "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
+                    "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
+                    "bundle_gas_limit": 20479, "adjust_bps": 1250 });
+                // RPL-2 (a v0.6.8 node): the `program_state` group, `null` without the section.
+                l["program_state"] = if self.program_state {
+                    json!({ "cell_fee": "10000000", "max_reads": 8, "max_writes": 8, "max_payouts": 4 })
+                } else {
+                    Value::Null
+                };
+                l
+            }
+            // RPL-2: a program's vault and its cells, as the node serves them from the ledger —
+            // here derived from the committed invokes: the vault is what every invoke's bundle
+            // deposited less what its `pays` paid out, per asset; the cells are the latest
+            // write to each key, in key order, zero-valued ones gone.
+            "rand_getProgramVault" | "rand_getProgramCells" if !self.program_state => json!({ "enabled": false }),
+            "rand_getProgramVault" => {
+                let id = p(0).as_str().unwrap_or("").to_string();
+                let mut vault: std::collections::BTreeMap<u64, i128> = Default::default();
+                for (_, _, t) in self.committed().filter(|(_, _, t)| t["action"]["kind"] == "invoke" && t["action"]["program"] == id) {
+                    let b = &t["bundle"];
+                    let num = |v: &Value| v.as_u64().map(|n| n as i128).or_else(|| v.as_str().and_then(|s| s.parse().ok())).unwrap_or(0);
+                    *vault.entry(0).or_default() += num(&b["burn_r"]);
+                    if t["action"]["transition"]["inflow"] == "deposit" {
+                        *vault.entry(b["burn_asset"].as_u64().unwrap_or(0)).or_default() += num(&b["burn_a"]);
+                    }
+                    for pay in t["action"]["transition"]["pays"].as_array().into_iter().flatten() {
+                        *vault.entry(pay["asset"].as_u64().unwrap_or(0)).or_default() -= num(&pay["amount"]);
+                    }
+                }
+                json!(vault.iter().filter(|(_, a)| **a > 0).map(|(a, n)| json!({ "asset": a, "amount": n.to_string() })).collect::<Vec<_>>())
+            }
+            "rand_getProgramCells" => {
+                let id = p(0).as_str().unwrap_or("").to_string();
+                let after = p(1)["after"].as_str().map(str::to_string);
+                let limit = p(1)["limit"].as_u64().unwrap_or(1000).clamp(1, 1000) as usize;
+                let mut cells: std::collections::BTreeMap<String, String> = Default::default();
+                for (_, _, t) in self.committed().filter(|(_, _, t)| t["action"]["kind"] == "invoke" && t["action"]["program"] == id) {
+                    for w in t["action"]["transition"]["writes"].as_array().into_iter().flatten() {
+                        let (k, v) = (w["key"].as_str().unwrap().to_string(), w["value"].as_str().unwrap().to_string());
+                        if v == "00".repeat(32) {
+                            cells.remove(&k);
+                        } else {
+                            cells.insert(k, v);
+                        }
+                    }
+                }
+                let page: Vec<Value> = cells
+                    .iter()
+                    .filter(|(k, _)| after.as_ref().is_none_or(|a| *k > a))
+                    .take(limit)
+                    .map(|(k, v)| json!({ "key": k, "value": v }))
+                    .collect();
+                let more = cells.iter().filter(|(k, _)| after.as_ref().is_none_or(|a| *k > a)).count() > page.len();
+                json!({ "cells": page, "next": if more { page.last().map(|c| c["key"].clone()).unwrap_or(Value::Null) } else { Value::Null } })
+            }
             other => return Err((-32601, format!("unknown method {other}"))),
         })
     }

@@ -210,6 +210,10 @@ chain without the setting and on a node too old to report it:
 - `bundle_gas_limit` — the flat gas every bundle proof must declare (`20479` on chain 18);
   `adjust_bps` — the dynamic controller's per-block step in basis points (`1250` = 12.5%), `null`
   when the prices never move. Both `null` without a `gas` section.
+- `program_state` — RPL-2 (fullnode v0.6.8): `{ "cell_fee": "10000000", "max_reads": 8,
+  "max_writes": 8, "max_payouts": 4 }` on a chain whose genesis has the section (`cell_fee` is
+  the RAND units an invoke's fee floor gains per cell it creates), `null` without it — where
+  every `invoke` is refused — and absent on a node predating the field.
 
 `hc_auth` (top level) is the same guest as `rand_status` reports it, and `gas_prices` are the
 **tip's** live prices, refreshed every commit: under a dynamic `gas` section they move per block
@@ -224,8 +228,14 @@ the proof, not a field of the receipt), so the explorer cannot show it per trans
   "genesis_deposited": "…", "genesis_staked": "…", "faucet_minted": "…",
   "withdraw_deposited": "…", "fees_paid": "…", "burned": "…",
   "pool_value": "…", "register_total": "…", "total_supply": "…", "invariant_holds": true,
-  "vesting_issued": "…", "vesting_released": "…", "vesting_in_register": "…", "vesting_locked": "…" }
+  "vesting_issued": "…", "vesting_released": "…", "vesting_in_register": "…", "vesting_locked": "…",
+  "program_rand_out": "…", "program_rand_held": "…" }
 ```
+
+`program_rand_out` and `program_rand_held` are RPL-2: RAND that invokes have paid out of program
+vaults as notes (pool side, beside `withdraw_deposited`) and what the vaults still hold (register
+side, inside `total_supply`); `"0"` on a chain without a `program_state` section, `null` on a
+node predating them.
 
 Note values are hidden, but every crossing of the pool boundary is public, so these are exact.
 `invariant_holds` false would be a chain bug, never a legitimate state. The four `vesting_*`
@@ -505,7 +515,30 @@ kinds and which fields they fill:
 | `unpause_mints` | the PQ guardian quorum lifts the mint pause | null | | `bridge_governance`, `pq_signers`, `action_nonce` |
 | `register_bridged_token` | a new bridged token listed after genesis by the PQ guardian quorum | null | | `bridge_governance`, `pq_signers` |
 | `list_backing` | another source-chain backing added to an already-listed bridged token | null | `asset_index` | `bridge_governance`, `pq_signers` |
+| `invoke` | RPL-2: a confidential call whose proof vouches for one declared state transition of the program, which the ledger applied | null | `program` | `call_proof_len`, `input_envelope_len`, `receipt`, `transition` |
 | `other` | a kind newer than this explorer build | null | | none |
+
+An `invoke`'s `transition` is the node's rendering, verbatim but for amounts as decimal strings:
+
+```json
+"transition": {
+  "reads":  [{ "key": "0100…00", "value": "0000…00" }],
+  "writes": [{ "key": "0100…00", "value": "0500…00" }],
+  "inflow": "deposit",
+  "pays":  [{ "asset": 0, "amount": "300", "recipient": "rand1…", "time": 41, "r": "…", "cm": "…" }],
+  "mints": [{ "asset": 2, "amount": "40", "recipient": "rand1…", "time": 41, "r": "…", "cm": "…" }] }
+```
+
+`reads` are the cells the program read with the values it read (the ledger refused the
+transaction unless they still held — a read of 64 zeros is of a cell that did not exist),
+`writes` the cells it wrote (64 zeros deletes the cell). What came **in** is the bundle's:
+`burn_r` is RAND deposited into the program's vault, and `burn_a` of `burn_asset` is the token
+`inflow` names — `deposit` into the vault, `burn` destroyed (the program's own token), `none`
+when `burn_a` is 0. What went **out** is one chain-computed note per payout, `pays` (out of the
+vault) then `mints` (new units of a token whose mint authority is the program), in that order in
+the tree; `time` is the bundle's and `cm` the leaf the chain appended, which this explorer links
+to the transaction like a `token_mint`'s note (`GET /notes/:cm`, and among the transaction's
+`envelopes`). The receipt is a call's.
 
 `TransactionDetail` adds `chain_id`, `bundle` and the per-kind fields above (null when they do
 not apply). The bundle is the transaction's public face — chain 14's hidden-asset bundle, four
@@ -702,7 +735,8 @@ entry active.
 | method and path | returns |
 |---|---|
 | `GET /programs?page&limit` | paginated `ProgramSummary` |
-| `GET /programs/:id` | `ProgramSummary` plus `recent_calls` (last 10 `TransactionSummary`) |
+| `GET /programs/:id` | `ProgramSummary` plus `recent_calls` (last 10 `TransactionSummary`, calls and invokes) and `program_state` |
+| `GET /programs/:id/cells?after&limit` | a page of the program's state cells in key order, live from the node (RPL-2); 404 on a chain without a `program_state` section |
 
 ```json
 {
@@ -712,9 +746,26 @@ entry active.
   "base_pc": 0, "words_len": 42,
   "code_hash": "675adeea7e4242d8dc48bf56faedb7bea14a4f832d7c8a973f942fa7dd850065",
   "public_words_len": 0, "public_digest": null,
-  "call_count": 3, "last_called_height": 105
+  "call_count": 3, "last_called_height": 105,
+  "invoke_count": 1, "last_invoked_height": 120,
+  "recent_calls": [ … ],
+  "program_state": {
+    "vault": [{ "asset": 0, "amount": "300000000" }, { "asset": 2, "amount": "500" }],
+    "cells": [{ "key": "0100…00", "value": "0500…00" }],
+    "cells_next": null
+  }
 }
 ```
+
+`invoke_count`, `last_invoked_height` and `program_state` are RPL-2 (fullnode v0.6.8, a
+genesis-gated `program_state` section; on no chain as of 2026-10-01). `program_state` is read
+live from the node when the page is served — a program's state is public chain state that moves
+with every invoke: `vault` is what the program holds per asset (registry index, 0 is RAND; units
+of that asset; a row at zero does not exist), `cells` the first 100 of its cells in key order
+(each a 64-hex `Word8` key and value; a cell written to zeros is gone), and `cells_next` the last
+key served when more follow — pass it as `after` to `GET /programs/:id/cells` (`limit` 1 to
+1000, default 100), which answers `{ "cells": [...], "next": "<key>" | null }`. `program_state`
+is `null` on a chain without the section and on a node predating it.
 
 Programs are content addressed and immutable; `id` never changes. There is no deployer: a deploy
 is paid by a shielded bundle, so the chain does not know who deployed it.

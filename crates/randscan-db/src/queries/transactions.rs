@@ -12,7 +12,7 @@ pub const TX_DETAIL_COLS: &str = "hash, block_hash, height, tx_index, kind, fee:
     envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
     words_len, call_proof_len, input_envelope_len, cm, registered, action_nonce, attestation_len, recipient, note_time,
     relayer_fee::text AS relayer_fee, to_chain, bridge_to, bridge_token, deposit_r, derived_cm, pq_signers,
-    token_action, bridge_governance, auth_commit, auth_proof_len";
+    token_action, bridge_governance, auth_commit, auth_proof_len, transition";
 
 /// The public fields of one hidden-asset bundle (chain 14: four input slots, four output slots,
 /// dummies included; no public `asset` field — see `randscan_core::Bundle`'s doc comment).
@@ -76,6 +76,10 @@ pub struct NewTx<'a> {
     pub token_action: Option<serde_json::Value>,
     /// pause_mints / unpause_mints / register_bridged_token / list_backing, in full.
     pub bridge_governance: Option<serde_json::Value>,
+    /// invoke (RPL-2): the transition in full, and the commitments of its payout notes (pays
+    /// then mints), each a leaf the chain appended that links back to this transaction.
+    pub transition: Option<serde_json::Value>,
+    pub payout_cms: Vec<String>,
 }
 
 /// Insert the transaction and every nullifier its bundle published.
@@ -91,7 +95,7 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
              program_id, words_len, call_proof_len, input_envelope_len, amount, cm, validator, registered,
              action_nonce, attestation_len, recipient, note_time, asset_index, relayer_fee, to_chain, bridge_to,
              bridge_token, deposit_r, derived_cm, pq_signers, token_action, bridge_governance,
-             auth_commit, auth_proof_len)
+             auth_commit, auth_proof_len, transition, payout_cms)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric,
              $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
              $19::numeric, $20::numeric, $21, $22,
@@ -99,7 +103,7 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
              $28, $29, $30, $31, $32::numeric, $33, $34, $35,
              $36, $37, $38, $39, $40, $41::numeric, $42, $43,
              $44, $45, $46, $47, $48, $49,
-             $50, $51)",
+             $50, $51, $52, $53)",
     )
     .bind(t.hash)
     .bind(t.block_hash)
@@ -152,6 +156,8 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(t.bridge_governance.as_ref())
     .bind(b.and_then(|b| b.auth_commit.as_deref()))
     .bind(b.map(|b| b.auth_proof_len).unwrap_or(0))
+    .bind(t.transition.as_ref())
+    .bind((!t.payout_cms.is_empty()).then_some(&t.payout_cms))
     .execute(&mut *conn)
     .await?;
 
@@ -290,9 +296,10 @@ pub async fn count_transactions(pool: &PgPool, f: &TxFilter<'_>) -> Result<i64> 
         .await?)
 }
 
+/// The latest calls and invokes of a program.
 pub async fn list_program_calls(pool: &PgPool, program: &str, limit: i64) -> Result<Vec<TxRow>> {
     let sql = format!(
-        "SELECT {TX_COLS} FROM transactions WHERE kind = 'call' AND program_id = $1 ORDER BY height DESC, tx_index DESC LIMIT $2"
+        "SELECT {TX_COLS} FROM transactions WHERE kind IN ('call', 'invoke') AND program_id = $1 ORDER BY height DESC, tx_index DESC LIMIT $2"
     );
     Ok(sqlx::query_as::<_, TxRow>(&sql)
         .bind(program)
@@ -301,13 +308,13 @@ pub async fn list_program_calls(pool: &PgPool, program: &str, limit: i64) -> Res
         .await?)
 }
 
-/// The transaction whose bundle (or mint, or chain-computed note) created the note with
-/// commitment `cm`.
+/// The transaction whose bundle (or mint, chain-computed note, or invoke payout) created the
+/// note with commitment `cm`.
 pub async fn find_transaction_by_commitment(pool: &PgPool, cm: &str) -> Result<Option<TxRow>> {
     let sql = format!(
         "SELECT {TX_COLS} FROM transactions
          WHERE commitment_1 = $1 OR commitment_2 = $1 OR commitment_3 = $1 OR commitment_4 = $1
-            OR cm = $1 OR derived_cm = $1 LIMIT 1"
+            OR cm = $1 OR derived_cm = $1 OR $1 = ANY(payout_cms) LIMIT 1"
     );
     Ok(sqlx::query_as::<_, TxRow>(&sql)
         .bind(cm)

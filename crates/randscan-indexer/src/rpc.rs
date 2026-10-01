@@ -185,6 +185,28 @@ impl RpcClient {
             .await
     }
 
+    /// RPL-2: a program's vault. `None` on a node without the method and on a chain without a
+    /// `program_state` section (`{"enabled": false}`); an empty vault is `Some(vec![])`.
+    pub async fn program_vault(&self, id: &str) -> Result<Option<Vec<randscan_core::VaultRow>>> {
+        let v: Option<serde_json::Value> = self.call_optional_method("rand_getProgramVault", serde_json::json!([id])).await?;
+        match v {
+            Some(rows @ serde_json::Value::Array(_)) => Ok(Some(serde_json::from_value(rows)?)),
+            _ => Ok(None),
+        }
+    }
+
+    /// RPL-2: a page of a program's cells in key order, after `after` (a 64-hex key) when given,
+    /// at most `limit` (the node clamps to 1 000). `None` as [`Self::program_vault`].
+    pub async fn program_cells(&self, id: &str, after: Option<&str>, limit: u64) -> Result<Option<randscan_core::ProgramCellsPage>> {
+        let v: Option<serde_json::Value> = self
+            .call_optional_method("rand_getProgramCells", serde_json::json!([id, { "after": after, "limit": limit }]))
+            .await?;
+        match v {
+            Some(v) if v.get("cells").is_some() => Ok(Some(serde_json::from_value(v)?)),
+            _ => Ok(None),
+        }
+    }
+
     /// A page of commitment-tree leaves from `from_index`, at most 1000 rows.
     pub async fn commitments(&self, from_index: u64, limit: u64) -> Result<Vec<RpcCommitment>> {
         self.call_required(
@@ -570,10 +592,80 @@ pub enum RpcAction {
         nonce: u64,
         pq_signers: Vec<i64>,
     },
+    /// RPL-2: a call plus the state transition its proof vouched for (`docs/rpc.md`,
+    /// `rand_getTransaction`'s `invoke`).
+    Invoke {
+        program: String,
+        proof_len: u64,
+        input_envelope_len: Option<u64>,
+        transition: RpcTransition,
+    },
     /// A kind this build does not decode; `kind` is the node's tag.
     Unknown {
         kind: String,
     },
+}
+
+/// An invoke's transition as the node renders it — the shape `randscan_core::Transition` keeps,
+/// with amounts as the wire's number-or-string.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcTransition {
+    #[serde(default)]
+    pub reads: Vec<RpcCell>,
+    #[serde(default)]
+    pub writes: Vec<RpcCell>,
+    pub inflow: String,
+    #[serde(default)]
+    pub pays: Vec<RpcPayout>,
+    #[serde(default)]
+    pub mints: Vec<RpcPayout>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcCell {
+    pub key: String,
+    pub value: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcPayout {
+    pub asset: u32,
+    pub amount: Units,
+    pub recipient: String,
+    pub time: u64,
+    pub r: String,
+    pub cm: String,
+}
+
+impl RpcTransition {
+    /// The explorer's own type, amounts normalised to decimal strings.
+    pub fn to_core(&self) -> randscan_core::Transition {
+        let cells = |v: &[RpcCell]| v.iter().map(|c| randscan_core::ProgramCell { key: c.key.clone(), value: c.value.clone() }).collect();
+        let payouts = |v: &[RpcPayout]| {
+            v.iter()
+                .map(|p| randscan_core::Payout {
+                    asset: p.asset as i64,
+                    amount: p.amount.0.clone(),
+                    recipient: p.recipient.clone(),
+                    time: p.time as i64,
+                    r: p.r.clone(),
+                    cm: p.cm.clone(),
+                })
+                .collect()
+        };
+        randscan_core::Transition {
+            reads: cells(&self.reads),
+            writes: cells(&self.writes),
+            inflow: self.inflow.clone(),
+            pays: payouts(&self.pays),
+            mints: payouts(&self.mints),
+        }
+    }
+
+    /// Every payout note's commitment, pays then mints — the order the chain appended them in.
+    pub fn payout_cms(&self) -> Vec<String> {
+        self.pays.iter().chain(&self.mints).map(|p| p.cm.clone()).collect()
+    }
 }
 
 /// `register_token`'s optional `initial` mint: every word of the note the chain computes for it.
@@ -605,6 +697,13 @@ enum KnownAction {
         proof_len: u64,
         #[serde(default)]
         input_envelope_len: Option<u64>,
+    },
+    Invoke {
+        program: String,
+        proof_len: u64,
+        #[serde(default)]
+        input_envelope_len: Option<u64>,
+        transition: RpcTransition,
     },
     Bond {
         validator: String,
@@ -721,6 +820,7 @@ const KNOWN_TAGS: &[&str] = &[
     "mint",
     "deploy",
     "call",
+    "invoke",
     "bond",
     "unbond",
     "withdraw",
@@ -765,6 +865,17 @@ impl<'de> Deserialize<'de> for RpcAction {
                     program,
                     proof_len,
                     input_envelope_len,
+                },
+                KnownAction::Invoke {
+                    program,
+                    proof_len,
+                    input_envelope_len,
+                    transition,
+                } => RpcAction::Invoke {
+                    program,
+                    proof_len,
+                    input_envelope_len,
+                    transition,
                 },
                 KnownAction::Bond {
                     validator,

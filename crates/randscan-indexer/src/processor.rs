@@ -49,7 +49,8 @@ impl BlockProcessor {
         // Receipts come from the node; fetch them before opening the DB transaction.
         let mut receipts = Vec::new();
         for tx in &block.transactions {
-            if let RpcAction::Call { .. } = tx.action {
+            // An invoke is a call with a transition: its receipt is a call's.
+            if let RpcAction::Call { .. } | RpcAction::Invoke { .. } = tx.action {
                 match self.rpc.receipt(&tx.hash).await {
                     Ok(Some(r)) => receipts.push(PreparedReceipt {
                         tx_hash: tx.hash.clone(),
@@ -160,6 +161,8 @@ impl BlockProcessor {
                     pq_signers: f.pq_signers.clone(),
                     token_action: f.token_action.clone(),
                     bridge_governance: f.bridge_governance.clone(),
+                    transition: f.transition.clone(),
+                    payout_cms: f.payout_cms.clone(),
                 },
             )
             .await
@@ -364,6 +367,10 @@ struct TxFields<'a> {
     pq_signers: Option<Vec<i32>>,
     token_action: Option<serde_json::Value>,
     bridge_governance: Option<serde_json::Value>,
+    /// invoke (RPL-2): the transition in full, and its payout notes' commitments (pays then
+    /// mints) — leaves the chain appended, linked to this transaction as a `derived_cm` is.
+    transition: Option<serde_json::Value>,
+    payout_cms: Vec<String>,
 }
 
 impl<'a> TxFields<'a> {
@@ -393,6 +400,8 @@ impl<'a> TxFields<'a> {
             pq_signers: None,
             token_action: None,
             bridge_governance: None,
+            transition: None,
+            payout_cms: Vec::new(),
         }
     }
 
@@ -419,6 +428,19 @@ impl<'a> TxFields<'a> {
                 call_proof_len: Some(*proof_len as i64),
                 input_envelope_len: input_envelope_len.map(|n| n as i64),
                 ..Self::empty(TxKind::Call)
+            },
+            RpcAction::Invoke {
+                program,
+                proof_len,
+                input_envelope_len,
+                transition,
+            } => TxFields {
+                program: Some(program),
+                call_proof_len: Some(*proof_len as i64),
+                input_envelope_len: input_envelope_len.map(|n| n as i64),
+                transition: serde_json::to_value(transition.to_core()).ok(),
+                payout_cms: transition.payout_cms(),
+                ..Self::empty(TxKind::Invoke)
             },
             RpcAction::Bond {
                 validator,
