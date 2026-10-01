@@ -104,6 +104,19 @@ export function AuthForm({ mode }: AuthFormProps) {
         <button type="submit" disabled={busy} className="btn-primary w-full justify-center disabled:opacity-60">
           {busy ? 'Please wait…' : text.button}
         </button>
+        {mode === 'signup' && (
+          <p className="text-center text-xs text-mute">
+            By creating an account you accept the{' '}
+            <Link href="/terms" className="link">
+              Terms of Service
+            </Link>{' '}
+            and the{' '}
+            <Link href="/privacy" className="link">
+              Privacy Policy
+            </Link>
+            .
+          </p>
+        )}
         <p className="text-center text-sm text-soft">
           {text.alt}{' '}
           <Link href={text.altLink} className="link">

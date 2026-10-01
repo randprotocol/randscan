@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Mark } from './Brand';
 
 export function Footer() {
@@ -25,6 +26,12 @@ export function Footer() {
           >
             GitHub
           </a>
+          <Link href="/privacy" className="transition-colors hover:text-strong">
+            Privacy
+          </Link>
+          <Link href="/terms" className="transition-colors hover:text-strong">
+            Terms
+          </Link>
         </div>
       </div>
     </footer>
