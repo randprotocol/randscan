@@ -5,6 +5,7 @@ export const key_info: (a: number, b: number, c: number, d: number) => [number, 
 export const nullifier_of: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
 export const open_call: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
 export const open_note: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
+export const rebuild_note: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
 export const __wbindgen_externrefs: WebAssembly.Table;
 export const __wbindgen_malloc: (a: number, b: number) => number;
 export const __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

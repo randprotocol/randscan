@@ -577,3 +577,82 @@ pub fn nullifier_of(key_kind: &str, key: &str, cm_hex: &str) -> Result<String, S
     let cm = word8_from_hex(cm_hex).ok_or("commitment must be 64 hex characters")?;
     Ok(word8_to_hex(&vk.nullifier(&cm)))
 }
+
+// ------------------------------------------------------------- notes the chain computed
+
+/// `randprotocol_core::ledger::tokens::MINT_FROM`: the `from` word of every RPL mint's note
+/// (`token_mint`, a `register_token`'s initial mint): ASCII `rpl-mint`, zero-padded.
+pub const MINT_FROM: Word8 = [u32::from_le_bytes(*b"rpl-"), u32::from_le_bytes(*b"mint"), 0, 0, 0, 0, 0, 0];
+/// `randprotocol_core::ledger::program_state::PROGRAM_FROM`: the `from` word of an RPL-2
+/// invoke's payout notes, ASCII `rpl2-pay`, zero-padded.
+pub const PROGRAM_FROM: Word8 = [u32::from_le_bytes(*b"rpl2"), u32::from_le_bytes(*b"-pay"), 0, 0, 0, 0, 0, 0];
+/// A bridge deposit's and a bridge fee note's `from`: zero (`bridge_notes::DEPOSIT_FROM`).
+pub const DEPOSIT_FROM: Word8 = [0; 8];
+
+/// The public opening of a chain-computed note as randscan serves it beside the leaf
+/// (`GET /api/v1/envelopes`, `public`): every word but `pk` and `from`.
+#[derive(Clone, Debug, Deserialize)]
+pub struct PublicNote {
+    pub source: String,
+    pub amount: serde_json::Value,
+    pub asset: u32,
+    pub time: u32,
+    pub r: String,
+}
+
+/// The `from` word a chain-computed note of `source` carries; `None` for an unknown source.
+pub fn from_word(source: &str) -> Option<Word8> {
+    match source {
+        "bridge_deposit" | "bridge_fee" => Some(DEPOSIT_FROM),
+        "token_mint" | "initial_mint" => Some(MINT_FROM),
+        "payout" => Some(PROGRAM_FROM),
+        _ => None,
+    }
+}
+
+/// The note `p` describes, owned by `vk`, if — and only if — it commits to `cm`. This is
+/// fullnode v0.6.8's wallet rebuild (`wallet::rebuilt_notes_with`) from the explorer's side: the
+/// owner is always the key's own `pk`, never a field from the server, so a served opening can
+/// hide a note (by being wrong) but can credit one only if the leaf itself is the commitment.
+pub fn rebuild(cm: &Word8, p: &PublicNote, vk: &ViewingKey) -> Option<Note> {
+    let amount: u64 = match &p.amount {
+        serde_json::Value::String(s) => s.parse().ok()?,
+        serde_json::Value::Number(n) => n.as_u64()?,
+        _ => return None,
+    };
+    let note = Note { pk: vk.pk(), from: from_word(&p.source)?, amount, asset: p.asset, time: p.time, r: word8_from_hex(&p.r)? };
+    (note.commitment() == *cm).then_some(note)
+}
+
+#[derive(Serialize)]
+struct RebuiltNote {
+    #[serde(flatten)]
+    note: OpenedNote,
+    /// Which chain-computed note this is: `bridge_deposit`, `bridge_fee`, `token_mint`,
+    /// `initial_mint` or `payout`.
+    source: String,
+}
+
+/// Rebuild a chain-computed note (a bridge deposit, a bridge fee note — which has no envelope —
+/// an RPL mint or initial mint, an RPL-2 payout) for a viewing key from its public opening
+/// (`public_json`, randscan's `public` object) and check it against the leaf `cm_hex`. `key_kind`
+/// and `key` are [`open_note`]'s ("viewing", "spend" or "file"; a transaction key cannot rebuild
+/// anything). Returns the note as JSON in `open_note`'s shape (`role` "received", `tx_key` empty,
+/// with its nullifier) plus `source`, or `null` when the note is not this key's.
+#[wasm_bindgen]
+pub fn rebuild_note(cm_hex: &str, public_json: &str, key_kind: &str, key: &str) -> Result<String, String> {
+    let cm = word8_from_hex(cm_hex).ok_or("commitment must be 64 hex characters")?;
+    let p: PublicNote = serde_json::from_str(public_json).map_err(|e| format!("public note: {e}"))?;
+    if key_kind == "tx" {
+        return Err("a transaction key cannot rebuild a chain-computed note; use a viewing key".into());
+    }
+    let vk = viewing_key_from(key_kind, key)?;
+    match rebuild(&cm, &p, &vk) {
+        Some(note) => {
+            let mut o = opened("received", [0; 32], note, Some(vk.nullifier(&cm)), None);
+            o.tx_key = String::new();
+            serde_json::to_string(&RebuiltNote { note: o, source: p.source }).map_err(|e| e.to_string())
+        }
+        None => Ok("null".into()),
+    }
+}

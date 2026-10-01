@@ -24,6 +24,16 @@ export function open_call(h_in_hex: string, envelope_json: string, key_kind: str
  */
 export function open_note(cm_hex: string, envelope_json: string, key_kind: string, key: string): string;
 
+/**
+ * Rebuild a chain-computed note (a bridge deposit, a bridge fee note — which has no envelope —
+ * an RPL mint or initial mint, an RPL-2 payout) for a viewing key from its public opening
+ * (`public_json`, randscan's `public` object) and check it against the leaf `cm_hex`. `key_kind`
+ * and `key` are [`open_note`]'s ("viewing", "spend" or "file"; a transaction key cannot rebuild
+ * anything). Returns the note as JSON in `open_note`'s shape (`role` "received", `tx_key` empty,
+ * with its nullifier) plus `source`, or `null` when the note is not this key's.
+ */
+export function rebuild_note(cm_hex: string, public_json: string, key_kind: string, key: string): string;
+
 export type InitInput = RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
 
 export interface InitOutput {
@@ -32,6 +42,7 @@ export interface InitOutput {
     readonly nullifier_of: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number, number];
     readonly open_call: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly open_note: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
+    readonly rebuild_note: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => [number, number, number, number];
     readonly __wbindgen_externrefs: WebAssembly.Table;
     readonly __wbindgen_malloc: (a: number, b: number) => number;
     readonly __wbindgen_realloc: (a: number, b: number, c: number, d: number) => number;

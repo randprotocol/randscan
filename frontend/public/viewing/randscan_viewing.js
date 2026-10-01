@@ -133,6 +133,46 @@ export function open_note(cm_hex, envelope_json, key_kind, key) {
         wasm.__wbindgen_free(deferred6_0, deferred6_1, 1);
     }
 }
+
+/**
+ * Rebuild a chain-computed note (a bridge deposit, a bridge fee note — which has no envelope —
+ * an RPL mint or initial mint, an RPL-2 payout) for a viewing key from its public opening
+ * (`public_json`, randscan's `public` object) and check it against the leaf `cm_hex`. `key_kind`
+ * and `key` are [`open_note`]'s ("viewing", "spend" or "file"; a transaction key cannot rebuild
+ * anything). Returns the note as JSON in `open_note`'s shape (`role` "received", `tx_key` empty,
+ * with its nullifier) plus `source`, or `null` when the note is not this key's.
+ * @param {string} cm_hex
+ * @param {string} public_json
+ * @param {string} key_kind
+ * @param {string} key
+ * @returns {string}
+ */
+export function rebuild_note(cm_hex, public_json, key_kind, key) {
+    let deferred6_0;
+    let deferred6_1;
+    try {
+        const ptr0 = passStringToWasm0(cm_hex, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passStringToWasm0(public_json, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ptr2 = passStringToWasm0(key_kind, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len2 = WASM_VECTOR_LEN;
+        const ptr3 = passStringToWasm0(key, wasm.__wbindgen_malloc, wasm.__wbindgen_realloc);
+        const len3 = WASM_VECTOR_LEN;
+        const ret = wasm.rebuild_note(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3);
+        var ptr5 = ret[0];
+        var len5 = ret[1];
+        if (ret[3]) {
+            ptr5 = 0; len5 = 0;
+            throw takeFromExternrefTable0(ret[2]);
+        }
+        deferred6_0 = ptr5;
+        deferred6_1 = len5;
+        return getStringFromWasm0(ptr5, len5);
+    } finally {
+        wasm.__wbindgen_free(deferred6_0, deferred6_1, 1);
+    }
+}
 function __wbg_get_imports() {
     const import0 = {
         __proto__: null,

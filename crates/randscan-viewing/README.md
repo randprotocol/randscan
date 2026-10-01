@@ -12,7 +12,11 @@ and chain 19 is cut and run with, so chain 19 needs no rebuild):
 the Poseidon2 sponge with the node's seeded round constants, `nk -> pk / ovk / ML-KEM seed`,
 the note layout and commitment, ChaCha20-Poly1305 with the commitment as associated data, and
 the three openings (receiver through ML-KEM-768, sender through `ovk`, or the transaction key),
-plus a call's sealed input transcript checked against the receipt's `H_IN`. No sealing, no
+plus a call's sealed input transcript checked against the receipt's `H_IN`, and (fullnode
+v0.6.8, `wallet::rebuilt_notes_with`) `rebuild_note`: a chain-computed note — a bridge deposit, a
+bridge fee note (no envelope), an RPL mint, an RPL-2 payout — rebuilt from its public opening
+(randscan's `public`) with the key's own `pk` and accepted only when it commits to the leaf
+(`tests/rebuild.rs`, chain 20 block 1664's leaves 19 and 20). No sealing, no
 randomness, no ledger. `tests/vectors.json` was produced by the fullnode crate itself; the
 tests open it.
 
