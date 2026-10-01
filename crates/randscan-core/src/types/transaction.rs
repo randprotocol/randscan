@@ -18,6 +18,12 @@ use serde::{Deserialize, Serialize};
 /// 2026-10-01): `invoke`, a call whose proof vouches for one declared state transition of the
 /// program — cells read and written, value into and out of the program's vault, tokens the
 /// program mints — which the ledger applies. Its receipt is a call's.
+///
+/// Audit v6 (fullnode v0.6.8, chain 20): `admit_validator` (28, the validator set's vote to admit
+/// a key), `slash_equivocation` (29, two headers of one key for one view), and the bridge's
+/// rotations — `rotate_pq_guardians` / `rotate_pause_key` (rules v2, 22/23) and their
+/// possession-carrying twins `rotate_pq_guardians_v2` / `rotate_pause_key_v2` (30/31) — and
+/// `cancel_rotation` (32).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TxKind {
@@ -39,6 +45,13 @@ pub enum TxKind {
     RegisterBridgedToken,
     ListBacking,
     Invoke,
+    AdmitValidator,
+    SlashEquivocation,
+    RotatePqGuardians,
+    RotatePauseKey,
+    RotatePqGuardiansV2,
+    RotatePauseKeyV2,
+    CancelRotation,
     Other,
 }
 
@@ -63,6 +76,13 @@ impl TxKind {
         TxKind::RegisterBridgedToken,
         TxKind::ListBacking,
         TxKind::Invoke,
+        TxKind::AdmitValidator,
+        TxKind::SlashEquivocation,
+        TxKind::RotatePqGuardians,
+        TxKind::RotatePauseKey,
+        TxKind::RotatePqGuardiansV2,
+        TxKind::RotatePauseKeyV2,
+        TxKind::CancelRotation,
     ];
 
     pub fn as_str(&self) -> &'static str {
@@ -85,6 +105,13 @@ impl TxKind {
             TxKind::RegisterBridgedToken => "register_bridged_token",
             TxKind::ListBacking => "list_backing",
             TxKind::Invoke => "invoke",
+            TxKind::AdmitValidator => "admit_validator",
+            TxKind::SlashEquivocation => "slash_equivocation",
+            TxKind::RotatePqGuardians => "rotate_pq_guardians",
+            TxKind::RotatePauseKey => "rotate_pause_key",
+            TxKind::RotatePqGuardiansV2 => "rotate_pq_guardians_v2",
+            TxKind::RotatePauseKeyV2 => "rotate_pause_key_v2",
+            TxKind::CancelRotation => "cancel_rotation",
             TxKind::Other => "other",
         }
     }
@@ -123,7 +150,14 @@ impl TxKind {
     pub fn has_pq_signers(&self) -> bool {
         matches!(
             self,
-            TxKind::BridgeAttest | TxKind::UnpauseMints | TxKind::RegisterBridgedToken | TxKind::ListBacking
+            TxKind::BridgeAttest
+                | TxKind::UnpauseMints
+                | TxKind::RegisterBridgedToken
+                | TxKind::ListBacking
+                | TxKind::RotatePqGuardians
+                | TxKind::RotatePauseKey
+                | TxKind::RotatePqGuardiansV2
+                | TxKind::RotatePauseKeyV2
         )
     }
 }
@@ -299,6 +333,54 @@ pub enum BridgeGovernanceAction {
         nonce: i64,
         pq_signers: Vec<i64>,
     },
+    /// Bridge rules v2: a new PQ guardian set (Dilithium2 keys, hex), signed by the set before.
+    RotatePqGuardians { new_pq_guardians: Vec<String>, nonce: i64, pq_signers: Vec<i64> },
+    /// Bridge rules v2: a new pause key, signed by the PQ quorum.
+    RotatePauseKey { new_pause_key: String, nonce: i64, pq_signers: Vec<i64> },
+    /// Audit v6 (BRG-14): the rotation with every new holder's proof of possession (counted, not
+    /// shown); it takes effect after the genesis `bridge.rotation.delay_secs` unless cancelled.
+    RotatePqGuardiansV2 { new_pq_guardians: Vec<String>, possession_signatures: i64, nonce: i64, pq_signers: Vec<i64> },
+    RotatePauseKeyV2 { new_pause_key: String, nonce: i64, pq_signers: Vec<i64> },
+    /// Audit v6 (BRG-14): a pending rotation withdrawn before it took effect; `rotation_kind` is
+    /// `pq_guardians` or `pause_key`.
+    CancelRotation { rotation_kind: String, nonce: i64 },
+}
+
+/// Audit v6's validator-set actions (fullnode v0.6.8): bundle-less and fee-less.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum StakingAction {
+    /// STAKE-2: the validator set's vote admitting `candidate` (an address; `candidate_key` the
+    /// Dilithium2 key, hex) to register with a `bond`, on a chain whose genesis sets
+    /// `staking.admission_by_vote`. `voters` are the signing validators, by address.
+    AdmitValidator { candidate: String, candidate_key: String, voters: Vec<String> },
+    /// STAKE-1: the evidence of a leader equivocation — two headers one key signed for one view.
+    SlashEquivocation { offender: String, view: i64, first: HeaderRef, second: HeaderRef },
+}
+
+/// A block header named by hash and height (a `slash_equivocation`'s two headers).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct HeaderRef {
+    pub hash: String,
+    pub height: i64,
+}
+
+/// The bridge fee note (fullnode v0.6.8, genesis `bridge.fees`, chain 20): the zUSD note the chain
+/// mints to the fee recipient out of a deposit (beside the depositor's net note) or out of a burn
+/// (beside the release). Every word of it but its owner, which is the genesis
+/// `bridge.fees.recipient`. It is an extra leaf in the commitment tree — after the deposit's on an
+/// attest, after the bundle's four on a burn — and has **no envelope**: it is sealed to nobody,
+/// so no viewing key finds it by trial decryption; the recipient rebuilds it from these words.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BridgeFeeNote {
+    /// token units (eight decimals), decimal string
+    pub amount: String,
+    /// the token's registry index
+    pub asset: i64,
+    pub time: i64,
+    pub r: String,
+    /// the leaf the chain appended for it
+    pub commitment: String,
 }
 
 /// One program-state cell as an `invoke` read or wrote it (RPL-2): a `Word8` key and value, 64
@@ -401,6 +483,18 @@ pub struct TransactionDetail {
     pub bridge_governance: Option<BridgeGovernanceAction>,
     /// invoke (RPL-2): the state transition the proof vouched for and the ledger applied.
     pub transition: Option<Transition>,
+    /// bridge_attest (v0.6.8): the depositor's note value — `amount` (the gross the guardians
+    /// signed, which is what the backing's `locked` and custody grew by) less the bridge fee.
+    /// Equal to `amount` on a chain without `bridge.fees`; `None` on a node predating it.
+    pub deposit_amount: Option<String>,
+    /// bridge_burn (v0.6.8): what the source contract releases and what left the backing's
+    /// `locked` — `amount` (what the bundle burned) less the bridge fee.
+    pub release_amount: Option<String>,
+    /// bridge_attest / bridge_burn (v0.6.8): the fee note, `None` without `bridge.fees` or when
+    /// the fee rounds to zero.
+    pub fee_note: Option<BridgeFeeNote>,
+    /// admit_validator / slash_equivocation.
+    pub staking_action: Option<StakingAction>,
 }
 
 #[cfg(test)]
@@ -526,6 +620,10 @@ mod tests {
             token_action: None,
             bridge_governance: None,
             transition: None,
+            deposit_amount: None,
+            release_amount: None,
+            fee_note: None,
+            staking_action: None,
         }
     }
 
@@ -629,5 +727,43 @@ mod tests {
         });
         let v = serde_json::to_value(&d).unwrap();
         assert_eq!(v["bridge_governance"]["pq_signers"], serde_json::json!([0, 2]));
+    }
+
+    /// Audit v6's kinds are filterable, their tags are the node's (`tx_json` in fullnode
+    /// v0.6.8's `rpc.rs`, pinned by its own tests), and the rotations are PQ-quorum actions.
+    #[test]
+    fn the_audit_v6_kinds_are_the_nodes_tags() {
+        for (k, tag) in [
+            (TxKind::AdmitValidator, "admit_validator"),
+            (TxKind::SlashEquivocation, "slash_equivocation"),
+            (TxKind::RotatePqGuardians, "rotate_pq_guardians"),
+            (TxKind::RotatePauseKey, "rotate_pause_key"),
+            (TxKind::RotatePqGuardiansV2, "rotate_pq_guardians_v2"),
+            (TxKind::RotatePauseKeyV2, "rotate_pause_key_v2"),
+            (TxKind::CancelRotation, "cancel_rotation"),
+        ] {
+            assert_eq!(k.as_str(), tag);
+            assert_eq!(TxKind::parse(tag), Some(k));
+            assert_eq!(serde_json::to_string(&k).unwrap(), format!("\"{tag}\""));
+        }
+        assert!(TxKind::RotatePqGuardiansV2.has_pq_signers() && !TxKind::CancelRotation.has_pq_signers());
+        assert!(!TxKind::AdmitValidator.has_pq_signers());
+        // The governance enum's own tags agree with the kinds'.
+        let g = BridgeGovernanceAction::RotatePqGuardiansV2 {
+            new_pq_guardians: vec!["ab".into()],
+            possession_signatures: 1,
+            nonce: 9,
+            pq_signers: vec![2],
+        };
+        assert_eq!(serde_json::to_value(&g).unwrap()["kind"], "rotate_pq_guardians_v2");
+        let c: BridgeGovernanceAction =
+            serde_json::from_value(serde_json::json!({ "kind": "cancel_rotation", "rotation_kind": "pause_key", "nonce": 11 })).unwrap();
+        assert!(matches!(c, BridgeGovernanceAction::CancelRotation { nonce: 11, .. }));
+        let s: StakingAction = serde_json::from_value(serde_json::json!({
+            "kind": "slash_equivocation", "offender": "2nRd", "view": 7,
+            "first": { "hash": "aa", "height": 5 }, "second": { "hash": "bb", "height": 5 }
+        }))
+        .unwrap();
+        assert!(matches!(s, StakingAction::SlashEquivocation { view: 7, .. }));
     }
 }

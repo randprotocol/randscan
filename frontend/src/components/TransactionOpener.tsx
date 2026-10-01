@@ -5,7 +5,7 @@ import { KeyPanel, type SubmittedKey } from '@/components/KeyPanel';
 import { OpenedCallBlock, OpenedNoteBlock, type OpenedNoteRow, type SpentState } from '@/components/OpenedNotes';
 import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { openCall, openNote, type OpenedCall, type OpenedNote } from '@/lib/viewing';
+import { openCall, openNote, rebuildNote, type OpenedCall, type OpenedNote } from '@/lib/viewing';
 import type { TransactionKind } from '@/types';
 
 async function spentState(nullifier: string): Promise<SpentState> {
@@ -45,7 +45,12 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
         } else {
           opened = await openNote(n.cm, n.envelope, keyKind, key);
         }
-        const row: OpenedNoteRow = { leaf_index: n.leaf_index, cm: n.cm, height: n.height, opened };
+        // A chain-computed note is rebuilt from its public opening for a viewing key's own pk
+        // (a bridge fee note has no envelope at all; a deposit's envelope may be junk).
+        if (!opened && n.public && keyKind !== 'call' && keyKind !== 'tx') {
+          opened = await rebuildNote(n.cm, n.public, keyKind, key);
+        }
+        const row: OpenedNoteRow = { leaf_index: n.leaf_index, cm: n.cm, height: n.height, opened, public: n.public ?? null };
         if (opened && opened.nullifier) row.spent = await spentState(opened.nullifier);
         out.push(row);
       }

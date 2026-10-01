@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Column, DataTable } from '@/components/DataTable';
 import { Hash } from '@/components/Hash';
 import { ErrorState, PageHeader } from '@/components/States';
-import { useValidators } from '@/hooks/useApi';
+import { useAdmittedValidators, useValidators } from '@/hooks/useApi';
 import { formatNumber, formatPercentage, formatStake, formatTimestamp } from '@/lib/utils';
 import type { Validator } from '@/types';
 
@@ -104,6 +104,7 @@ const columns: Column<Validator>[] = [
 
 export default function ValidatorsPage() {
   const { data, error, isLoading, mutate } = useValidators();
+  const { data: admitted } = useAdmittedValidators();
 
   if (error && !data) {
     return (
@@ -141,6 +142,27 @@ export default function ValidatorsPage() {
         isLoading={isLoading && !data}
         emptyMessage="No validators reported"
       />
+
+      {admitted?.admission_by_vote && (
+        <div className="text-xs text-mute">
+          <p>
+            New validators are admitted by the set&apos;s vote (audit v6): a bond that registers a new key
+            needs an <code>admit_validator</code> first.{' '}
+            {admitted.admitted.length === 0
+              ? 'No key is admitted and waiting to register.'
+              : `${formatNumber(admitted.admitted.length)} admitted, not yet registered:`}
+          </p>
+          {admitted.admitted.length > 0 && (
+            <ul className="mt-1 space-y-0.5">
+              {admitted.admitted.map((a) => (
+                <li key={a}>
+                  <Hash value={a} start={10} end={6} />
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
 
       <p className="text-xs text-mute">
         The register is the one place this chain stores amounts in the clear. Active validators are

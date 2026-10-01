@@ -11,7 +11,7 @@ import { PageHeader } from '@/components/States';
 import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
 import { formatAmount, formatTokenAmount, formatNumber, tokenBalances, type TokenBalance } from '@/lib/utils';
-import { keyInfo, openNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
+import { keyInfo, openNote, rebuildNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
 import type { TokenInfo } from '@/types';
 
 interface HistoryRow {
@@ -119,8 +119,10 @@ export default function ViewingPage() {
         const page = await api.getEnvelopePage(from, 1000);
         for (const n of page.notes) {
           scanned += 1;
-          if (!n.envelope) continue;
-          const opened = await openNote(n.cm, n.envelope, kind, key);
+          // An envelope first; a chain-computed note (a bridge fee note has no envelope; a
+          // deposit's may be junk) is rebuilt from its public opening for this key's own pk.
+          let opened = n.envelope ? await openNote(n.cm, n.envelope, kind, key) : null;
+          if (!opened && n.public) opened = await rebuildNote(n.cm, n.public, kind, key);
           if (opened) {
             found.push({ leaf_index: n.leaf_index, cm: n.cm, height: n.height, tx_hash: n.tx_hash, note: opened, spent: { state: 'unknown' } });
           }

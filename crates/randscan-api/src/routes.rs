@@ -57,6 +57,7 @@ pub fn create_router(state: AppState) -> Router {
         .route("/tokens/:id", get(handlers::get_token))
         .route("/supply", get(handlers::get_supply))
         .route("/validators", get(handlers::list_validators))
+        .route("/validators/admitted", get(handlers::admitted_validators))
         .route("/validators/:address", get(handlers::get_validator))
         .route("/programs", get(handlers::list_programs))
         .route("/programs/:id", get(handlers::get_program))

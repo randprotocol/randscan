@@ -48,10 +48,13 @@ fn backing_rows(
             let token = flows.iter().find(|f| f.asset_index == a.index);
             let token_deposited = token.map_or_else(|| "0".to_string(), |f| f.deposited.clone());
             let token_burned = token.map_or_else(|| "0".to_string(), |f| f.burned.clone());
+            let token_deposit_fees = token.map_or_else(|| "0".to_string(), |f| f.deposit_fees.clone());
+            let token_burn_fees = token.map_or_else(|| "0".to_string(), |f| f.burn_fees.clone());
             let own = burns
                 .iter()
                 .find(|b| b.asset_index == a.index && b.chain == a.chain && b.token.eq_ignore_ascii_case(&a.token));
             let burned = own.map_or_else(|| "0".to_string(), |b| b.burned.clone());
+            let burn_fees = own.map_or_else(|| "0".to_string(), |b| b.burn_fees.clone());
             let sole = backings == 1;
             let known = approved_token(a.chain, &a.token);
             BridgeAssetActivity {
@@ -68,6 +71,9 @@ fn backing_rows(
                 burns: own.map_or(0, |b| b.burns),
                 outstanding: a.locked.clone().unwrap_or_else(|| units_sub(&token_deposited, &burned)),
                 burned,
+                burn_fees,
+                token_deposit_fees,
+                token_burn_fees,
                 token_deposits: token.map_or(0, |f| f.deposits),
                 token_deposited,
                 token_burns: token.map_or(0, |f| f.burns),
@@ -129,6 +135,8 @@ mod tests {
             deposited: deposited.into(),
             burns,
             burned: burned.into(),
+            deposit_fees: "0".into(),
+            burn_fees: "0".into(),
             first_height: Some(500),
             last_height: Some(900),
         }
@@ -171,6 +179,7 @@ mod tests {
             token: "aa".into(),
             burns: 1,
             burned: "400".into(),
+            burn_fees: "0".into(),
         }];
         let rows = backing_rows(&assets, &[token_flow(1, 1, "1000", 1, "400")], &burns);
         // Matched on the index, the chain and the address (hex case aside): the same address on
@@ -188,10 +197,37 @@ mod tests {
         let mut old_node = backing(1, 2, "cc", "0");
         old_node.locked = None; // a node before chain 14 serves no `locked`
         let rows = backing_rows(&[old_node, backing(2, 2, "dd", "0")], &[token_flow(1, 1, "1000", 1, "400")], &[
-            BridgeBackingBurnRow { asset_index: 1, chain: 2, token: "cc".into(), burns: 1, burned: "400".into() },
+            BridgeBackingBurnRow { asset_index: 1, chain: 2, token: "cc".into(), burns: 1, burned: "400".into(), burn_fees: "0".into() },
         ]);
         assert_eq!((rows[0].deposits, rows[0].deposited.as_deref()), (Some(1), Some("1000")));
         assert_eq!(rows[0].outstanding, "600", "rebuilt from the flows only without the registry's figure");
         assert_eq!((rows[1].deposits, rows[1].deposited.as_deref()), (Some(0), Some("0")));
+    }
+
+    /// Chain 20 (`bridge.fees` 10/10 bps): one 1 zUSD deposit through Ethereum USDT and a 0.5
+    /// zUSD burn back out. The backing holds gross − release; the fees are notes beside it, and
+    /// what the rows hold still equals what the chain's zUSD supply is backed by.
+    #[test]
+    fn under_bridge_fees_a_backing_holds_the_gross_less_the_releases() {
+        let assets = vec![backing(1, 2, "e7", "50050000")];
+        let mut flow = token_flow(1, 1, "100000000", 1, "49950000");
+        flow.deposit_fees = "100000".into();
+        flow.burn_fees = "50000".into();
+        let burns = vec![BridgeBackingBurnRow {
+            asset_index: 1,
+            chain: 2,
+            token: "e7".into(),
+            burns: 1,
+            burned: "49950000".into(),
+            burn_fees: "50000".into(),
+        }];
+        let rows = backing_rows(&assets, &[flow], &burns);
+        let r = &rows[0];
+        assert_eq!(r.deposited.as_deref(), Some("100000000"), "the gross the guardians signed");
+        assert_eq!((r.burned.as_str(), r.burn_fees.as_str()), ("49950000", "50000"));
+        assert_eq!((r.token_deposit_fees.as_str(), r.token_burn_fees.as_str()), ("100000", "50000"));
+        assert_eq!(r.outstanding, "50050000");
+        // deposited − released == locked, and supply (net notes + fee notes) is the same figure.
+        assert_eq!(units_sub(r.deposited.as_deref().unwrap(), &r.burned), r.outstanding);
     }
 }

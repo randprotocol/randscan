@@ -204,6 +204,29 @@ export default function DashboardPage() {
             · auth guest{' '}
             {stats.limits.hc_auth ? <Hash value={stats.limits.hc_auth} start={8} end={6} /> : 'none'}
           </span>
+          <span>· proof window {formatNumber(stats.limits.proof_window_blocks ?? 256)} blocks</span>
+          {stats.limits.binding_domain != null && (
+            <span>
+              · bindings over {stats.limits.binding_domain === 1 ? 'the genesis hash' : 'the chain id'}
+            </span>
+          )}
+        </p>
+      )}
+
+      {stats?.limits && (stats.limits.testnet || stats.limits.admission_by_vote || stats.limits.slashing) && (
+        <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
+          <span>Network:{stats.limits.testnet ? ' testnet (the genesis marker)' : ' mainnet'}</span>
+          {stats.limits.admission_by_vote && (
+            <span>
+              · new validators admitted by the set&apos;s vote (<Link href="/validators" className="link">admitted keys</Link>)
+            </span>
+          )}
+          <span>
+            · equivocation slashing{' '}
+            {stats.limits.slashing
+              ? `${(stats.limits.slashing.equivocation_bps / 100).toFixed(2)}% of stake, jailed ${formatNumber(stats.limits.slashing.jail_epochs)} epochs`
+              : 'off'}
+          </span>
         </p>
       )}
 
@@ -221,6 +244,13 @@ export default function DashboardPage() {
           <span>
             · {formatAmount((stats.gas_prices ?? stats.limits).byte_price ?? '0')} per KiB
           </span>
+          {(stats.limits.max_gas_price || stats.limits.max_byte_price) && (
+            <span>
+              · ceilings {formatAmount(stats.limits.max_gas_price ?? '0')} / gas,{' '}
+              {formatAmount(stats.limits.max_byte_price ?? '0')} / KiB
+              {stats.limits.byte_load === 'paying' ? ' (only paying bytes move the byte price)' : ''}
+            </span>
+          )}
           {stats.limits.bundle_gas_limit !== null && (
             <span>· every bundle declares {formatNumber(stats.limits.bundle_gas_limit)} gas</span>
           )}

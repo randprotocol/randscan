@@ -5,7 +5,7 @@ import { Hash } from '@/components/Hash';
 import { DetailRow } from '@/components/States';
 import { formatTokenAmount, formatNumber } from '@/lib/utils';
 import type { OpenedCall, OpenedNote } from '@/lib/viewing';
-import type { Nullifier, TokenInfo } from '@/types';
+import type { Nullifier, PublicNote, TokenInfo } from '@/types';
 
 export type SpentState = { state: 'unspent' } | { state: 'spent'; nullifier: Nullifier } | { state: 'unknown' };
 
@@ -15,6 +15,8 @@ export interface OpenedNoteRow {
   height: number;
   /** null: the key does not open it; undefined: no envelope indexed. */
   opened: OpenedNote | null | undefined;
+  /** The leaf's public opening when the chain computed the note (see `NoteEnvelope.public`). */
+  public?: PublicNote | null;
   spent?: SpentState;
 }
 
@@ -48,11 +50,15 @@ export function OpenedNoteBlock({ row, tokens }: { row: OpenedNoteRow; tokens?: 
       <Hash value={row.cm} start={10} end={6} />
     </span>
   );
+  const feeHint =
+    row.public?.source === 'bridge_fee'
+      ? 'bridge fee note: it has no envelope (sealed to nobody), so only the fee recipient’s viewing key finds it, by rebuilding it from the public fields'
+      : null;
   if (row.opened === undefined) {
     return (
       <div className="border-t border-border-soft py-3">
         {title}
-        <p className="mt-1 text-sm text-mute">envelope not indexed yet</p>
+        <p className="mt-1 text-sm text-mute">{feeHint ?? 'envelope not indexed yet'}</p>
       </div>
     );
   }
@@ -60,7 +66,7 @@ export function OpenedNoteBlock({ row, tokens }: { row: OpenedNoteRow; tokens?: 
     return (
       <div className="border-t border-border-soft py-3">
         {title}
-        <p className="mt-1 text-sm text-mute">not opened by this key (or a dummy slot, sealed to nobody)</p>
+        <p className="mt-1 text-sm text-mute">{feeHint ?? 'not opened by this key (or a dummy slot, sealed to nobody)'}</p>
       </div>
     );
   }
@@ -84,7 +90,11 @@ export function OpenedNoteBlock({ row, tokens }: { row: OpenedNoteRow; tokens?: 
         <span className="font-mono">{formatNumber(n.time)}</span>
       </DetailRow>
       <DetailRow label="Commitment">
-        <span className="text-accent">verified ✓ (recomputed from the plaintext)</span>
+        <span className="text-accent">
+          {n.source
+            ? 'verified ✓ (rebuilt from the public fields with this key’s pk, and equal to the leaf)'
+            : 'verified ✓ (recomputed from the plaintext)'}
+        </span>
       </DetailRow>
       {n.nullifier && (
         <>

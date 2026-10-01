@@ -277,6 +277,13 @@ export const TRANSACTION_KINDS: TransactionKind[] = [
   'register_bridged_token',
   'list_backing',
   'invoke',
+  'admit_validator',
+  'slash_equivocation',
+  'rotate_pq_guardians',
+  'rotate_pause_key',
+  'rotate_pq_guardians_v2',
+  'rotate_pause_key_v2',
+  'cancel_rotation',
 ];
 
 const KIND_LABELS: Record<TransactionKind, string> = {
@@ -298,6 +305,13 @@ const KIND_LABELS: Record<TransactionKind, string> = {
   register_bridged_token: 'Bridged token listed',
   list_backing: 'Backing listed',
   invoke: 'Invoke (program state)',
+  admit_validator: 'Validator admitted (vote)',
+  slash_equivocation: 'Equivocation slashed',
+  rotate_pq_guardians: 'PQ guardians rotated',
+  rotate_pause_key: 'Pause key rotated',
+  rotate_pq_guardians_v2: 'PQ guardian rotation (delayed)',
+  rotate_pause_key_v2: 'Pause key rotation (delayed)',
+  cancel_rotation: 'Rotation cancelled',
   other: 'Other',
 };
 
@@ -320,6 +334,13 @@ const KIND_SHORT_LABELS: Record<TransactionKind, string> = {
   register_bridged_token: 'List token',
   list_backing: 'List backing',
   invoke: 'Invoke',
+  admit_validator: 'Admit',
+  slash_equivocation: 'Slash',
+  rotate_pq_guardians: 'Rotate PQ',
+  rotate_pause_key: 'Rotate pause',
+  rotate_pq_guardians_v2: 'Rotate PQ',
+  rotate_pause_key_v2: 'Rotate pause',
+  cancel_rotation: 'Cancel rotation',
   other: 'Other',
 };
 
@@ -342,6 +363,13 @@ const KIND_BADGE_CLASSES: Record<TransactionKind, string> = {
   register_bridged_token: 'badge badge-bridge',
   list_backing: 'badge badge-bridge',
   invoke: 'badge badge-call',
+  admit_validator: 'badge badge-stake',
+  slash_equivocation: 'badge badge-stake',
+  rotate_pq_guardians: 'badge badge-bridge',
+  rotate_pause_key: 'badge badge-bridge',
+  rotate_pq_guardians_v2: 'badge badge-bridge',
+  rotate_pause_key_v2: 'badge badge-bridge',
+  cancel_rotation: 'badge badge-bridge',
   other: 'badge badge-neutral',
 };
 

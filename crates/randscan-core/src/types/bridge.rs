@@ -110,6 +110,18 @@ pub struct BridgeState {
     pub min_inbound_sequence: Option<std::collections::BTreeMap<String, i64>>,
     #[serde(default)]
     pub assets: Vec<BridgeAsset>,
+    /// fullnode v0.6.8 (genesis `bridge.fees`, chain 20): the share of every deposit and every
+    /// burn the chain mints as a zUSD note to `recipient`. `None` on a chain without it (14–19).
+    #[serde(default)]
+    pub fees: Option<BridgeFees>,
+    /// Audit v6 (BRG-14, genesis `bridge.rotation`): how long a rotation waits before it takes
+    /// effect and whether it must carry the new holders' proof of possession. `None` without.
+    #[serde(default)]
+    pub rotation_rules: Option<RotationRules>,
+    /// Audit v6 (BRG-14): rotations signed but not yet in effect, as the node renders them
+    /// (`{kind, new_pq_guardians | new_pause_key, effective_at_secs}`). `None` without the group.
+    #[serde(default)]
+    pub pending_rotations: Option<Vec<serde_json::Value>>,
     /// Derived by the explorer, never sent by the node: each of `emitters` as its own chain
     /// prints it, with its replay floor (`BridgeState::derive_endpoints`).
     #[serde(default)]
@@ -129,6 +141,23 @@ pub struct BridgeRulesV2 {
     pub global_minted_in_window: Option<String>,
     #[serde(default, deserialize_with = "amount::amount_opt")]
     pub global_mint_headroom: Option<String>,
+}
+
+/// The genesis `bridge.fees` group (fullnode `docs/bridge.md` §25): basis points of the gross
+/// deposit (`mint_bps`) and of the burned amount (`burn_bps`), rounded down to a whole release unit
+/// of the backing, minted as a zUSD note to `recipient` (a `rand1…` address).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct BridgeFees {
+    pub mint_bps: i64,
+    pub burn_bps: i64,
+    pub recipient: String,
+}
+
+/// The genesis `bridge.rotation` group (audit v6, BRG-14).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RotationRules {
+    pub delay_secs: i64,
+    pub needs_possession: bool,
 }
 
 /// One source-chain endpoint the chain mints from: a row of `emitters`, readable. The node and
@@ -248,11 +277,16 @@ pub struct BridgeAssetActivity {
     /// How many backings the token at `index` has (rows sharing this `index`).
     pub backings: i64,
     /// This backing's deposits; `None` when the token has several backings (see above).
+    /// `deposited` is the gross the guardians signed — what `locked` and custody grew by.
     pub deposits: Option<i64>,
     pub deposited: Option<String>,
-    /// Burns that redeemed this backing (`(to_chain, token)` of the burn).
+    /// Burns that redeemed this backing (`(to_chain, token)` of the burn). `burned` is what left
+    /// `locked` — the release amount, the burn less the bridge fee (v0.6.8; the whole burn on a
+    /// chain without `bridge.fees`).
     pub burns: i64,
     pub burned: String,
+    /// v0.6.8: the bridge fees the chain kept as zUSD notes out of this backing's burns.
+    pub burn_fees: String,
     /// What this backing holds for the chain right now: the registry's `locked`. Only on a node
     /// that does not serve `locked` is it rebuilt as `deposited - burned`, which is exact there
     /// because such a node has one backing per token.
@@ -262,6 +296,12 @@ pub struct BridgeAssetActivity {
     pub token_deposited: String,
     pub token_burns: i64,
     pub token_burned: String,
+    /// v0.6.8: the bridge fee notes the chain minted out of the token's deposits and burns —
+    /// zUSD in circulation backed by locked coins, so `Σ locked == supply == custody` still holds:
+    /// a deposit locks its gross and mints `net + fee`; a burn destroys `release + fee`, releases
+    /// `release` and mints `fee` back.
+    pub token_deposit_fees: String,
+    pub token_burn_fees: String,
     /// First and last height of any bridge activity of the token (not of this backing alone).
     pub first_height: Option<i64>,
     pub last_height: Option<i64>,

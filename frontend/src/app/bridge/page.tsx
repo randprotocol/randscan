@@ -148,6 +148,21 @@ const activityColumns: Column<BridgeAssetActivity>[] = [
     ),
   },
   {
+    key: "fees",
+    header: "Fees on burns",
+    render: (a) =>
+      a.burn_fees == null || a.burn_fees === "0" ? (
+        <span className="text-mute">—</span>
+      ) : (
+        <span
+          className="font-mono"
+          title="v0.6.8 bridge fees kept as zUSD notes out of this coin's burns; 'Bridged out' counts only what was released and left the locked balance."
+        >
+          {formatBridgeUnits(a.burn_fees, a.symbol)}
+        </span>
+      ),
+  },
+  {
     key: "outstanding",
     header: "On Rand now",
     render: (a) => (
@@ -628,6 +643,56 @@ export default function BridgePage() {
                   : formatNumber(bridge.next_index)}
               </span>
             </DetailRow>
+            {bridge.fees && (
+              <DetailRow label="Bridge fees">
+                <span className="font-mono">
+                  {(bridge.fees.mint_bps / 100).toFixed(2)}% in / {(bridge.fees.burn_bps / 100).toFixed(2)}% out
+                </span>{" "}
+                <span className="text-soft">
+                  ({formatNumber(bridge.fees.mint_bps)} / {formatNumber(bridge.fees.burn_bps)} bps), minted as a zUSD note to
+                </span>{" "}
+                <Hash value={bridge.fees.recipient} start={12} end={8} />
+                {(() => {
+                  const seen = new Set<number>();
+                  let dep = 0n;
+                  let out = 0n;
+                  for (const a of assets) {
+                    if (seen.has(a.index)) continue;
+                    seen.add(a.index);
+                    dep += BigInt(a.token_deposit_fees ?? "0");
+                    out += BigInt(a.token_burn_fees ?? "0");
+                  }
+                  return (
+                    <div className="text-xs text-mute">
+                      collected so far: <span className="font-mono">{formatBridgeUnits(dep.toString())}</span> on deposits,{" "}
+                      <span className="font-mono">{formatBridgeUnits(out.toString())}</span> on burns. A deposit locks its
+                      gross and mints the recipient&apos;s note plus the fee note; a burn releases the burn less the fee and
+                      mints the fee back, so supply = Σ locked = custody still holds. Fee notes have no envelope.
+                    </div>
+                  );
+                })()}
+              </DetailRow>
+            )}
+            {bridge.rotation_rules && (
+              <DetailRow label="Rotation rules">
+                <span className="text-soft">
+                  a rotation takes effect {formatMintWindow(bridge.rotation_rules.delay_secs)} after it commits
+                  {bridge.rotation_rules.needs_possession ? ", and must carry every new holder’s proof of possession" : ""}
+                </span>
+                {bridge.pending_rotations && bridge.pending_rotations.length > 0 ? (
+                  <ul className="mt-1 space-y-0.5 text-xs">
+                    {bridge.pending_rotations.map((r, i) => (
+                      <li key={i}>
+                        pending {r.kind === "pause_key" ? "pause-key" : "PQ guardian"} rotation, effective{" "}
+                        <span className="font-mono">{new Date(r.effective_at_secs * 1000).toISOString()}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <div className="text-xs text-mute">no rotation pending</div>
+                )}
+              </DetailRow>
+            )}
             {bridge.rotation_nonce != null && (
               <DetailRow label="Rotation nonce">
                 <span className="font-mono">{formatNumber(bridge.rotation_nonce)}</span>

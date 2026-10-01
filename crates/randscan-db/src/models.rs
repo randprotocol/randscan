@@ -2,7 +2,7 @@
 
 use chrono::{DateTime, Utc};
 use randscan_core::{
-    BlockSummary, BridgeGovernanceAction, Bundle, GeoInfo, NetworkStats, Note, Nullifier,
+    BlockSummary, BridgeFeeNote, BridgeGovernanceAction, Bundle, StakingAction, GeoInfo, NetworkStats, Note, Nullifier,
     PendingStake, ProgramSummary, Receipt, TokenAction, TransactionDetail, TransactionSummary, Transition,
     TxKind, Validator,
 };
@@ -118,6 +118,10 @@ pub struct TxDetailRow {
     pub auth_commit: Option<String>,
     pub auth_proof_len: i64,
     pub transition: Option<serde_json::Value>,
+    pub deposit_amount: Option<String>,
+    pub release_amount: Option<String>,
+    pub fee_note: Option<serde_json::Value>,
+    pub staking_action: Option<serde_json::Value>,
 }
 
 impl TxDetailRow {
@@ -186,6 +190,8 @@ impl TxDetailRow {
             .pq_signers
             .map(|v| v.into_iter().map(i64::from).collect());
         let transition: Option<Transition> = self.transition.and_then(|v| serde_json::from_value(v).ok());
+        let fee_note: Option<BridgeFeeNote> = self.fee_note.and_then(|v| serde_json::from_value(v).ok());
+        let staking_action: Option<StakingAction> = self.staking_action.and_then(|v| serde_json::from_value(v).ok());
         TransactionDetail {
             chain_id: self.chain_id,
             bundle,
@@ -209,6 +215,10 @@ impl TxDetailRow {
             token_action,
             bridge_governance,
             transition,
+            deposit_amount: self.deposit_amount,
+            release_amount: self.release_amount,
+            fee_note,
+            staking_action,
             summary: self.tx.into(),
         }
     }

@@ -330,6 +330,12 @@ What is a backing's own and what is the whole token's:
 
 - `burns` / `burned` are **this backing's**. A burn names the coin it redeems, `(to_chain, token)`,
   and the ledger holds that pair to one of the token's backings.
+- **Bridge fees (fullnode v0.6.8, chain 20's `bridge.fees`).** `deposited` / `token_deposited` are
+  the gross each attestation signed — what `locked` and custody grew by. `burned` /
+  `token_burned` are the **release amounts**, what left `locked` (the burn less the fee).
+  `burn_fees`, `token_deposit_fees` and `token_burn_fees` are the fee notes the chain minted to the
+  fee recipient; they stay in circulation, so `supply == Σ locked == custody` still holds
+  (`outstanding == deposited − burned` for a token with one backing).
 - `outstanding` is **this backing's**: what it holds for the chain right now, the registry's
   `locked`. (On a node too old to serve `locked` it is rebuilt as `deposited - burned`, which is
   exact there because such a node has one backing per token.) `locked`, `minted_today` and
@@ -506,8 +512,8 @@ kinds and which fields they fill:
 | `bond` | stake leaving the pool into a validator's register entry | RAND units | `validator` | `registered` (a first-time registration) |
 | `unbond` | stake moved to the unbonding queue (validator-signed) | RAND units | `validator` | `action_nonce` |
 | `withdraw` | released stake and rewards deposited as a new note (validator-signed) | RAND units | `validator` | `action_nonce`, `note_time` (the deposit note's time word) |
-| `bridge_attest` | a guardian-signed inbound message depositing a bridged note | that token's units (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time`, `deposit_r`, `commitment`, `pq_signers` |
-| `bridge_burn` | a bridged asset burned to another chain, one bundle | that token's units | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `bridge_token` |
+| `bridge_attest` | a guardian-signed inbound message depositing a bridged note | that token's units, the **gross** the guardians signed (null for a guardian-set rotation) | `asset_index` | `attestation_len`, `recipient`, `note_time`, `deposit_r`, `commitment` (the net deposit's leaf), `pq_signers`, `deposit_amount` (net), `fee_note` |
+| `bridge_burn` | a bridged asset burned to another chain, one bundle | that token's units, what the bundle burned | `asset_index` | `relayer_fee`, `to_chain`, `bridge_to`, `bridge_token`, `release_amount`, `fee_note` |
 | `register_token` | an RPL token registered, with an optional initial mint | the initial mint's amount, or null | `asset_index` = the new index | `token_action`, `recipient`, `note_time`, `deposit_r` |
 | `token_mint` | a signed mint of an existing RPL token | that token's units | `asset_index` | `token_action`, `recipient`, `note_time`, `deposit_r`, `action_nonce` |
 | `set_authority` | an RPL token's mint authority changed (or renounced) | null | `asset_index` | `token_action`, `action_nonce` |
@@ -517,6 +523,11 @@ kinds and which fields they fill:
 | `register_bridged_token` | a new bridged token listed after genesis by the PQ guardian quorum | null | | `bridge_governance`, `pq_signers` |
 | `list_backing` | another source-chain backing added to an already-listed bridged token | null | `asset_index` | `bridge_governance`, `pq_signers` |
 | `invoke` | RPL-2: a confidential call whose proof vouches for one declared state transition of the program, which the ledger applied | null | `program` | `call_proof_len`, `input_envelope_len`, `receipt`, `transition` |
+| `admit_validator` | audit v6: the validator set's vote admitting a key to register | null | `validator` = the candidate | `staking_action` (`candidate`, `candidate_key`, `voters`) |
+| `slash_equivocation` | audit v6: two headers one key signed for one view | null | `validator` = the offender | `staking_action` (`offender`, `view`, `first`, `second`) |
+| `rotate_pq_guardians` / `rotate_pause_key` | bridge rules v2: a new PQ guardian set / pause key | null | | `bridge_governance`, `pq_signers`, `action_nonce` |
+| `rotate_pq_guardians_v2` / `rotate_pause_key_v2` | audit v6: the same with proofs of possession, effective after the genesis delay | null | | `bridge_governance` (`possession_signatures` on the PQ one), `pq_signers`, `action_nonce` |
+| `cancel_rotation` | audit v6: a pending rotation withdrawn | null | | `bridge_governance` (`rotation_kind`), `action_nonce` |
 | `other` | a kind newer than this explorer build | null | | none |
 
 An `invoke`'s `transition` is the node's rendering, verbatim but for amounts as decimal strings:
@@ -697,6 +708,26 @@ because they do not have the key.
 `envelope` is `null` for a leaf indexed before envelopes were stored; it fills in on the next
 indexer pass.
 
+**Chain-computed notes (`public`, fullnode v0.6.8).** Some leaves are notes the *chain* computed
+from a transaction's public fields rather than a bundle's output: a bridge deposit, a bridge fee
+note (chain 20's `bridge.fees`), an RPL `token_mint` or `register_token` initial mint, and an
+RPL-2 invoke's payouts. Each such leaf (in both envelope endpoints) carries
+
+```json
+"public": { "source": "bridge_deposit", "amount": "99900000", "asset": 1, "time": 1599,
+            "r": "63a44e149332d851011f20ac2c2622e814297177c8b18f7447fe9a0484edb7a0" }
+```
+
+— every word of the note but its owner `pk` and its `from` word, which `source` fixes
+(`bridge_deposit` / `bridge_fee`: zero; `token_mint` / `initial_mint`: `MINT_FROM`; `payout`:
+`PROGRAM_FROM`). `public` is `null` for a bundle's notes. A **bridge fee note has no envelope at
+all** (it is sealed to nobody), so trial decryption never finds it; a deposit's envelope is the
+submitter's and may be junk. The viewing wasm's `rebuild_note(cm, public_json, key_kind, key)`
+rebuilds the note with the key's *own* `pk` and returns it (in `open_note`'s shape, `role`
+`received`, with its nullifier, plus `source`) only when it commits to the leaf `cm` — so a wrong
+`public` can hide a note but never credit one. A deposit's `amount` here is the net (the gross
+less the bridge fee), which is what the note holds.
+
 ### Accounts
 
 `GET /accounts/:address` and `GET /accounts/:address/transactions` answer **410**
@@ -735,6 +766,7 @@ over the members that answered its own last poll (`max` is the job slots, one pe
 |---|---|
 | `GET /validators` | the register: array of `Validator`, in address order |
 | `GET /validators/:address` | `Validator` plus `recent_blocks` (last 10 `BlockSummary`) |
+| `GET /validators/admitted` | audit v6: `{ admission_by_vote, max, admitted: [address…] }`, the keys voted in by `admit_validator` that have not registered yet (read from the node) |
 
 ```json
 {

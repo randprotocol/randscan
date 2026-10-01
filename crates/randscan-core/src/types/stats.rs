@@ -126,6 +126,40 @@ pub struct ChainLimits {
     /// predating the field.
     #[serde(default)]
     pub program_state: Option<ProgramStateLimits>,
+    /// Audit v6 (POOL-2): the ceilings the dynamic controller never lifts a price over, decimal
+    /// strings; `None` where the genesis sets none.
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub max_gas_price: Option<String>,
+    #[serde(default, deserialize_with = "crate::amount::amount_opt")]
+    pub max_byte_price: Option<String>,
+    /// `"paying"` when only a call's proof and input envelope move `byte_price` (POOL-2).
+    #[serde(default)]
+    pub byte_load: Option<String>,
+    /// Audit v6 (STAKE-2): a bond that registers a new key needs the validator set's vote
+    /// (`admit_validator`) first.
+    #[serde(default)]
+    pub admission_by_vote: bool,
+    /// The genesis `testnet` marker (STAKE-2): what lets a faucet sit beside a bridge.
+    #[serde(default)]
+    pub testnet: bool,
+    /// Audit v6 (STAKE-1): the genesis `staking.slashing` section, `None` without.
+    #[serde(default)]
+    pub slashing: Option<SlashingLimits>,
+    /// Audit v6 (BIND-1): `0` where bindings and signed messages carry the chain id alone
+    /// (chains 14–19), `1` where they carry the genesis hash. `None` on a node predating it.
+    #[serde(default)]
+    pub binding_domain: Option<u32>,
+    /// Issue #118: how old, in blocks, a bundle's anchor and `time` may be (256..4 096); `None`
+    /// where the genesis leaves both at 256.
+    #[serde(default)]
+    pub proof_window_blocks: Option<u64>,
+}
+
+/// The `slashing` group of `rand_getLimits` (audit v6, STAKE-1).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SlashingLimits {
+    pub equivocation_bps: u32,
+    pub jail_epochs: u64,
 }
 
 /// The `program_state` group of `rand_getLimits` (RPL-2).

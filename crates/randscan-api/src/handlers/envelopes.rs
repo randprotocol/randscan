@@ -14,7 +14,9 @@ use randscan_db as db;
 use serde::Deserialize;
 
 fn to_wire(r: db::NoteEnvelopeRow) -> NoteEnvelope {
+    let public = r.public_note();
     NoteEnvelope {
+        public,
         leaf_index: r.leaf_index,
         cm: r.cm,
         height: r.height,

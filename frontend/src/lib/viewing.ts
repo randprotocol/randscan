@@ -3,7 +3,7 @@
  * crates/randscan-viewing, a re-implementation of the fullnode's open-side crypto) runs in the
  * page; a pasted key stays in React state and is never part of any request.
  */
-import type { CallEnvelopeHex, EnvelopeHex } from '@/types';
+import type { CallEnvelopeHex, EnvelopeHex, PublicNote } from '@/types';
 
 /** How a pasted key is to be read. `file` is a wallet key file (`{"version":2,"spend_key":…}`). */
 export type KeyKind = 'viewing' | 'spend' | 'file' | 'tx' | 'call';
@@ -28,6 +28,8 @@ export interface OpenedNote {
   r: string;
   nullifier: string | null;
   verified: boolean;
+  /** Set on a note rebuilt from its public opening (`rebuildNote`), not opened from an envelope. */
+  source?: PublicNote['source'];
 }
 
 export interface OpenedCall {
@@ -43,6 +45,7 @@ interface WasmModule {
   open_note(cm: string, envelopeJson: string, keyKind: string, key: string): string;
   open_call(hIn: string, envelopeJson: string, keyKind: string, key: string): string;
   nullifier_of(keyKind: string, key: string, cm: string): string;
+  rebuild_note(cm: string, publicJson: string, keyKind: string, key: string): string;
 }
 
 let loading: Promise<WasmModule> | null = null;
@@ -95,6 +98,17 @@ export async function openNote(
 ): Promise<OpenedNote | null> {
   const m = await loadViewing();
   return wrap(() => parse<OpenedNote>(m.open_note(cm, JSON.stringify(envelope), kind, key)));
+}
+
+/**
+ * Rebuild a chain-computed note for a viewing key from its public opening and accept it only if
+ * it commits to the leaf `cm` with the key's own pk. Finds a bridge fee note (no envelope) and a
+ * deposit or mint whose envelope is junk. A transaction or call key cannot rebuild: `null`.
+ */
+export async function rebuildNote(cm: string, pub: PublicNote, kind: KeyKind, key: string): Promise<OpenedNote | null> {
+  if (kind === 'tx' || kind === 'call') return null;
+  const m = await loadViewing();
+  return wrap(() => parse<OpenedNote>(m.rebuild_note(cm, JSON.stringify(pub), kind, key)));
 }
 
 export async function openCall(

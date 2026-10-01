@@ -1,4 +1,5 @@
 import type {
+  AdmittedSet,
   ApprovedToken,
   BridgeAssetActivity,
   NoteEnvelopePage,
@@ -260,6 +261,11 @@ export function getToken(id: string | number): Promise<TokenDetail> {
 
 export function getValidators(): Promise<Validator[]> {
   return request<Validator[]>('/validators');
+}
+
+/** Audit v6 (STAKE-2): keys voted in by the validator set that have not registered yet. */
+export function getAdmittedValidators(): Promise<AdmittedSet> {
+  return request<AdmittedSet>('/validators/admitted');
 }
 
 export function getValidator(address: string): Promise<ValidatorDetail> {

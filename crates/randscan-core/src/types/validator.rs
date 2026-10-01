@@ -40,3 +40,16 @@ pub struct ValidatorDetail {
     pub validator: Validator,
     pub recent_blocks: Vec<BlockSummary>,
 }
+
+/// `rand_getAdmitted` (audit v6, STAKE-2): on a chain whose genesis sets
+/// `staking.admission_by_vote`, the keys the validator set has voted in with an `admit_validator`
+/// that have not registered yet, by address; a registering `bond` must name one of them. `max` is
+/// how many the ledger holds at once. On a chain without the flag the list is always empty.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct AdmittedSet {
+    pub admission_by_vote: bool,
+    #[serde(default)]
+    pub max: i64,
+    #[serde(default)]
+    pub admitted: Vec<String>,
+}

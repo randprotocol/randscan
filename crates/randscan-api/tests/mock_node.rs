@@ -446,7 +446,10 @@ async fn indexes_every_shielded_kind_and_survives_hard_forks() {
         "envelope_bytes": 1860, "hardening_v6": true, "hc_auth": h("hc_auth"),
         "gas_price": "100", "byte_price": "800", "gas_metering": "circuit",
         "bundle_gas_limit": 20479, "adjust_bps": 1250,
-        "program_state": { "cell_fee": "10000000", "max_reads": 8, "max_writes": 8, "max_payouts": 4 } }));
+        "program_state": { "cell_fee": "10000000", "max_reads": 8, "max_writes": 8, "max_payouts": 4 },
+        // Audit v6's fields, absent from this mock's (chain-18-shaped) reply: their defaults.
+        "max_gas_price": null, "max_byte_price": null, "byte_load": null, "admission_by_vote": false,
+        "testnet": false, "slashing": null, "binding_domain": null, "proof_window_blocks": null }));
     // Off `rand_status`, refreshed every commit: the auth guest, and the tip's live prices (one
     // 12.5% step above the genesis prices the limits report — a dynamic chain moves them).
     assert_eq!(stats["hc_auth"], h("hc_auth"));

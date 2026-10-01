@@ -284,6 +284,13 @@ impl RpcClient {
             .await
     }
 
+    /// Audit v6 (STAKE-2): the keys the validator set has voted in that have not registered yet.
+    /// `None` on a node without the method.
+    pub async fn admitted(&self) -> Result<Option<randscan_core::AdmittedSet>> {
+        self.call_optional_method("rand_getAdmitted", serde_json::json!([]))
+            .await
+    }
+
     /// The node's build (v0.3). `None` on a node without the method.
     pub async fn version(&self) -> Result<Option<RpcVersion>> {
         self.call_optional_method("rand_getVersion", serde_json::json!([]))
@@ -523,15 +530,25 @@ pub enum RpcAction {
         commitment: Option<String>,
         /// B3: the PQ guardians who co-signed, by index.
         pq_signers: Vec<i64>,
+        /// v0.6.8: the depositor's note value, `amount` less the bridge fee (`amount` itself on a
+        /// chain without `bridge.fees`); `None` on an older node or a rotation.
+        deposit_amount: Option<Units>,
+        /// v0.6.8: the treasury's fee note, `None` without `bridge.fees`.
+        fee_note: Option<RpcFeeNote>,
     },
     BridgeBurn {
         asset: u32,
+        /// What the bundle burned (the gross).
         amount: Units,
         relayer_fee: Units,
         to_chain: u16,
         /// The backing being redeemed: a source-chain token address, 32 bytes hex.
         token: String,
         to: String,
+        /// v0.6.8: what the source contract releases (and what left `locked`), `amount` less
+        /// the bridge fee; `None` on an older node.
+        release_amount: Option<Units>,
+        fee_note: Option<RpcFeeNote>,
     },
     /// RPL (spec §4/§6): a token's registration and mints are public by design, as a bridge
     /// deposit is — only a later *transfer* of the token's notes is shielded.
@@ -600,6 +617,16 @@ pub enum RpcAction {
         input_envelope_len: Option<u64>,
         transition: RpcTransition,
     },
+    /// Audit v6, STAKE-2: the validator set's vote admitting a key.
+    AdmitValidator { candidate: String, candidate_key: String, voters: Vec<String> },
+    /// Audit v6, STAKE-1: two headers of one key for one view.
+    SlashEquivocation { offender: String, view: u64, first: RpcHeaderRef, second: RpcHeaderRef },
+    /// Bridge rules v2 (22) and audit v6's possession-carrying twin (30, `v2`).
+    RotatePqGuardians { new_pq_guardians: Vec<String>, possession_signatures: Option<u64>, nonce: u64, pq_signers: Vec<i64>, v2: bool },
+    /// Bridge rules v2 (23) and audit v6's twin (31, `v2`).
+    RotatePauseKey { new_pause_key: String, nonce: u64, pq_signers: Vec<i64>, v2: bool },
+    /// Audit v6, BRG-14 (32).
+    CancelRotation { rotation_kind: String, nonce: u64 },
     /// A kind this build does not decode; `kind` is the node's tag.
     Unknown {
         kind: String,
@@ -666,6 +693,34 @@ impl RpcTransition {
     pub fn payout_cms(&self) -> Vec<String> {
         self.pays.iter().chain(&self.mints).map(|p| p.cm.clone()).collect()
     }
+}
+
+/// A bridge fee note as `tx_json` renders it (v0.6.8): every word but its owner.
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcFeeNote {
+    pub amount: Units,
+    pub asset: u32,
+    pub time: u64,
+    pub r: String,
+    pub commitment: String,
+}
+
+impl RpcFeeNote {
+    pub fn to_core(&self) -> randscan_core::BridgeFeeNote {
+        randscan_core::BridgeFeeNote {
+            amount: self.amount.0.clone(),
+            asset: self.asset as i64,
+            time: self.time as i64,
+            r: self.r.clone(),
+            commitment: self.commitment.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct RpcHeaderRef {
+    pub hash: String,
+    pub height: u64,
 }
 
 /// `register_token`'s optional `initial` mint: every word of the note the chain computes for it.
@@ -742,6 +797,10 @@ enum KnownAction {
         commitment: Option<String>,
         #[serde(default)]
         pq_signers: Vec<i64>,
+        #[serde(default)]
+        deposit_amount: Option<Units>,
+        #[serde(default)]
+        fee_note: Option<RpcFeeNote>,
     },
     BridgeBurn {
         asset: u32,
@@ -752,6 +811,10 @@ enum KnownAction {
         #[serde(default)]
         token: String,
         to: String,
+        #[serde(default)]
+        release_amount: Option<Units>,
+        #[serde(default)]
+        fee_note: Option<RpcFeeNote>,
     },
     RegisterToken {
         name: String,
@@ -813,6 +876,51 @@ enum KnownAction {
         #[serde(default)]
         pq_signers: Vec<i64>,
     },
+    AdmitValidator {
+        candidate: String,
+        #[serde(default)]
+        candidate_key: String,
+        #[serde(default)]
+        voters: Vec<String>,
+    },
+    SlashEquivocation {
+        offender: String,
+        view: u64,
+        first: RpcHeaderRef,
+        second: RpcHeaderRef,
+    },
+    RotatePqGuardians {
+        new_pq_guardians: Vec<String>,
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    RotatePauseKey {
+        new_pause_key: String,
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    #[serde(rename = "rotate_pq_guardians_v2")]
+    RotatePqGuardiansV2 {
+        new_pq_guardians: Vec<String>,
+        #[serde(default)]
+        possession_signatures: u64,
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    #[serde(rename = "rotate_pause_key_v2")]
+    RotatePauseKeyV2 {
+        new_pause_key: String,
+        nonce: u64,
+        #[serde(default)]
+        pq_signers: Vec<i64>,
+    },
+    CancelRotation {
+        rotation_kind: String,
+        nonce: u64,
+    },
 }
 
 const KNOWN_TAGS: &[&str] = &[
@@ -834,6 +942,13 @@ const KNOWN_TAGS: &[&str] = &[
     "unpause_mints",
     "register_bridged_token",
     "list_backing",
+    "admit_validator",
+    "slash_equivocation",
+    "rotate_pq_guardians",
+    "rotate_pause_key",
+    "rotate_pq_guardians_v2",
+    "rotate_pause_key_v2",
+    "cancel_rotation",
 ];
 
 impl<'de> Deserialize<'de> for RpcAction {
@@ -916,6 +1031,8 @@ impl<'de> Deserialize<'de> for RpcAction {
                     r,
                     commitment,
                     pq_signers,
+                    deposit_amount,
+                    fee_note,
                 } => RpcAction::BridgeAttest {
                     attestation_len,
                     recipient,
@@ -926,6 +1043,8 @@ impl<'de> Deserialize<'de> for RpcAction {
                     r,
                     commitment,
                     pq_signers,
+                    deposit_amount,
+                    fee_note,
                 },
                 KnownAction::BridgeBurn {
                     asset,
@@ -934,6 +1053,8 @@ impl<'de> Deserialize<'de> for RpcAction {
                     to_chain,
                     token,
                     to,
+                    release_amount,
+                    fee_note,
                 } => RpcAction::BridgeBurn {
                     asset,
                     amount,
@@ -941,6 +1062,8 @@ impl<'de> Deserialize<'de> for RpcAction {
                     to_chain,
                     token,
                     to,
+                    release_amount,
+                    fee_note,
                 },
                 KnownAction::RegisterToken {
                     name,
@@ -994,6 +1117,31 @@ impl<'de> Deserialize<'de> for RpcAction {
                 KnownAction::ListBacking { token_index, chain, token, decimals, nonce, pq_signers } => {
                     RpcAction::ListBacking { token_index, chain, token, decimals, nonce, pq_signers }
                 }
+                KnownAction::AdmitValidator { candidate, candidate_key, voters } => {
+                    RpcAction::AdmitValidator { candidate, candidate_key, voters }
+                }
+                KnownAction::SlashEquivocation { offender, view, first, second } => {
+                    RpcAction::SlashEquivocation { offender, view, first, second }
+                }
+                KnownAction::RotatePqGuardians { new_pq_guardians, nonce, pq_signers } => {
+                    RpcAction::RotatePqGuardians { new_pq_guardians, possession_signatures: None, nonce, pq_signers, v2: false }
+                }
+                KnownAction::RotatePqGuardiansV2 { new_pq_guardians, possession_signatures, nonce, pq_signers } => {
+                    RpcAction::RotatePqGuardians {
+                        new_pq_guardians,
+                        possession_signatures: Some(possession_signatures),
+                        nonce,
+                        pq_signers,
+                        v2: true,
+                    }
+                }
+                KnownAction::RotatePauseKey { new_pause_key, nonce, pq_signers } => {
+                    RpcAction::RotatePauseKey { new_pause_key, nonce, pq_signers, v2: false }
+                }
+                KnownAction::RotatePauseKeyV2 { new_pause_key, nonce, pq_signers } => {
+                    RpcAction::RotatePauseKey { new_pause_key, nonce, pq_signers, v2: true }
+                }
+                KnownAction::CancelRotation { rotation_kind, nonce } => RpcAction::CancelRotation { rotation_kind, nonce },
             }),
             // A known tag with a malformed body is a real error; an unknown tag is tolerated.
             Err(e) => {
@@ -1343,6 +1491,86 @@ mod tests {
             other => panic!("{other:?}"),
         }
         assert_eq!(b.transactions[0].bundle.as_ref().unwrap().fee.0, "1000000");
+    }
+
+    /// Chain 20 (fullnode v0.6.8): the live attest at block 1664 — 1 zUSD gross, 0.999 to the
+    /// depositor, a 0.001 fee note — and a burn's release split; and audit v6's five kinds, in
+    /// the shapes `tx_json`'s own tests pin.
+    #[test]
+    fn parses_chain_20s_bridge_fees_and_the_audit_v6_kinds() {
+        let a: RpcAction = serde_json::from_value(serde_json::json!({
+            "kind": "bridge_attest", "attestation_len": 586, "recipient": "rand1Do", "asset": 1, "asset_index": 1,
+            "amount": "100000000", "deposit_amount": "99900000",
+            "fee_note": { "amount": "100000", "asset": 1, "commitment": "47c3", "r": "ecee", "time": 1599 },
+            "time": 1599, "r": "63a4", "commitment": "d8f1", "pq_signers": [0, 3, 4, 5, 6, 7]
+        }))
+        .unwrap();
+        match a {
+            RpcAction::BridgeAttest { amount, deposit_amount, fee_note, commitment, .. } => {
+                assert_eq!(amount.unwrap().0, "100000000");
+                assert_eq!(deposit_amount.unwrap().0, "99900000");
+                let f = fee_note.unwrap().to_core();
+                assert_eq!((f.amount.as_str(), f.asset, f.commitment.as_str()), ("100000", 1, "47c3"));
+                assert_eq!(commitment.as_deref(), Some("d8f1"), "the net deposit's leaf");
+            }
+            other => panic!("{other:?}"),
+        }
+        let b: RpcAction = serde_json::from_value(serde_json::json!({
+            "kind": "bridge_burn", "asset": 1, "amount": "500000", "relayer_fee": "0", "to_chain": 2,
+            "token": "cdcd", "to": "abab", "release_amount": "499500",
+            "fee_note": { "amount": "500", "asset": 1, "commitment": "ee", "r": "ff", "time": 9 }
+        }))
+        .unwrap();
+        assert!(matches!(b, RpcAction::BridgeBurn { release_amount: Some(ref r), fee_note: Some(_), .. } if r.0 == "499500"));
+        // A chain without the group (and an older node): no split.
+        let b: RpcAction = serde_json::from_value(serde_json::json!({
+            "kind": "bridge_burn", "asset": 1, "amount": 400, "relayer_fee": 100, "to_chain": 5, "token": "cd", "to": "ab",
+            "release_amount": "400", "fee_note": null
+        }))
+        .unwrap();
+        assert!(matches!(b, RpcAction::BridgeBurn { fee_note: None, .. }));
+
+        let k = |v: serde_json::Value| serde_json::from_value::<RpcAction>(v).unwrap();
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "admit_validator", "candidate": "2nRd", "candidate_key": "ab", "voters": ["a", "b"] })),
+            RpcAction::AdmitValidator { ref voters, .. } if voters.len() == 2
+        ));
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "slash_equivocation", "offender": "2nRd", "view": 1,
+                "first": { "hash": "aa", "height": 3 }, "second": { "hash": "bb", "height": 3 } })),
+            RpcAction::SlashEquivocation { view: 1, .. }
+        ));
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "rotate_pq_guardians", "new_pq_guardians": ["k0", "k1"], "nonce": 7, "pq_signers": [1, 4] })),
+            RpcAction::RotatePqGuardians { v2: false, possession_signatures: None, nonce: 7, .. }
+        ));
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "rotate_pq_guardians_v2", "new_pq_guardians": ["k0", "k1"], "possession_signatures": 2, "nonce": 9, "pq_signers": [2] })),
+            RpcAction::RotatePqGuardians { v2: true, possession_signatures: Some(2), nonce: 9, .. }
+        ));
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "rotate_pause_key_v2", "new_pause_key": "k0", "nonce": 10, "pq_signers": [1] })),
+            RpcAction::RotatePauseKey { v2: true, nonce: 10, .. }
+        ));
+        assert!(matches!(
+            k(serde_json::json!({ "kind": "cancel_rotation", "rotation_kind": "pause_key", "nonce": 11 })),
+            RpcAction::CancelRotation { nonce: 11, .. }
+        ));
+    }
+
+    /// Chain 20's `rand_getLimits`, as node E served it on 2026-10-01.
+    #[test]
+    fn parses_chain_20s_limits() {
+        let l: randscan_core::ChainLimits = serde_json::from_str(
+            r#"{"adjust_bps":1250,"admission_by_vote":true,"binding_domain":1,"bundle_gas_limit":20479,"byte_load":"paying","byte_price":"800","envelope_bytes":1860,"gas_metering":"circuit","gas_price":"100","hardening_v6":true,"hc_auth":"1e4e","max_block_bytes":20971520,"max_byte_price":"80000","max_call_envelope_bytes":65536,"max_gas_price":"10000","max_program_public_words":32768,"max_program_words":65535,"max_proof_bytes":4194304,"program_state":{"cell_fee":"10000000","max_payouts":4,"max_reads":8,"max_writes":8},"proof_window_blocks":1024,"slashing":null,"testnet":true}"#,
+        )
+        .unwrap();
+        assert!(l.testnet && l.admission_by_vote && l.slashing.is_none());
+        assert_eq!((l.binding_domain, l.proof_window_blocks), (Some(1), Some(1024)));
+        assert_eq!((l.max_gas_price.as_deref(), l.max_byte_price.as_deref()), (Some("10000"), Some("80000")));
+        assert_eq!(l.byte_load.as_deref(), Some("paying"));
+        let back: randscan_core::ChainLimits = serde_json::from_value(serde_json::to_value(&l).unwrap()).unwrap();
+        assert_eq!(back, l);
     }
 
     #[test]

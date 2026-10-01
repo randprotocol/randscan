@@ -12,7 +12,8 @@ pub const TX_DETAIL_COLS: &str = "hash, block_hash, height, tx_index, kind, fee:
     envelope_len_1, envelope_len_2, envelope_len_3, envelope_len_4,
     words_len, call_proof_len, input_envelope_len, cm, registered, action_nonce, attestation_len, recipient, note_time,
     relayer_fee::text AS relayer_fee, to_chain, bridge_to, bridge_token, deposit_r, derived_cm, pq_signers,
-    token_action, bridge_governance, auth_commit, auth_proof_len, transition";
+    token_action, bridge_governance, auth_commit, auth_proof_len, transition,
+    deposit_amount::text AS deposit_amount, release_amount::text AS release_amount, fee_note, staking_action";
 
 /// The public fields of one hidden-asset bundle (chain 14: four input slots, four output slots,
 /// dummies included; no public `asset` field — see `randscan_core::Bundle`'s doc comment).
@@ -80,6 +81,15 @@ pub struct NewTx<'a> {
     /// then mints), each a leaf the chain appended that links back to this transaction.
     pub transition: Option<serde_json::Value>,
     pub payout_cms: Vec<String>,
+    /// bridge_attest (v0.6.8): the depositor's net note value (`amount` stays the gross).
+    pub deposit_amount: Option<String>,
+    /// bridge_burn (v0.6.8): what the source contract releases (`amount` stays what was burned).
+    pub release_amount: Option<String>,
+    /// bridge_attest / bridge_burn (v0.6.8): the fee note in full, and its leaf's commitment.
+    pub fee_note: Option<serde_json::Value>,
+    pub fee_cm: Option<String>,
+    /// admit_validator / slash_equivocation, in full.
+    pub staking_action: Option<serde_json::Value>,
 }
 
 /// Insert the transaction and every nullifier its bundle published.
@@ -95,7 +105,8 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
              program_id, words_len, call_proof_len, input_envelope_len, amount, cm, validator, registered,
              action_nonce, attestation_len, recipient, note_time, asset_index, relayer_fee, to_chain, bridge_to,
              bridge_token, deposit_r, derived_cm, pq_signers, token_action, bridge_governance,
-             auth_commit, auth_proof_len, transition, payout_cms)
+             auth_commit, auth_proof_len, transition, payout_cms,
+             deposit_amount, release_amount, fee_note, fee_cm, staking_action)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8::numeric,
              $9, $10, $11, $12, $13, $14, $15, $16, $17, $18,
              $19::numeric, $20::numeric, $21, $22,
@@ -103,7 +114,8 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
              $28, $29, $30, $31, $32::numeric, $33, $34, $35,
              $36, $37, $38, $39, $40, $41::numeric, $42, $43,
              $44, $45, $46, $47, $48, $49,
-             $50, $51, $52, $53)",
+             $50, $51, $52, $53,
+             $54::numeric, $55::numeric, $56, $57, $58)",
     )
     .bind(t.hash)
     .bind(t.block_hash)
@@ -158,6 +170,11 @@ pub async fn insert_transaction(conn: &mut PgConnection, t: &NewTx<'_>) -> Resul
     .bind(b.map(|b| b.auth_proof_len).unwrap_or(0))
     .bind(t.transition.as_ref())
     .bind((!t.payout_cms.is_empty()).then_some(&t.payout_cms))
+    .bind(t.deposit_amount.as_deref())
+    .bind(t.release_amount.as_deref())
+    .bind(t.fee_note.as_ref())
+    .bind(t.fee_cm.as_deref())
+    .bind(t.staking_action.as_ref())
     .execute(&mut *conn)
     .await?;
 
@@ -314,7 +331,7 @@ pub async fn find_transaction_by_commitment(pool: &PgPool, cm: &str) -> Result<O
     let sql = format!(
         "SELECT {TX_COLS} FROM transactions
          WHERE commitment_1 = $1 OR commitment_2 = $1 OR commitment_3 = $1 OR commitment_4 = $1
-            OR cm = $1 OR derived_cm = $1 OR $1 = ANY(payout_cms) LIMIT 1"
+            OR cm = $1 OR derived_cm = $1 OR $1 = ANY(payout_cms) OR fee_cm = $1 LIMIT 1"
     );
     Ok(sqlx::query_as::<_, TxRow>(&sql)
         .bind(cm)

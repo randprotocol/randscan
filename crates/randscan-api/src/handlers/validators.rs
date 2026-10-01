@@ -3,7 +3,7 @@ use axum::{
     extract::{Path, State},
     Json,
 };
-use randscan_core::{Validator, ValidatorDetail};
+use randscan_core::{AdmittedSet, Validator, ValidatorDetail};
 use randscan_db as db;
 
 async fn active_stake(pool: &db::PgPool) -> ApiResult<u128> {
@@ -35,4 +35,19 @@ pub async fn get_validator(
         validator: row.into_validator(total),
         recent_blocks: recent.into_iter().map(Into::into).collect(),
     }))
+}
+
+/// GET /api/v1/validators/admitted — audit v6 (STAKE-2): the keys the validator set has voted in
+/// (`admit_validator`) that have not registered yet, read from the node as of its head. On a chain
+/// without `staking.admission_by_vote` (or a node predating the method) `admission_by_vote` is
+/// false and the list empty.
+pub async fn admitted_validators(State(state): State<AppState>) -> ApiResult<Json<AdmittedSet>> {
+    let set = state
+        .indexer
+        .rpc()
+        .admitted()
+        .await
+        .map_err(|e| AppError::Internal(format!("admitted set: {e:#}")))?
+        .unwrap_or_default();
+    Ok(Json(set))
 }

@@ -163,6 +163,11 @@ impl BlockProcessor {
                     bridge_governance: f.bridge_governance.clone(),
                     transition: f.transition.clone(),
                     payout_cms: f.payout_cms.clone(),
+                    deposit_amount: f.deposit_amount.clone(),
+                    release_amount: f.release_amount.clone(),
+                    fee_note: f.fee_note.clone(),
+                    fee_cm: f.fee_cm.clone(),
+                    staking_action: f.staking_action.clone(),
                 },
             )
             .await
@@ -371,6 +376,16 @@ struct TxFields<'a> {
     /// mints) — leaves the chain appended, linked to this transaction as a `derived_cm` is.
     transition: Option<serde_json::Value>,
     payout_cms: Vec<String>,
+    /// bridge_attest (v0.6.8): the depositor's net note value; bridge_burn: the release amount.
+    deposit_amount: Option<String>,
+    release_amount: Option<String>,
+    /// bridge_attest / bridge_burn (v0.6.8): the fee note in full, and its commitment — a leaf the
+    /// chain appended (after the deposit's, or after the bundle's four), linked back to this
+    /// transaction as a `derived_cm` is.
+    fee_note: Option<serde_json::Value>,
+    fee_cm: Option<String>,
+    /// admit_validator / slash_equivocation.
+    staking_action: Option<serde_json::Value>,
 }
 
 impl<'a> TxFields<'a> {
@@ -402,6 +417,11 @@ impl<'a> TxFields<'a> {
             bridge_governance: None,
             transition: None,
             payout_cms: Vec::new(),
+            deposit_amount: None,
+            release_amount: None,
+            fee_note: None,
+            fee_cm: None,
+            staking_action: None,
         }
     }
 
@@ -484,6 +504,8 @@ impl<'a> TxFields<'a> {
                 r,
                 commitment,
                 pq_signers,
+                deposit_amount,
+                fee_note,
                 ..
             } => TxFields {
                 attestation_len: Some(*attestation_len as i64),
@@ -495,6 +517,9 @@ impl<'a> TxFields<'a> {
                 // The node computes this itself and reports it directly — no hashing needed.
                 derived_cm: commitment.clone(),
                 pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                deposit_amount: deposit_amount.as_ref().map(|a| a.0.clone()),
+                fee_note: fee_note.as_ref().and_then(|n| serde_json::to_value(n.to_core()).ok()),
+                fee_cm: fee_note.as_ref().map(|n| n.commitment.clone()),
                 ..Self::empty(TxKind::BridgeAttest)
             },
             RpcAction::BridgeBurn {
@@ -504,6 +529,8 @@ impl<'a> TxFields<'a> {
                 to_chain,
                 token,
                 to,
+                release_amount,
+                fee_note,
             } => TxFields {
                 asset_index: Some(*asset as i64),
                 amount: Some(amount.0.clone()),
@@ -511,6 +538,9 @@ impl<'a> TxFields<'a> {
                 to_chain: Some(i32::from(*to_chain)),
                 bridge_to: Some(to),
                 bridge_token: Some(token),
+                release_amount: release_amount.as_ref().map(|a| a.0.clone()),
+                fee_note: fee_note.as_ref().and_then(|n| serde_json::to_value(n.to_core()).ok()),
+                fee_cm: fee_note.as_ref().map(|n| n.commitment.clone()),
                 ..Self::empty(TxKind::BridgeBurn)
             },
             RpcAction::RegisterToken {
@@ -677,6 +707,91 @@ impl<'a> TxFields<'a> {
                     ..Self::empty(TxKind::ListBacking)
                 }
             }
+            RpcAction::AdmitValidator { candidate, candidate_key, voters } => {
+                let action = randscan_core::StakingAction::AdmitValidator {
+                    candidate: candidate.clone(),
+                    candidate_key: candidate_key.clone(),
+                    voters: voters.clone(),
+                };
+                TxFields {
+                    validator: Some(candidate),
+                    staking_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::AdmitValidator)
+                }
+            }
+            RpcAction::SlashEquivocation { offender, view, first, second } => {
+                let r = |h: &crate::rpc::RpcHeaderRef| randscan_core::HeaderRef { hash: h.hash.clone(), height: h.height as i64 };
+                let action = randscan_core::StakingAction::SlashEquivocation {
+                    offender: offender.clone(),
+                    view: *view as i64,
+                    first: r(first),
+                    second: r(second),
+                };
+                TxFields {
+                    validator: Some(offender),
+                    staking_action: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::SlashEquivocation)
+                }
+            }
+            RpcAction::RotatePqGuardians { new_pq_guardians, possession_signatures, nonce, pq_signers, v2 } => {
+                let (action, kind) = if *v2 {
+                    (
+                        randscan_core::BridgeGovernanceAction::RotatePqGuardiansV2 {
+                            new_pq_guardians: new_pq_guardians.clone(),
+                            possession_signatures: possession_signatures.unwrap_or(0) as i64,
+                            nonce: *nonce as i64,
+                            pq_signers: pq_signers.clone(),
+                        },
+                        TxKind::RotatePqGuardiansV2,
+                    )
+                } else {
+                    (
+                        randscan_core::BridgeGovernanceAction::RotatePqGuardians {
+                            new_pq_guardians: new_pq_guardians.clone(),
+                            nonce: *nonce as i64,
+                            pq_signers: pq_signers.clone(),
+                        },
+                        TxKind::RotatePqGuardians,
+                    )
+                };
+                TxFields {
+                    action_nonce: Some(*nonce as i64),
+                    pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(kind)
+                }
+            }
+            RpcAction::RotatePauseKey { new_pause_key, nonce, pq_signers, v2 } => {
+                let (new_pause_key, nonce_i, signers) = (new_pause_key.clone(), *nonce as i64, pq_signers.clone());
+                let (action, kind) = if *v2 {
+                    (
+                        randscan_core::BridgeGovernanceAction::RotatePauseKeyV2 { new_pause_key, nonce: nonce_i, pq_signers: signers },
+                        TxKind::RotatePauseKeyV2,
+                    )
+                } else {
+                    (
+                        randscan_core::BridgeGovernanceAction::RotatePauseKey { new_pause_key, nonce: nonce_i, pq_signers: signers },
+                        TxKind::RotatePauseKey,
+                    )
+                };
+                TxFields {
+                    action_nonce: Some(nonce_i),
+                    pq_signers: Some(pq_signers.iter().map(|&i| i as i32).collect()),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(kind)
+                }
+            }
+            RpcAction::CancelRotation { rotation_kind, nonce } => {
+                let action = randscan_core::BridgeGovernanceAction::CancelRotation {
+                    rotation_kind: rotation_kind.clone(),
+                    nonce: *nonce as i64,
+                };
+                TxFields {
+                    action_nonce: Some(*nonce as i64),
+                    bridge_governance: serde_json::to_value(&action).ok(),
+                    ..Self::empty(TxKind::CancelRotation)
+                }
+            }
             RpcAction::Unknown { kind: tag } => TxFields {
                 // The column is VARCHAR(32); a longer tag is stored truncated on a char boundary.
                 kind_tag: truncate_chars(tag, 32),
@@ -715,6 +830,8 @@ mod tests {
             to_chain: 5,
             token: "cd".repeat(32),
             to: "00".repeat(32),
+            release_amount: None,
+            fee_note: None,
         };
         let f = TxFields::from_action(&k);
         assert_eq!(f.kind, TxKind::BridgeBurn);
@@ -831,11 +948,81 @@ mod tests {
             r: Some("aa".repeat(32)),
             commitment: Some("cc".repeat(32)),
             pq_signers: vec![0, 1],
+            deposit_amount: None,
+            fee_note: None,
         };
         let f = TxFields::from_action(&k);
         assert_eq!(f.kind, TxKind::BridgeAttest);
         assert_eq!(f.derived_cm.as_deref(), Some("cc".repeat(32).as_str()));
         assert_eq!(f.pq_signers, Some(vec![0, 1]));
+        assert!(f.fee_cm.is_none() && f.deposit_amount.is_none());
+    }
+
+    /// v0.6.8 (`bridge.fees`): the amount stays the gross (what `locked` grew by), the net and the
+    /// fee note ride beside it, and the fee note's leaf is linkable to the transaction.
+    #[test]
+    fn a_fee_split_deposit_keeps_the_gross_and_links_its_fee_note() {
+        let fee = crate::rpc::RpcFeeNote {
+            amount: Units("100000".into()),
+            asset: 1,
+            time: 1599,
+            r: "ec".repeat(32),
+            commitment: "47".repeat(32),
+        };
+        let k = RpcAction::BridgeAttest {
+            attestation_len: 586,
+            recipient: "rand1abc".into(),
+            asset: Some(1),
+            asset_index: Some(1),
+            amount: Some(Units("100000000".into())),
+            time: Some(1599),
+            r: Some("63".repeat(32)),
+            commitment: Some("d8".repeat(32)),
+            pq_signers: vec![0, 3],
+            deposit_amount: Some(Units("99900000".into())),
+            fee_note: Some(fee.clone()),
+        };
+        let f = TxFields::from_action(&k);
+        assert_eq!(f.amount.as_deref(), Some("100000000"));
+        assert_eq!(f.deposit_amount.as_deref(), Some("99900000"));
+        assert_eq!(f.derived_cm.as_deref(), Some("d8".repeat(32).as_str()), "the net deposit's leaf");
+        assert_eq!(f.fee_cm.as_deref(), Some("47".repeat(32).as_str()));
+        assert_eq!(f.fee_note.as_ref().unwrap()["amount"], "100000");
+
+        let burn = RpcAction::BridgeBurn {
+            asset: 1,
+            amount: Units("500000".into()),
+            relayer_fee: Units("0".into()),
+            to_chain: 2,
+            token: "cd".repeat(32),
+            to: "00".repeat(32),
+            release_amount: Some(Units("499500".into())),
+            fee_note: Some(fee),
+        };
+        let f = TxFields::from_action(&burn);
+        assert_eq!((f.amount.as_deref(), f.release_amount.as_deref()), (Some("500000"), Some("499500")));
+        assert!(f.fee_cm.is_some());
+    }
+
+    #[test]
+    fn the_audit_v6_actions_are_stored_with_their_kinds() {
+        let a = RpcAction::AdmitValidator { candidate: "2nRd".into(), candidate_key: "ab".into(), voters: vec!["v1".into()] };
+        let f = TxFields::from_action(&a);
+        assert_eq!((f.kind, f.validator), (TxKind::AdmitValidator, Some("2nRd")));
+        assert_eq!(f.staking_action.unwrap()["kind"], "admit_validator");
+        let r = RpcAction::RotatePqGuardians {
+            new_pq_guardians: vec!["k".into()],
+            possession_signatures: Some(1),
+            nonce: 3,
+            pq_signers: vec![1],
+            v2: true,
+        };
+        let f = TxFields::from_action(&r);
+        assert_eq!((f.kind, f.kind_tag), (TxKind::RotatePqGuardiansV2, "rotate_pq_guardians_v2"));
+        assert_eq!(f.bridge_governance.unwrap()["possession_signatures"], 1);
+        let c = RpcAction::CancelRotation { rotation_kind: "pq_guardians".into(), nonce: 4 };
+        let f = TxFields::from_action(&c);
+        assert_eq!((f.kind, f.action_nonce), (TxKind::CancelRotation, Some(4)));
     }
 
     #[test]

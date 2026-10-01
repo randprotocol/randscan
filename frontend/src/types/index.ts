@@ -28,6 +28,13 @@ export type TransactionKind =
   | 'register_bridged_token'
   | 'list_backing'
   | 'invoke'
+  | 'admit_validator'
+  | 'slash_equivocation'
+  | 'rotate_pq_guardians'
+  | 'rotate_pause_key'
+  | 'rotate_pq_guardians_v2'
+  | 'rotate_pause_key_v2'
+  | 'cancel_rotation'
   | 'other';
 
 export type HealthStatus = 'healthy' | 'degraded' | 'unhealthy';
@@ -219,7 +226,39 @@ export type BridgeGovernanceAction =
       decimals: number;
       nonce: number;
       pq_signers: number[];
+    }
+  | { kind: 'rotate_pq_guardians'; new_pq_guardians: string[]; nonce: number; pq_signers: number[] }
+  | { kind: 'rotate_pause_key'; new_pause_key: string; nonce: number; pq_signers: number[] }
+  | {
+      kind: 'rotate_pq_guardians_v2';
+      new_pq_guardians: string[];
+      possession_signatures: number;
+      nonce: number;
+      pq_signers: number[];
+    }
+  | { kind: 'rotate_pause_key_v2'; new_pause_key: string; nonce: number; pq_signers: number[] }
+  | { kind: 'cancel_rotation'; rotation_kind: 'pq_guardians' | 'pause_key' | string; nonce: number };
+
+/** Audit v6's validator-set actions (v0.6.8): bundle-less and fee-less. */
+export type StakingAction =
+  | { kind: 'admit_validator'; candidate: string; candidate_key: string; voters: string[] }
+  | {
+      kind: 'slash_equivocation';
+      offender: string;
+      view: number;
+      first: { hash: string; height: number };
+      second: { hash: string; height: number };
     };
+
+/** A bridge fee note (v0.6.8, genesis `bridge.fees`): every word but its owner (the fee
+ * recipient). An extra leaf with no envelope. */
+export interface BridgeFeeNote {
+  amount: string;
+  asset: number;
+  time: number;
+  r: string;
+  commitment: string;
+}
 
 /** One program-state cell as an invoke read or wrote it (RPL-2): Word8 key and value, 64 hex
  * each; a written value of 64 zeros deletes the cell, a read of 64 zeros is of none. */
@@ -302,6 +341,15 @@ export interface TransactionDetail extends TransactionSummary {
   bridge_governance: BridgeGovernanceAction | null;
   /** invoke (RPL-2): the transition the proof vouched for and the ledger applied. */
   transition?: Transition | null;
+  /** bridge_attest (v0.6.8): the depositor's note value — `amount` (the gross the guardians signed)
+   * less the bridge fee. */
+  deposit_amount?: string | null;
+  /** bridge_burn (v0.6.8): what the source contract releases — `amount` less the bridge fee. */
+  release_amount?: string | null;
+  /** bridge_attest / bridge_burn (v0.6.8): the fee note, null without `bridge.fees`. */
+  fee_note?: BridgeFeeNote | null;
+  /** admit_validator / slash_equivocation. */
+  staking_action?: StakingAction | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -346,6 +394,17 @@ export interface NoteEnvelope {
   height: number;
   tx_hash: string | null;
   envelope: EnvelopeHex | null;
+  /** A chain-computed note's public opening (a bridge deposit, a bridge fee note — which has no
+   * envelope — an RPL mint or initial mint, an RPL-2 payout); null for a note a bundle created. */
+  public?: PublicNote | null;
+}
+
+export interface PublicNote {
+  source: 'bridge_deposit' | 'bridge_fee' | 'token_mint' | 'initial_mint' | 'payout';
+  amount: string;
+  asset: number;
+  time: number;
+  r: string;
 }
 
 /** Everything a key can be tried against for one transaction. */
@@ -446,6 +505,13 @@ export interface BridgeState {
   /** The genesis replay floor: source chain id -> the lowest sequence a lock may carry. */
   min_inbound_sequence?: Record<string, number> | null;
   assets: BridgeAsset[];
+  /** v0.6.8 (genesis `bridge.fees`, chain 20): basis points of each deposit / burn minted as a
+   * zUSD note to `recipient`; null on chains 14–19. */
+  fees?: { mint_bps: number; burn_bps: number; recipient: string } | null;
+  /** Audit v6 (BRG-14): rotation delay and whether it needs proof of possession; null without. */
+  rotation_rules?: { delay_secs: number; needs_possession: boolean } | null;
+  /** Audit v6 (BRG-14): rotations signed and waiting out the delay. */
+  pending_rotations?: Array<{ kind: string; new_pq_guardians?: string[]; new_pause_key?: string; effective_at_secs: number }> | null;
   /** `emitters`, readable; absent from an API older than chain 19's. */
   endpoints?: BridgeEndpoint[];
 }
@@ -468,9 +534,12 @@ export interface BridgeAssetActivity extends BridgeAsset {
    */
   deposits: number | null;
   deposited: string | null;
-  /** Burns that redeemed this backing; a burn names its coin, so these are exact per row. */
+  /** Burns that redeemed this backing; a burn names its coin, so these are exact per row.
+   * `burned` is what left `locked`: the release amounts (v0.6.8: the burn less the bridge fee). */
   burns: number;
   burned: string;
+  /** v0.6.8: bridge fees kept as zUSD notes out of this backing's burns. */
+  burn_fees?: string;
   /** What this backing holds for the chain now: the registry's `locked`. */
   outstanding: string;
   /**
@@ -481,6 +550,9 @@ export interface BridgeAssetActivity extends BridgeAsset {
   token_deposited: string;
   token_burns: number;
   token_burned: string;
+  /** v0.6.8: the bridge fee notes minted out of the token's deposits and burns. */
+  token_deposit_fees?: string;
+  token_burn_fees?: string;
   /** First and last height of any bridge activity of the token, not of this backing alone. */
   first_height: number | null;
   last_height: number | null;
@@ -776,6 +848,27 @@ export interface ChainLimits {
     max_writes: number;
     max_payouts: number;
   } | null;
+  /** Audit v6 (POOL-2): price ceilings, decimal strings; `byte_load` "paying". */
+  max_gas_price?: string | null;
+  max_byte_price?: string | null;
+  byte_load?: string | null;
+  /** Audit v6 (STAKE-2): a registering bond needs the validator set's vote first. */
+  admission_by_vote?: boolean;
+  /** The genesis testnet marker. */
+  testnet?: boolean;
+  /** Audit v6 (STAKE-1): equivocation slashing, null without. */
+  slashing?: { equivocation_bps: number; jail_epochs: number } | null;
+  /** Audit v6 (BIND-1): 0 = bindings carry the chain id, 1 = the genesis hash. */
+  binding_domain?: number | null;
+  /** Issue #118: anchor and time window in blocks; null = 256. */
+  proof_window_blocks?: number | null;
+}
+
+/** `GET /validators/admitted` (audit v6, STAKE-2). */
+export interface AdmittedSet {
+  admission_by_vote: boolean;
+  max: number;
+  admitted: string[];
 }
 
 /** The tip's live gas prices under a chain's gas section, decimal strings. */

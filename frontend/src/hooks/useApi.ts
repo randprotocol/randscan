@@ -3,6 +3,7 @@
 import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 import * as api from '@/lib/api';
 import type {
+  AdmittedSet,
   ApiKey,
   BlockDetail,
   BlockSummary,
@@ -236,6 +237,14 @@ export function useToken(
 // ---------------------------------------------------------------------------
 // Validators
 // ---------------------------------------------------------------------------
+
+export function useAdmittedValidators(config?: SWRConfiguration): SWRResponse<AdmittedSet> {
+  return useSWR<AdmittedSet>('validators-admitted', api.getAdmittedValidators, {
+    ...defaultConfig,
+    refreshInterval: 60_000,
+    ...config,
+  });
+}
 
 export function useValidators(config?: SWRConfiguration): SWRResponse<Validator[]> {
   return useSWR<Validator[]>('validators', api.getValidators, {

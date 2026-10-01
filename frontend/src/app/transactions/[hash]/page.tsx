@@ -20,7 +20,7 @@ import {
   getKindLabel,
   resolveToken,
 } from '@/lib/utils';
-import type { Bundle, Payout, ProgramCell, Receipt, TokenInfo, TransactionDetail } from '@/types';
+import type { BridgeFeeNote, Bundle, Payout, ProgramCell, Receipt, TokenInfo, TransactionDetail } from '@/types';
 
 export default function TransactionDetailPage() {
   const params = useParams<{ hash: string }>();
@@ -337,6 +337,19 @@ function PqSignersRow({ signers }: { signers: number[] | null }) {
 
 /** A resolved token's symbol as a link to its page, or "asset #N" when this build's cached
  * registry does not (yet) know the index. */
+function FeeNoteRow({ note, tokens }: { note: BridgeFeeNote | null; tokens: TokenInfo[] }) {
+  if (!note) return null;
+  return (
+    <DetailRow label="Bridge fee">
+      <span className="inline-flex flex-wrap items-center gap-2">
+        <span>{formatTokenAmount(note.amount, note.asset, tokens)}</span>
+        <span className="text-xs text-mute">a note to the fee recipient, leaf</span>
+        <Hash value={note.commitment} href={`/notes/${note.commitment}`} start={10} end={6} />
+      </span>
+    </DetailRow>
+  );
+}
+
 function AssetLink({ index, tokens }: { index: number | null; tokens: TokenInfo[] }) {
   if (index === null) return <span className="text-mute">—</span>;
   if (index === 0) return <span className="font-mono">RAND</span>;
@@ -487,6 +500,12 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
             {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
           </span>
         </DetailRow>
+        {tx.release_amount != null && (
+          <DetailRow label="Released on the source chain">
+            <span>{formatTokenAmount(tx.release_amount, tx.asset_index, tokens)}</span>
+          </DetailRow>
+        )}
+        <FeeNoteRow note={tx.fee_note ?? null} tokens={tokens} />
         <DetailRow label="Relayer fee">
           <span>{formatTokenAmount(tx.relayer_fee, tx.asset_index, tokens)}</span>
         </DetailRow>
@@ -542,9 +561,16 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
           ) : (
             <span className="text-base font-semibold text-strong">
               {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+              {tx.fee_note ? <span className="ml-2 text-xs font-normal text-mute">gross, locked on the source chain</span> : null}
             </span>
           )}
         </DetailRow>
+        {tx.fee_note && tx.deposit_amount != null && (
+          <DetailRow label="Deposited to the recipient">
+            <span>{formatTokenAmount(tx.deposit_amount, tx.asset_index, tokens)}</span>
+          </DetailRow>
+        )}
+        <FeeNoteRow note={tx.fee_note ?? null} tokens={tokens} />
         <DetailRow label="Note time">
           {tx.note_time === null ? (
             <span className="text-mute">—</span>
@@ -565,6 +591,9 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
         <p className="px-4 py-3 text-xs text-mute">
           A guardian-signed message that deposits a bridged asset as a note for the recipient.
           The amount is public here and nowhere else.
+          {tx.fee_note
+            ? ' Under the chain’s bridge fee the gross is locked and split into two notes: the recipient’s, and a fee note to the fee recipient. The fee note has no envelope, so no viewing key finds it by decryption; its owner rebuilds it from the fields above.'
+            : ''}
         </p>
       </Panel>
     );
@@ -728,6 +757,98 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
         <PqSignersRow signers={tx.pq_signers} />
         <p className="px-4 py-3 text-xs text-mute">
           Authorised by the PQ guardian quorum, on a RAND fee bundle its submitter pays.
+        </p>
+      </Panel>
+    );
+  }
+
+  if (
+    tx.kind === 'rotate_pq_guardians' ||
+    tx.kind === 'rotate_pq_guardians_v2' ||
+    tx.kind === 'rotate_pause_key' ||
+    tx.kind === 'rotate_pause_key_v2' ||
+    tx.kind === 'cancel_rotation'
+  ) {
+    const action = tx.bridge_governance;
+    const delayed = tx.kind.endsWith('_v2');
+    return (
+      <Panel title={title}>
+        <DetailRow label="Rotation nonce">
+          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        </DetailRow>
+        {action && 'new_pq_guardians' in action && (
+          <DetailRow label="New PQ guardian set">
+            <span className="font-mono">{formatNumber(action.new_pq_guardians.length)} Dilithium2 keys</span>
+          </DetailRow>
+        )}
+        {action && 'new_pause_key' in action && (
+          <DetailRow label="New pause key">
+            <Hash value={action.new_pause_key} start={16} end={8} />
+          </DetailRow>
+        )}
+        {action?.kind === 'rotate_pq_guardians_v2' && (
+          <DetailRow label="Proofs of possession">
+            <span className="font-mono">{formatNumber(action.possession_signatures)}</span>
+          </DetailRow>
+        )}
+        {action?.kind === 'cancel_rotation' && (
+          <DetailRow label="Cancelled">
+            <span>{action.rotation_kind === 'pause_key' ? 'the pending pause-key rotation' : 'the pending PQ guardian rotation'}</span>
+          </DetailRow>
+        )}
+        {tx.kind !== 'cancel_rotation' && <PqSignersRow signers={tx.pq_signers} />}
+        <p className="px-4 py-3 text-xs text-mute">
+          {tx.kind === 'cancel_rotation'
+            ? 'A rotation signed but not yet in effect, withdrawn before its delay ran out (audit v6, BRG-14).'
+            : delayed
+              ? 'Signed by the current PQ guardian quorum, with every new holder’s proof of possession; it takes effect after the genesis rotation delay (see the bridge page) unless cancelled.'
+              : 'Signed by the PQ guardian quorum of the set before the rotation (bridge rules v2).'}
+        </p>
+      </Panel>
+    );
+  }
+
+  if (tx.kind === 'admit_validator' || tx.kind === 'slash_equivocation') {
+    const action = tx.staking_action;
+    return (
+      <Panel title={title}>
+        {action?.kind === 'admit_validator' && (
+          <>
+            <ValidatorRow label="Candidate" address={action.candidate} />
+            <DetailRow label="Voters">
+              <span className="font-mono">{formatNumber(action.voters.length)} validators</span>
+            </DetailRow>
+            <DetailRow label="Voted by">
+              <span className="flex flex-col gap-1">
+                {action.voters.map((v) => (
+                  <Hash key={v} value={v} href={`/validators/${v}`} start={10} end={6} />
+                ))}
+              </span>
+            </DetailRow>
+          </>
+        )}
+        {action?.kind === 'slash_equivocation' && (
+          <>
+            <ValidatorRow label="Offender" address={action.offender} />
+            <DetailRow label="View">
+              <span className="font-mono">{formatNumber(action.view)}</span>
+            </DetailRow>
+            <DetailRow label="First header">
+              <span className="font-mono">
+                #{formatNumber(action.first.height)} <Hash value={action.first.hash} start={10} end={6} />
+              </span>
+            </DetailRow>
+            <DetailRow label="Second header">
+              <span className="font-mono">
+                #{formatNumber(action.second.height)} <Hash value={action.second.hash} start={10} end={6} />
+              </span>
+            </DetailRow>
+          </>
+        )}
+        <p className="px-4 py-3 text-xs text-mute">
+          {tx.kind === 'admit_validator'
+            ? 'The validator set’s vote letting this key register with a bond, on a chain that admits validators by vote (audit v6, STAKE-2). Bundle-less and fee-less.'
+            : 'Two headers one validator key signed for the same view: the evidence of a leader equivocation, slashed by the genesis slashing rule (audit v6, STAKE-1).'}
         </p>
       </Panel>
     );
