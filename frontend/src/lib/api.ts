@@ -12,6 +12,7 @@ import type {
   Health,
   NetworkStats,
   NodeInfo,
+  ProverView,
   Note,
   Nullifier,
   Paginated,
@@ -288,6 +289,10 @@ export function getProgram(id: string): Promise<ProgramDetail> {
 
 export function getNodes(): Promise<NodeInfo[]> {
   return request<NodeInfo[]>('/nodes');
+}
+
+export function getProvers(): Promise<ProverView[]> {
+  return request<ProverView[]>('/provers');
 }
 
 // ---------------------------------------------------------------------------

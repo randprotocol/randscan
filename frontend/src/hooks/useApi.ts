@@ -12,6 +12,7 @@ import type {
   Health,
   NetworkStats,
   NodeInfo,
+  ProverView,
   Note,
   Paginated,
   ProgramDetail,
@@ -285,6 +286,14 @@ export function useProgram(
 // ---------------------------------------------------------------------------
 // Nodes
 // ---------------------------------------------------------------------------
+
+export function useProvers(config?: SWRConfiguration): SWRResponse<ProverView[]> {
+  return useSWR<ProverView[]>('provers', api.getProvers, {
+    ...defaultConfig,
+    refreshInterval: 30_000,
+    ...config,
+  });
+}
 
 export function useNodes(config?: SWRConfiguration): SWRResponse<NodeInfo[]> {
   return useSWR<NodeInfo[]>('nodes', api.getNodes, {

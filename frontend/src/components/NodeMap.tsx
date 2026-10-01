@@ -130,9 +130,11 @@ function popupHtml(node: NodeInfo): string {
 
 interface NodeMapProps {
   nodes: NodeInfo[];
+  /** Replaces the peer popup (the provers map shows a member host, not a peer). */
+  popup?: (node: NodeInfo) => string;
 }
 
-export default function NodeMap({ nodes }: NodeMapProps) {
+export default function NodeMap({ nodes, popup }: NodeMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.LayerGroup | null>(null);
@@ -235,7 +237,7 @@ export default function NodeMap({ nodes }: NodeMapProps) {
         fillColor: color,
         fillOpacity: 0.35,
       })
-        .bindPopup(popupHtml(node))
+        .bindPopup((popup ?? popupHtml)(node))
         .addTo(layer);
     }
 
@@ -245,7 +247,7 @@ export default function NodeMap({ nodes }: NodeMapProps) {
     } else {
       map.setView([20, 0], 2);
     }
-  }, [nodes, dark, colorFor]);
+  }, [nodes, dark, colorFor, popup]);
 
   return (
     <div className="card overflow-hidden">

@@ -16,6 +16,7 @@ const navLinks = [
   { href: '/notes', label: 'Notes' },
   { href: '/viewing', label: 'History' },
   { href: '/validators', label: 'Validators' },
+  { href: '/provers', label: 'Provers' },
   { href: '/programs', label: 'Programs' },
   { href: '/tokens', label: 'Tokens' },
   { href: '/bridge', label: 'Bridge' },

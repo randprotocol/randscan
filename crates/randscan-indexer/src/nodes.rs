@@ -2,7 +2,7 @@
 
 use crate::rpc::RpcClient;
 use anyhow::Result;
-use randscan_core::{is_private_ip, parse_multiaddr, NodeInfo};
+use randscan_core::{is_private_ip, parse_multiaddr, NodeInfo, ProverInfoReply, ProverMember, ProverView, KNOWN_PROVERS};
 use randscan_db::{self as db, DbPool};
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -21,6 +21,8 @@ pub struct NodeTracker {
     interval: Duration,
     public_ip: RwLock<Option<String>>,
     nodes: Arc<RwLock<Vec<NodeInfo>>>,
+    /// The known provers (`KNOWN_PROVERS`) as last polled, members geolocated.
+    provers: Arc<RwLock<Vec<ProverView>>>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +73,7 @@ impl NodeTracker {
                     .filter(|s| !s.is_empty()),
             ),
             nodes: Arc::new(RwLock::new(Vec::new())),
+            provers: Arc::new(RwLock::new(KNOWN_PROVERS.iter().map(ProverView::unpolled).collect())),
         }
     }
 
@@ -78,10 +81,17 @@ impl NodeTracker {
         self.nodes.read().await.clone()
     }
 
+    pub async fn provers(&self) -> Vec<ProverView> {
+        self.provers.read().await.clone()
+    }
+
     pub async fn run(&self) {
         loop {
             if let Err(e) = self.refresh().await {
                 warn!("node tracker refresh failed: {:#}", e);
+            }
+            if let Err(e) = self.refresh_provers().await {
+                warn!("prover refresh failed: {:#}", e);
             }
             tokio::time::sleep(self.interval).await;
         }
@@ -133,29 +143,7 @@ impl NodeTracker {
             .filter_map(|n| n.ip.clone())
             .filter(|ip| !is_private_ip(ip))
             .collect();
-        let mut cache: HashMap<String, db::NodeGeoRow> = db::get_node_geo(self.pool.inner(), &ips)
-            .await?
-            .into_iter()
-            .map(|r| (r.ip.clone(), r))
-            .collect();
-
-        for ip in &ips {
-            let stale = cache
-                .get(ip)
-                .map(|r| {
-                    chrono_age(r.updated_at) > GEO_TTL
-                        || (!r.ok && chrono_age(r.updated_at) > Duration::from_secs(3600))
-                })
-                .unwrap_or(true);
-            if stale {
-                match self.lookup(ip).await {
-                    Ok(row) => {
-                        cache.insert(ip.clone(), row);
-                    }
-                    Err(e) => warn!("geo lookup {} failed: {:#}", ip, e),
-                }
-            }
-        }
+        let cache = self.geolocate(&ips).await?;
 
         for n in nodes.iter_mut() {
             if let Some(ip) = &n.ip {
@@ -182,6 +170,87 @@ impl NodeTracker {
         );
         *self.nodes.write().await = nodes;
         Ok(())
+    }
+
+    /// The cached geolocation of each public IP in `ips`, looked up again past `GEO_TTL` (an
+    /// hour for a failed lookup).
+    async fn geolocate(&self, ips: &[String]) -> Result<HashMap<String, db::NodeGeoRow>> {
+        let mut cache: HashMap<String, db::NodeGeoRow> = db::get_node_geo(self.pool.inner(), ips)
+            .await?
+            .into_iter()
+            .map(|r| (r.ip.clone(), r))
+            .collect();
+        for ip in ips {
+            let stale = cache
+                .get(ip)
+                .map(|r| {
+                    chrono_age(r.updated_at) > GEO_TTL
+                        || (!r.ok && chrono_age(r.updated_at) > Duration::from_secs(3600))
+                })
+                .unwrap_or(true);
+            if stale {
+                match self.lookup(ip).await {
+                    Ok(row) => {
+                        cache.insert(ip.clone(), row);
+                    }
+                    Err(e) => warn!("geo lookup {} failed: {:#}", ip, e),
+                }
+            }
+        }
+        Ok(cache)
+    }
+
+    /// Poll every known prover's `prover_info` and place its members. A prover that does not
+    /// answer keeps its last reply (and `last_up_ms`), marked down with the error.
+    async fn refresh_provers(&self) -> Result<()> {
+        let ips: Vec<String> = KNOWN_PROVERS.iter().flat_map(|p| p.members.iter().map(|m| m.ip.to_string())).collect();
+        let cache = self.geolocate(&ips).await?;
+        let previous = self.provers().await;
+        let now = chrono_now().timestamp_millis();
+        let mut out = Vec::with_capacity(KNOWN_PROVERS.len());
+        for p in KNOWN_PROVERS {
+            let mut v = previous.iter().find(|v| v.url == p.url).cloned().unwrap_or_else(|| ProverView::unpolled(p));
+            v.members = p
+                .members
+                .iter()
+                .map(|m| ProverMember { label: m.label.into(), geo: cache.get(m.ip).and_then(|r| r.geo()) })
+                .collect();
+            v.checked_at_ms = Some(now);
+            match self.prover_info(p.url).await {
+                Ok(info) => {
+                    v.fingerprint_matches = info.kem_fingerprint.as_deref().map(|f| f == p.fingerprint);
+                    v.up = true;
+                    v.error = None;
+                    v.last_up_ms = Some(now);
+                    v.info = Some(info);
+                }
+                Err(e) => {
+                    debug!("prover {} did not answer: {:#}", p.url, e);
+                    v.up = false;
+                    v.error = Some(format!("{e:#}"));
+                }
+            }
+            out.push(v);
+        }
+        *self.provers.write().await = out;
+        Ok(())
+    }
+
+    /// One `prover_info` call (no `Origin` header: a server-side caller is served without CORS).
+    async fn prover_info(&self, url: &str) -> Result<ProverInfoReply> {
+        let reply: serde_json::Value = self
+            .http
+            .post(format!("{}/", url.trim_end_matches('/')))
+            .json(&serde_json::json!({ "jsonrpc": "2.0", "id": 1, "method": "prover_info", "params": [] }))
+            .send()
+            .await?
+            .error_for_status()?
+            .json()
+            .await?;
+        if let Some(err) = reply.get("error") {
+            anyhow::bail!("prover_info: {err}");
+        }
+        Ok(serde_json::from_value(reply.get("result").cloned().unwrap_or_default())?)
     }
 
     async fn discover_public_ip(&self) -> Option<String> {

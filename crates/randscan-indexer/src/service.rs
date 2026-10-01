@@ -93,6 +93,11 @@ impl IndexerService {
         self.nodes.nodes().await
     }
 
+    /// The known delegated provers as last polled, members geolocated (provers map).
+    pub async fn provers(&self) -> Vec<randscan_core::ProverView> {
+        self.nodes.provers().await
+    }
+
     /// The bridge's public state as last read from the node (`None` before the first refresh).
     pub async fn bridge(&self) -> Option<BridgeState> {
         self.bridge.read().await.clone()

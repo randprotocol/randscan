@@ -128,6 +128,7 @@ for v in validators:
 | `GET /tokens` | the whole RPL token registry, as cached from the node |
 | `GET /tokens/:id` | one token by registry index, 64-hex id or `rpl1…` text form, its deploy transaction and its public supply history |
 | `GET /nodes` | the explorer node and its peers, with geolocation |
+| `GET /provers` | the delegated provers the explorer knows of: whether each answers, its capacity and fee, and where its hosts are |
 
 `GET /health`:
 
@@ -701,6 +702,32 @@ indexer pass.
 `GET /accounts/:address` and `GET /accounts/:address/transactions` answer **410**
 `{ "error": "no_accounts" }`. There are no accounts on this chain. For deposit detection, run a
 wallet with your viewing key (`rand sync`); to watch stake, read `/validators`.
+
+### Provers
+
+`GET /provers` lists the delegated provers (fullnode `docs/prover.md`) this explorer knows of —
+the chain keeps no record of them, and a pool hides its hosts behind one URL, so the list is the
+explorer's own (`KNOWN_PROVERS` in `randscan-core`). Each endpoint's `prover_info` is polled every
+`NODES_INTERVAL_SECS`; each host is geolocated from its public IP, which is not served.
+
+```json
+[{
+  "name": "RandProtocol prover pool", "url": "https://prover.randprotocol.org",
+  "operator": "Rand Protocol validators", "fingerprint": "RGTF-7HKJ-XZFV-GQ1J",
+  "pairing_url": "https://prover.randprotocol.org/.well-known/rand-prover.json",
+  "up": true, "fingerprint_matches": true, "error": null,
+  "checked_at_ms": 1790825354832, "last_up_ms": 1790825354832,
+  "info": { "version": "0.6.7", "kem_fingerprint": "RGTF-7HKJ-XZFV-GQ1J", "hc_bundles": ["60af…"],
+            "backend": "cpu", "witness_kinds": ["viewing_key"],
+            "queue": { "depth": 0, "max": 5, "proving": 0 }, "fee": null },
+  "members": [{ "label": "rand-node-a", "geo": { "lat": 1.29, "lon": 103.85, "city": "Singapore", … } }]
+}]
+```
+
+`up` is whether the endpoint answered on the last poll; a prover that stops answering keeps its
+last `info` and `last_up_ms`, with the poll's `error`. Behind a pool `queue` is the router's sum
+over the members that answered its own last poll (`max` is the job slots, one per member there).
+`fee` is `null` for a free prover, else `{ amount, address }` with RAND base units.
 
 ### Validators
 

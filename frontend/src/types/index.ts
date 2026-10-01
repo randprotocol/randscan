@@ -828,6 +828,47 @@ export interface NodeInfo {
 }
 
 // ---------------------------------------------------------------------------
+// Delegated provers
+// ---------------------------------------------------------------------------
+
+/** A delegated prover's public `prover_info` (the ML-KEM key left out). */
+export interface ProverInfoReply {
+  version: string | null;
+  kem_fingerprint: string | null;
+  hc_bundles: string[];
+  /** `cpu` or `cuda` */
+  backend: string | null;
+  witness_kinds: string[];
+  /** Behind a pool, the sums over the members that answered the router's last poll. */
+  queue: { depth: number; max: number; proving: number } | null;
+  /** `null` for a free prover; otherwise RAND base units per bundle and the address paid. */
+  fee: { amount: string; address: string } | null;
+}
+
+/** A host that proves for a prover endpoint: its label and where it is (never its address). */
+export interface ProverMember {
+  label: string;
+  geo: GeoInfo | null;
+}
+
+export interface ProverView {
+  name: string;
+  url: string;
+  operator: string;
+  /** The pairing fingerprint a wallet pins. */
+  fingerprint: string;
+  pairing_url: string | null;
+  /** Whether the endpoint answered `prover_info` on the explorer's last poll. */
+  up: boolean;
+  info: ProverInfoReply | null;
+  fingerprint_matches: boolean | null;
+  error: string | null;
+  checked_at_ms: number | null;
+  last_up_ms: number | null;
+  members: ProverMember[];
+}
+
+// ---------------------------------------------------------------------------
 // Search
 // ---------------------------------------------------------------------------
 
