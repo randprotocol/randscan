@@ -12,6 +12,7 @@
   "dependencies": {
     "clsx": "^2.1.1",
     "leaflet": "^1.9.4",
+    "mmdb-lib": "^2.2.1",
     "next": "15.5.25",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
