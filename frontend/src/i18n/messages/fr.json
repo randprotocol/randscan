@@ -1,1 +1,1505 @@
-{}
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Explorateur du Rand Protocol",
+    "metaDescription": "Explorez les blocs, transactions, comptes, validateurs et programmes confidentiels du réseau Rand Protocol.",
+    "language": "Langue",
+    "englishGoverns": "Cette traduction est fournie à titre indicatif ; le texte anglais fait foi.",
+    "loading": "Chargement…",
+    "retry": "Réessayer",
+    "copy": "Copier",
+    "copied": "Copié",
+    "live": "En direct",
+    "offline": "Hors ligne",
+    "notFound": "Introuvable",
+    "backToDashboard": "Retour au tableau de bord",
+    "somethingWrong": "Une erreur s’est produite",
+    "apiUnreachable": "L’API de l’explorateur est injoignable. Veuillez réessayer.",
+    "previousPage": "Page précédente",
+    "nextPage": "Page suivante"
+  },
+  "fmt": {
+    "units": "unités",
+    "assetUnits": "{units} unités de l’actif n° {index}",
+    "bridged": "{tokens} jetons ({units} unités)",
+    "chain": "chaîne {id}",
+    "unknownLocation": "Emplacement inconnu"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "Tableau de bord",
+      "blocks": "Blocs",
+      "transactions": "Transactions",
+      "notes": "Notes",
+      "history": "Historique",
+      "validators": "Validateurs",
+      "provers": "Prouveurs",
+      "programs": "Programmes",
+      "tokens": "Jetons",
+      "bridge": "Pont",
+      "nodes": "Nœuds"
+    },
+    "apiKeys": "Clés API",
+    "signIn": "Se connecter",
+    "toggleNav": "Afficher ou masquer la navigation"
+  },
+  "footer": {
+    "blurb": "RandScan est l’explorateur du Rand Protocol.",
+    "privacy": "Confidentialité",
+    "terms": "Conditions"
+  },
+  "bridge": {
+    "title": "Pont",
+    "subtitle": "Des jetons verrouillés sur Ethereum, BSC, Solana et Tron et émis ici sous forme de notes protégées. La valeur transférée par le pont est constituée de notes, il n’y a donc pas de soldes : seulement ce qui est entré et ce qui est sorti.",
+    "loadError": "Impossible de charger l’état du pont.",
+    "noSection": "La chaîne {chain} n’a pas de section de pont dans son genesis : pas de gardiens, pas de registre d’actifs et pas encore de notes transférées. Les chaînes sources et les jetons approuvés ci-dessous sont ce que le pont acceptera une fois qu’une chaîne dotée d’une section de pont sera en service.",
+    "byChain": "Jetons transférés par chaîne source",
+    "openOn": "Ouvrir dans l’explorateur de {chain}",
+    "openOnChain": "Ouvrir dans l’explorateur de la chaîne",
+    "floorTitle": "Le seuil de rejeu fixé au genesis. Un verrouillage dont la séquence est inférieure a déjà été émis sur la chaîne dont celle-ci est issue, ou appartient à l’opérateur lui-même sur un contrat redéployé, et n’est jamais émis ici.",
+    "stats": {
+      "in": "Entrées via le pont",
+      "inSub": "dépôts attestés",
+      "out": "Sorties via le pont",
+      "outSub": "destructions libérées",
+      "assets": "Actifs observés",
+      "noActive": "aucune chaîne source active pour l’instant",
+      "from": "depuis {chains}",
+      "approved": "Jetons approuvés",
+      "approvedSub": "USDT et USDC sur quatre chaînes"
+    },
+    "activity": {
+      "token": "Jeton",
+      "asset": "Actif",
+      "in": "Entrées via le pont",
+      "out": "Sorties via le pont",
+      "fees": "Frais sur les destructions",
+      "feesTitle": "Frais de pont v0.6.8 conservés sous forme de notes zUSD à partir des destructions de ce jeton ; « Sorties via le pont » ne compte que ce qui a été libéré et a quitté le solde verrouillé.",
+      "outstanding": "Sur Rand actuellement",
+      "locked": "Verrouillé (registre)",
+      "minted": "Émis / plafond",
+      "inLast": "sur les {window} dernières",
+      "today": "aujourd’hui",
+      "headroom": "Marge d’émission",
+      "headroomMissing": "Fourni par les nœuds après la v0.6.7.",
+      "headroomTitle": "Le plus gros dépôt que les plafonds admettent actuellement pour ce jeton : son propre plafond moins ce qu’il a émis, et pas plus que ce qu’il reste à l’ensemble des jetons dans la fenêtre.",
+      "last": "Dernière activité",
+      "notApproved": "absent de la liste approuvée",
+      "na": "s. o.",
+      "naTitle": "Un dépôt publie le jeton qu’il a émis, et non la pièce source qui a été verrouillée ; il ne peut donc pas être attribué à une seule pièce d’un jeton multi-pièces.",
+      "transactions": {
+        "one": "{n} transaction",
+        "many": "{n} transactions",
+        "other": "{n} transactions"
+      }
+    },
+    "source": {
+      "contract": "contrat du pont",
+      "noContract": "aucun contrat de pont enregistré pour cette chaîne",
+      "floor": "verrouillages à partir de la séquence {sequence}",
+      "inOut": "{in} en entrée, {out} en sortie",
+      "out": "{out} en sortie",
+      "empty": "Rien n’a encore transité par le pont depuis {name} · identifiant de chaîne {chain}"
+    },
+    "tokens": {
+      "title": "Jetons approuvés",
+      "intro": "Le pont accepte ces jetons et aucun autre. Envoyez uniquement au contrat du pont sur la chaîne propre au jeton ; le contrat refuse le dépôt de tout autre jeton, et le dépôt d’un jeton approuvé sur la mauvaise chaîne correspond à un actif différent sur Rand.",
+      "empty": "Aucun jeton approuvé",
+      "noteOn": "{symbol} sur {chain} :",
+      "decimalsNote": "Les montants sur Rand comportent toujours 8 décimales, quel que soit le nombre de décimales du jeton d’origine ; le contrat du pont convertit à l’entrée comme à la sortie. Le registre stocke chaque adresse sous forme d’un mot de 32 octets : une adresse Ethereum, BSC ou Tron complétée à gauche par des zéros, un mint Solana tel quel.",
+      "token": "Jeton",
+      "chain": "Chaîne",
+      "address": "Adresse du contrat",
+      "decimals": "Décimales",
+      "onRand": "8 sur Rand",
+      "status": "Statut",
+      "allowed": "autorisé",
+      "discontinued": "abandonné"
+    },
+    "registry": {
+      "title": "Registre des actifs",
+      "empty": "Aucun actif transféré par le pont n’est encore enregistré",
+      "note": "Le registre propre au nœud, rempli lors du premier dépôt de chaque actif. L’indice est le mot d’actif que porte une note transférée par le pont ; l’indice 0 est RAND et ne figure jamais dans le registre.",
+      "index": "Indice",
+      "sourceChain": "Chaîne source",
+      "token": "Jeton",
+      "unknown": "inconnu",
+      "tokenAddress": "Adresse du jeton (32 octets)",
+      "assetId": "Identifiant d’actif"
+    },
+    "state": {
+      "title": "État du pont",
+      "mintPause": "Pause des émissions",
+      "paused": "En pause — les attestations de transfert sont refusées (les destructions et les rotations restent ouvertes)",
+      "notPaused": "Pas en pause",
+      "pauseNonce": "Nonce de pause / reprise",
+      "listNonce": "Nonce de liste",
+      "registrationFee": "Frais d’enregistrement",
+      "pqGuardians": "Gardiens PQ ({count})",
+      "pqGuardiansText": {
+        "one": "{n} clé Dilithium2, alignée par indice sur l’ensemble de gardiens classiques ci-dessous. Chaque attestation de dépôt et chaque action de gouvernance nécessitant un quorum est cosignée par cet ensemble ; une rotation ne le modifie jamais.",
+        "many": "{n} clés Dilithium2, alignées par indice sur l’ensemble de gardiens classiques ci-dessous. Chaque attestation de dépôt et chaque action de gouvernance nécessitant un quorum est cosignée par cet ensemble ; une rotation ne le modifie jamais.",
+        "other": "{n} clés Dilithium2, alignées par indice sur l’ensemble de gardiens classiques ci-dessous. Chaque attestation de dépôt et chaque action de gouvernance nécessitant un quorum est cosignée par cet ensemble ; une rotation ne le modifie jamais."
+      },
+      "pauseKey": "Clé de pause",
+      "outboundEmitter": "Émetteur sortant",
+      "guardianSet": "Ensemble de gardiens",
+      "guardians": "Gardiens ({count})",
+      "messagesEmitted": "Messages émis",
+      "nextIndex": "Prochain indice d’actif",
+      "fees": "Frais du pont",
+      "feeRates": "{in} en entrée / {out} en sortie",
+      "feeBps": "({in} / {out} bps), émis sous forme de note zUSD à",
+      "feesCollected": "perçus à ce jour : <code>{deposits}</code> sur les dépôts, <code>{burns}</code> sur les destructions. Un dépôt verrouille son montant brut et émet la note du destinataire plus la note de frais ; une destruction libère le montant détruit moins les frais et réémet les frais, de sorte que l’offre = Σ verrouillé = la garde tient toujours. Les notes de frais n’ont pas d’enveloppe.",
+      "rotationRules": "Règles de rotation",
+      "rotationDelay": "une rotation prend effet {delay} après son enregistrement",
+      "rotationDelayPossession": "une rotation prend effet {delay} après son enregistrement et doit comporter la preuve de possession de chaque nouveau détenteur",
+      "pendingPauseKey": "rotation de la clé de pause en attente, effective le <code>{at}</code>",
+      "pendingPq": "rotation des gardiens PQ en attente, effective le <code>{at}</code>",
+      "noPending": "aucune rotation en attente",
+      "rotationNonce": "Nonce de rotation",
+      "mintCapAll": "Plafond d’émission, tous jetons",
+      "mintCapPer": "par {window}, sur l’ensemble des garanties de tous les jetons confondus",
+      "mintedInWindow": "émis dans cette fenêtre <code>{minted}</code>, marge de <code>{room}</code> supplémentaires",
+      "trustedEmitters": "Émetteurs de confiance ({count})",
+      "asStored": "tel que la chaîne le stocke",
+      "floorMinted": "verrouillages émis à partir de la séquence {sequence}"
+    }
+  },
+  "auth": {
+    "login": {
+      "metaTitle": "Connexion — RandScan"
+    },
+    "signup": {
+      "metaTitle": "Créer un compte — RandScan"
+    },
+    "form": {
+      "intro": "Un compte vous permet de créer des clés API avec un quota de requêtes plus élevé.",
+      "email": "E-mail",
+      "password": "Mot de passe",
+      "minLength": "Au moins 10 caractères.",
+      "forgotLink": "Mot de passe oublié ?",
+      "pleaseWait": "Veuillez patienter…",
+      "requestFailed": "Échec de la requête",
+      "login": {
+        "title": "Se connecter",
+        "button": "Se connecter",
+        "alt": "Pas encore de compte ?",
+        "altLabel": "En créer un"
+      },
+      "signup": {
+        "title": "Créer un compte",
+        "button": "Créer le compte",
+        "alt": "Déjà inscrit ?",
+        "altLabel": "Se connecter",
+        "terms": "En créant un compte, vous acceptez les <a href=\"/terms\">Conditions d’utilisation</a> et la <a href=\"/privacy\">Politique de confidentialité</a>."
+      }
+    },
+    "forgot": {
+      "metaTitle": "Mot de passe oublié — RandScan",
+      "title": "Mot de passe oublié ?",
+      "intro": "Saisissez l’e-mail de votre compte et nous vous enverrons un lien pour choisir un nouveau mot de passe. Le lien est valable une heure.",
+      "sent": "Si un compte existe pour <code>{email}</code>, un lien de réinitialisation est en route. Vérifiez votre dossier de courrier indésirable s’il n’arrive pas d’ici quelques minutes.",
+      "backToSignIn": "Retour à la connexion",
+      "button": "Envoyer le lien de réinitialisation",
+      "remembered": "Vous vous en souvenez ?",
+      "signIn": "Se connecter"
+    },
+    "reset": {
+      "metaTitle": "Réinitialiser le mot de passe — RandScan",
+      "title": "Réinitialiser le mot de passe",
+      "missingToken": "Il manque le jeton à ce lien. Ouvrez le lien reçu par e-mail ou demandez-en un nouveau.",
+      "requestLink": "Demander un nouveau lien",
+      "choose": "Choisissez un nouveau mot de passe",
+      "signedOut": "Vous serez déconnecté de tous les autres appareils.",
+      "newPassword": "Nouveau mot de passe",
+      "confirm": "Confirmer le nouveau mot de passe",
+      "mismatch": "Les deux mots de passe ne correspondent pas.",
+      "button": "Définir le nouveau mot de passe",
+      "expired": "Lien expiré ?",
+      "requestNew": "En demander un nouveau"
+    },
+    "change": {
+      "current": "Mot de passe actuel",
+      "done": "Mot de passe modifié. Les autres appareils ont été déconnectés.",
+      "button": "Modifier le mot de passe"
+    }
+  },
+  "components": {
+    "dataTable": {
+      "empty": "Aucune donnée disponible"
+    },
+    "tables": {
+      "blocks": {
+        "height": "Hauteur",
+        "hash": "Hash",
+        "proposer": "Proposeur",
+        "txs": "Txs",
+        "view": "Voir",
+        "age": "Âge",
+        "empty": "Aucun bloc indexé pour l’instant"
+      },
+      "txs": {
+        "hash": "Tx hash",
+        "kind": "Type",
+        "height": "Hauteur",
+        "action": "Action",
+        "fee": "Frais",
+        "age": "Âge",
+        "empty": "Aucune transaction trouvée",
+        "hiddenTitle": "L’expéditeur, le destinataire et le montant sont masqués à l’intérieur du bundle",
+        "shielded": "protégée",
+        "noFeeTitle": "Action signée par un validateur : pas de bundle, pas de frais"
+      }
+    },
+    "search": {
+      "placeholder": "Rechercher par hauteur, hash, adresse ou programme",
+      "ariaLabel": "Rechercher dans l’explorateur"
+    },
+    "theme": {
+      "toLight": "Passer au thème clair",
+      "toDark": "Passer au thème sombre",
+      "light": "Thème clair",
+      "dark": "Thème sombre"
+    },
+    "nodeMap": {
+      "thisNode": "{role} · ce nœud",
+      "connected": "Connecté {time}",
+      "copyPeerId": "Copier l’identifiant du pair"
+    },
+    "openedNotes": {
+      "received": "Reçue",
+      "sent": "Envoyée",
+      "openedWithTxKey": "Ouverte avec la clé de transaction",
+      "unspent": "non dépensée",
+      "spentIn": "dépensée dans",
+      "leaf": "feuille n° {n}",
+      "feeHint": "note de frais du pont : elle n’a pas d’enveloppe (scellée pour personne), donc seule la clé de visualisation du destinataire des frais la retrouve, en la reconstruisant à partir des champs publics",
+      "notIndexed": "enveloppe pas encore indexée",
+      "notOpened": "non ouverte par cette clé (ou emplacement factice, scellé pour personne)",
+      "amount": "Montant",
+      "owner": "Propriétaire (pk)",
+      "createdBy": "Créée par (pk)",
+      "noteTime": "Horodatage de la note",
+      "commitment": "Engagement",
+      "verifiedRebuilt": "vérifié ✓ (reconstruit à partir des champs publics avec la pk de cette clé, et égal à la feuille)",
+      "verifiedRecomputed": "vérifié ✓ (recalculé à partir du texte en clair)",
+      "nullifier": "Nullifier",
+      "status": "Statut",
+      "noTranscript": "Cet appel n’a publié aucune transcription d’entrée.",
+      "transcriptNotOpened": "La transcription d’entrée n’est pas ouverte par cette clé.",
+      "caller": "Appelant",
+      "auditor": "Auditeur",
+      "openedWithCallKey": "Ouverte avec la clé d’appel",
+      "callInputs": "Entrées de l’appel",
+      "privateInputs": "Entrées privées",
+      "salt": "Sel",
+      "faithful": "conforme à H_IN ✓",
+      "falseTranscript": "ne correspond PAS à H_IN : l'appelant a publié une fausse transcription"
+    },
+    "txOpener": {
+      "noNotes": "Cette transaction n'a créé aucune note avec enveloppe (rien qu'une clé puisse ouvrir)."
+    },
+    "keyPanel": {
+      "title": "Ouvrir avec une clé",
+      "kinds": {
+        "viewing": "Clé de visualisation (nk)",
+        "spend": "Clé de dépense",
+        "tx": "Clé de transaction",
+        "call": "Clé d'appel"
+      },
+      "kindsLower": {
+        "viewing": "clé de visualisation (nk)",
+        "spend": "clé de dépense",
+        "tx": "clé de transaction",
+        "call": "clé d'appel"
+      },
+      "invalidWithFile": "Une clé comporte 64 caractères hexadécimaux, ou correspond au contenu d'un fichier de clé du portefeuille (wallet.key.json).",
+      "invalidKinds": "Une {kinds} comporte 64 caractères hexadécimaux.",
+      "placeholderFile": "64 caractères hexadécimaux, ou collez wallet.key.json",
+      "placeholder": "64 caractères hexadécimaux",
+      "keyFileDetected": "fichier de clé détecté",
+      "opening": "Ouverture…",
+      "open": "Ouvrir",
+      "remember": "mémoriser pour cet onglet",
+      "preferViewing": "Préférez une clé de visualisation : une clé de dépense peut déplacer des fonds. Cette page dérive la clé de visualisation localement et ne garde que celle-ci en mémoire."
+    }
+  },
+  "kinds": {
+    "transfer": {
+      "label": "Transfert (blindé)",
+      "short": "Transfert"
+    },
+    "mint": {
+      "label": "Émission (faucet)",
+      "short": "Émission"
+    },
+    "deploy": {
+      "label": "Déploiement",
+      "short": "Déploiement"
+    },
+    "call": {
+      "label": "Appel (confidentiel)",
+      "short": "Appel"
+    },
+    "bond": {
+      "label": "Engagement",
+      "short": "Engagement"
+    },
+    "unbond": {
+      "label": "Désengagement",
+      "short": "Désengagement"
+    },
+    "withdraw": {
+      "label": "Retrait",
+      "short": "Retrait"
+    },
+    "bridge_attest": {
+      "label": "Pont entrant (attestation)",
+      "short": "Pont entrant"
+    },
+    "bridge_burn": {
+      "label": "Pont sortant (destruction)",
+      "short": "Pont sortant"
+    },
+    "register_token": {
+      "label": "Jeton enregistré",
+      "short": "Enregistrer un jeton"
+    },
+    "token_mint": {
+      "label": "Émission de jeton",
+      "short": "Émission de jeton"
+    },
+    "set_authority": {
+      "label": "Autorité du jeton modifiée",
+      "short": "Définir l'autorité"
+    },
+    "token_burn": {
+      "label": "Destruction de jeton",
+      "short": "Destruction de jeton"
+    },
+    "pause_mints": {
+      "label": "Émissions du pont suspendues",
+      "short": "Suspendre les émissions"
+    },
+    "unpause_mints": {
+      "label": "Émissions du pont reprises",
+      "short": "Reprendre les émissions"
+    },
+    "register_bridged_token": {
+      "label": "Jeton ponté listé",
+      "short": "Lister un jeton"
+    },
+    "list_backing": {
+      "label": "Collatéral listé",
+      "short": "Lister le collatéral"
+    },
+    "invoke": {
+      "label": "Invocation (état du programme)",
+      "short": "Invocation"
+    },
+    "admit_validator": {
+      "label": "Validateur admis (vote)",
+      "short": "Admission"
+    },
+    "slash_equivocation": {
+      "label": "Équivocation sanctionnée",
+      "short": "Sanction"
+    },
+    "rotate_pq_guardians": {
+      "label": "Gardiens PQ renouvelés",
+      "short": "Rotation PQ"
+    },
+    "rotate_pause_key": {
+      "label": "Clé de pause renouvelée",
+      "short": "Rotation de pause"
+    },
+    "rotate_pq_guardians_v2": {
+      "label": "Rotation des gardiens PQ (différée)",
+      "short": "Rotation PQ"
+    },
+    "rotate_pause_key_v2": {
+      "label": "Rotation de la clé de pause (différée)",
+      "short": "Rotation de pause"
+    },
+    "cancel_rotation": {
+      "label": "Rotation annulée",
+      "short": "Annuler la rotation"
+    },
+    "other": {
+      "label": "Autre",
+      "short": "Autre"
+    }
+  },
+  "roles": {
+    "validator": "Validateur",
+    "observer": "Observateur",
+    "peer": "Pair"
+  },
+  "block": {
+    "notFound": "Bloc introuvable",
+    "notFoundMessage": "Aucun bloc ne correspond à « {id} ». Les blocs se recherchent par hauteur ou par hash de 64 caractères.",
+    "back": "Retour aux blocs",
+    "loadError": "Impossible de charger ce bloc.",
+    "title": "Bloc n° {height}",
+    "overview": "Aperçu",
+    "height": "Hauteur",
+    "hash": "Hash",
+    "parent": "Parent",
+    "genesis": "Genèse (sans parent)",
+    "proposer": "Proposant",
+    "timestamp": "Horodatage",
+    "view": "Vue",
+    "justifyView": "Vue justificative",
+    "transactions": "Transactions",
+    "txRoot": "Racine des transactions",
+    "stateRoot": "Racine d'état",
+    "txHeading": "Transactions ({count})",
+    "previous": "← Bloc précédent",
+    "empty": "Ce bloc ne contient aucune transaction"
+  },
+  "tx": {
+    "notFound": "Transaction introuvable",
+    "notFoundMessage": "Aucune transaction ne correspond à « {hash} ». Seules les transactions validées sont indexées.",
+    "back": "Retour aux transactions",
+    "loadError": "Impossible de charger cette transaction.",
+    "title": "Transaction",
+    "overview": "Aperçu",
+    "hash": "Hash",
+    "kind": "Type",
+    "block": "Bloc",
+    "indexInBlock": "Index dans le bloc",
+    "timestamp": "Horodatage",
+    "fee": "Frais",
+    "noFee": "Aucun (pas de lot)",
+    "bundle": "Lot",
+    "bundleYes": "Oui : payé avec les notes de l'expéditeur, prouvé par un STARK",
+    "bundleNo": "Non : signé par le quorum de validateurs ou de gardiens",
+    "chainId": "ID de chaîne",
+    "kindDetails": "Détails : {kind}",
+    "program": "Programme",
+    "callProofSize": "Taille de la preuve d'appel",
+    "inputTranscript": "Transcription des entrées",
+    "sealed": "{size} scellés",
+    "amount": "Montant",
+    "amountBurned": "Montant détruit",
+    "asset": "Actif",
+    "assetIndex": "actif n° {index}",
+    "recipient": "Destinataire",
+    "noteTime": "Heure de la note",
+    "token": "Jeton",
+    "name": "Nom",
+    "symbol": "Symbol",
+    "decimals": "Décimales",
+    "authority": "Autorité",
+    "registryIndex": "Index du registre",
+    "mintNonce": "Nonce d'émission",
+    "nonce": "Nonce",
+    "none": "Aucun",
+    "sourceChain": "Chaîne source",
+    "sourceToken": "Jeton source",
+    "sourceDecimals": "Décimales source",
+    "pqCoSigners": "Cosignataires gardiens PQ",
+    "bridgeFee": "Frais de pont",
+    "feeNoteLeaf": "une note pour le destinataire des frais, feuille",
+    "cells": {
+      "key": "clé",
+      "wrote": "écrit",
+      "read": "lu",
+      "zerosDeleted": "zéros — la cellule est supprimée",
+      "zerosAbsent": "zéros — la cellule n'existait pas"
+    },
+    "payout": {
+      "nth": "paiement {n}",
+      "to": "à",
+      "note": "note"
+    },
+    "invoke": {
+      "nonePublished": "Aucune publiée",
+      "intoVault": "Dans le coffre",
+      "noRand": "pas de RAND",
+      "and": "et",
+      "destroyed": "— détruit (le jeton propre du programme)",
+      "deposited": "— déposé",
+      "cellsRead": "Cellules lues ({count})",
+      "cellsWritten": "Cellules écrites ({count})",
+      "paidOut": "Versé ({count})",
+      "minted": "Émis ({count})",
+      "none": "aucun",
+      "nothingLeft": "rien n'a quitté le coffre",
+      "nothing": "rien",
+      "help": "Un appel dont la preuve atteste exactement cette transition, que le registre a appliquée : les lectures devaient correspondre aux valeurs indiquées, sinon la transaction était refusée, et chaque paiement est une note calculée par la chaîne à partir des termes ci-dessus, de sorte que son destinataire la retrouve comme il retrouve une émission. Qui a payé reste privé ; ce qui a circulé ne l'est pas."
+    },
+    "bundlePanel": {
+      "anchor": "Ancre",
+      "nullifierAsset": "Nullifier {n} (actif)",
+      "nullifierRand": "Nullifier {n} (RAND)",
+      "commitmentAsset": "Engagement {n} (actif)",
+      "commitmentRand": "Engagement {n} (RAND)",
+      "burned": "Détruit",
+      "nothingBurned": "Rien de détruit",
+      "time": "Heure (hauteur cible)",
+      "proofSize": "Taille de la preuve",
+      "envelopeSizes": "Tailles des enveloppes",
+      "authCommit": "Engagement d'autorisation",
+      "authProofSize": "Taille de la preuve d'autorisation",
+      "authorisation": "Autorisation",
+      "authInside": "Dans la preuve du lot (pas de preuve d'autorisation séparée sur cette chaîne)",
+      "help": "Quatre emplacements, fictifs compris : les emplacements 1 et 2 portent un actif privé (RAND ou n'importe quel jeton RPL) et les emplacements 3 et 4 toujours du RAND. Il n'y a aucun champ d'actif public — un transfert de RAND et un transfert de n'importe quel jeton RPL ont la même forme, champ pour champ. La preuve et les enveloppes ne sont indiquées que par leur taille.",
+      "splitAuth": "Autorisation scindée : la preuve du lot a été produite à partir de la clé de visualisation et publie l'engagement d'autorisation ; une seconde petite preuve sur la clé de dépense doit lui correspondre, si bien qu'un prouveur délégué ne détient jamais la clé de dépense."
+    },
+    "transfer": {
+      "help": "Un simple transfert blindé de RAND ou de n'importe quel jeton RPL — l'actif est privé, donc cette page ne peut pas dire lequel a circulé. Jusqu'à deux notes dépensées, jusqu'à deux créées, et les frais. Qui a payé qui, combien et dans quel actif n'est connu que des deux parties et de quiconque reçoit d'elles une clé de visualisation ou une clé de transaction."
+    },
+    "mint": {
+      "depositNote": "Note de dépôt",
+      "mintedBy": "Émis par",
+      "help": "Un dépôt du faucet du testnet. Le montant est public dans cette seule transaction ; ensuite, la note créée est indiscernable de toute autre."
+    },
+    "deploy": {
+      "wordsLength": "Longueur en mots",
+      "words": {
+        "one": "{n} mot",
+        "many": "{n} mots",
+        "other": "{n} mots"
+      }
+    },
+    "call": {
+      "nonePublished": "Aucune publiée (l'appelant a choisi --no-envelope)",
+      "help": "Les entrées privées de l'appel ne quittent jamais le portefeuille en clair. Lorsqu'une transcription est publiée, elle ne s'ouvre qu'avec la clé de visualisation de l'appelant, une clé propre à l'appel, ou l'auditeur désigné par l'appelant."
+    },
+    "staking": {
+      "validator": "Validateur",
+      "registration": "Enregistrement",
+      "newValidator": "Nouveau validateur",
+      "existingValidator": "Validateur existant",
+      "registerNonce": "Nonce d'enregistrement",
+      "bondHelp": "De la valeur a quitté le pool (la destruction du lot) pour rejoindre le stake public du validateur.",
+      "unbondHelp": "Le stake est passé dans la file de désengagement, signé par la clé du validateur.",
+      "withdrawHelp": "Le stake libéré et les récompenses sont devenus une nouvelle note de montant public à l'adresse de paiement du validateur."
+    },
+    "bridgeBurn": {
+      "released": "Libéré sur la chaîne source",
+      "relayerFee": "Frais du relayeur",
+      "destChain": "Chaîne de destination",
+      "destAddress": "Adresse de destination",
+      "coinRedeemed": "Pièce rachetée",
+      "help": "Un seul lot à actif caché porte toute la destruction : ses champs <code>burn_a</code> et <code>burn_asset</code> sont l'actif et le montant de cette action, et ses frais paient les frais de pont en RAND."
+    },
+    "attest": {
+      "size": "Taille de l'attestation",
+      "rotation": "Rotation de l'ensemble de gardiens, sans dépôt",
+      "gross": "brut, verrouillé sur la chaîne source",
+      "deposited": "Déposé au destinataire",
+      "commitment": "Engagement de dépôt",
+      "rotationShort": "— (rotation)",
+      "help": "Un message signé par les gardiens qui dépose un actif ponté sous forme de note pour le destinataire. Le montant est public ici et nulle part ailleurs.",
+      "feeHelp": "Avec les frais de pont de la chaîne, le brut est verrouillé et réparti en deux notes : celle du destinataire, et une note de frais pour le destinataire des frais. La note de frais n'a pas d'enveloppe, donc aucune clé de visualisation ne la trouve par déchiffrement ; son propriétaire la reconstruit à partir des champs ci-dessus."
+    },
+    "registerToken": {
+      "initialMint": "Émission initiale",
+      "amountTo": "{amount} à",
+      "help": "L'enregistrement d'un jeton et son émission initiale sont publics par conception, comme un dépôt de pont (spec §4) — seul un transfert ultérieur des notes du jeton est blindé."
+    },
+    "tokenMint": {
+      "help": "Chaque mot de la note émise figure ici (son expéditeur est l'étiquette d'émission fixe de la chaîne), de sorte que le destinataire la reconstruit sans rien déchiffrer, quelle que soit l'enveloppe publiée par l'émetteur."
+    },
+    "setAuthority": {
+      "newAuthority": "Nouvelle autorité",
+      "renounced": "Aucune (abandonnée — ce jeton ne pourra plus jamais être émis)"
+    },
+    "tokenBurn": {
+      "help": "Une destruction par un détenteur : publique par conception, puisque c'est elle qui rend l'offre totale du jeton auditable. Un transfert du même jeton est un simple transfert blindé — son actif reste privé."
+    },
+    "pause": {
+      "pauseHelp": "Pendant la pause, toute attestation de transfert est refusée ; les destructions et les rotations de l'ensemble de gardiens restent ouvertes. Signé par la seule clé de pause de la genèse.",
+      "unpauseHelp": "Lever la pause exige le quorum de gardiens PQ — la clé de pause ne peut jamais lever la pause à elle seule."
+    },
+    "governance": {
+      "help": "Autorisé par le quorum de gardiens PQ, sur un lot de frais en RAND payé par son émetteur."
+    },
+    "rotation": {
+      "nonce": "Nonce de rotation",
+      "newSet": "Nouvel ensemble de gardiens PQ",
+      "keys": {
+        "one": "{n} clé Dilithium2",
+        "many": "{n} clés Dilithium2",
+        "other": "{n} clés Dilithium2"
+      },
+      "newPauseKey": "Nouvelle clé de pause",
+      "possession": "Preuves de possession",
+      "cancelled": "Annulée",
+      "pendingPauseKey": "la rotation en attente de la clé de pause",
+      "pendingGuardians": "la rotation en attente des gardiens PQ",
+      "cancelHelp": "Une rotation signée mais pas encore effective, retirée avant la fin de son délai (audit v6, BRG-14).",
+      "delayedHelp": "Signée par le quorum actuel de gardiens PQ, avec la preuve de possession de chaque nouveau détenteur ; elle prend effet après le délai de rotation de la genèse (voir la page du pont), sauf annulation.",
+      "help": "Signée par le quorum de gardiens PQ de l'ensemble précédant la rotation (règles du pont v2)."
+    },
+    "admit": {
+      "candidate": "Candidat",
+      "voters": "Votants",
+      "validators": {
+        "one": "{n} validateur",
+        "many": "{n} validateurs",
+        "other": "{n} validateurs"
+      },
+      "votedBy": "Voté par",
+      "help": "Le vote de l'ensemble de validateurs autorisant cette clé à s'enregistrer avec un engagement, sur une chaîne qui admet les validateurs par vote (audit v6, STAKE-2). Sans lot et sans frais."
+    },
+    "slash": {
+      "offender": "Fautif",
+      "view": "Vue",
+      "firstHeader": "Premier en-tête",
+      "secondHeader": "Deuxième en-tête",
+      "help": "Deux en-têtes qu'une même clé de validateur a signés pour la même vue : la preuve d'une équivocation du leader, sanctionnée par la règle de slashing de la genèse (audit v6, STAKE-1)."
+    },
+    "receipt": {
+      "title": "Reçu",
+      "none": "Aucun reçu n'a été indexé pour cet appel ou cet invoke.",
+      "tier": "Niveau",
+      "position": "Position",
+      "index": "index {index}",
+      "hIn": "Engagement d'entrée (H_IN)",
+      "hPub": "Entrée publique (H_PUB)",
+      "hPubEmpty": "Vide — le programme a été déployé sans entrée publique",
+      "outputs": "Sorties",
+      "out": "sortie {index}",
+      "help": "Les huit mots de sortie publics sont enregistrés et rien d'autre ne bouge : la valeur ne circule que par le bundle qui a payé l'appel. H_IN est un condensat salé des entrées privées et ne divulgue rien à lui seul."
+    },
+    "unknownKind": {
+      "help": "Ce type de transaction est plus récent que cette version de l'explorateur. Il a été indexé avec son hachage, son bundle, ses frais et son bloc ; les champs décodés apparaîtront après la mise à jour de l'explorateur."
+    }
+  },
+  "note": {
+    "notFound": "Note introuvable",
+    "notFoundMessage": "Aucune feuille de l'arbre ne correspond à « {id} ». Les notes se recherchent par engagement (64 caractères hexadécimaux) ou par index de feuille ; un engagement issu d'un bloc très récent n'est peut-être pas encore chargé.",
+    "back": "Retour aux notes",
+    "loadError": "Impossible de charger cette note.",
+    "title": "Note n° {index}",
+    "leaf": "Feuille",
+    "leafIndex": "Index de feuille",
+    "commitment": "Engagement",
+    "createdAt": "Créée à la hauteur",
+    "createdBy": "Créée par",
+    "genesisDeposit": "Une note de dépôt de la genèse",
+    "depositOffWire": "Un dépôt dont l'engagement n'est pas sur le réseau (retrait ou attestation de bridge)",
+    "openWithKey": "Vous détenez la clé de visualisation du destinataire ou de l'expéditeur, ou la clé de cette transaction ? <a href=\"{href}\">Ouvrez-la avec une clé sur la page de la transaction</a>.",
+    "sealed": "Le propriétaire et le montant sont dans l'enveloppe scellée et ne s'ouvrent qu'avec les clés de visualisation du destinataire et de l'expéditeur. Savoir si cette note a été dépensée n'est pas public non plus : un annulateur ne peut pas être rattaché à sa feuille."
+  },
+  "program": {
+    "notFound": "Programme introuvable",
+    "notFoundMessage": "Aucun programme ne correspond à « {id} ». Les identifiants de programme sont des hachages de 64 caractères.",
+    "back": "Retour aux programmes",
+    "loadError": "Impossible de charger ce programme.",
+    "title": "Programme",
+    "calls": "Appels",
+    "andInvokes": {
+      "one": "et {n} invoke",
+      "many": "et {n} invokes",
+      "other": "et {n} invokes"
+    },
+    "codeSize": "Taille du code",
+    "words": {
+      "one": "{n} mot",
+      "many": "{n} mots",
+      "other": "{n} mots"
+    },
+    "deployedAt": "Déployé à",
+    "lastCalled": "Dernier appel",
+    "callOrInvoke": "call ou invoke",
+    "details": "Détails",
+    "programId": "Identifiant du programme",
+    "deployTx": "Transaction de déploiement",
+    "deployedAtHeight": "Déployé à la hauteur",
+    "basePc": "PC de base",
+    "wordsLength": "Longueur en mots",
+    "codeHash": "Hachage du code",
+    "publicInput": "Entrée publique",
+    "noPublicInput": "Aucune — les appels sont vérifiés par rapport à l'entrée vide",
+    "publicDigest": "Condensat public (H_PUB)",
+    "callCount": "Nombre d'appels",
+    "never": "Jamais",
+    "vault": "Coffre",
+    "vaultEmpty": "Le programme ne détient rien. La valeur entre dans son coffre par le bundle d'un invoke et en sort sous forme des notes que l'invoke paie.",
+    "asset": "Actif n° {index}",
+    "stateCells": "Cellules d'état ({count})",
+    "noCells": "Aucune cellule : rien n'a été écrit, ou toutes les écritures étaient des zéros.",
+    "key": "clé",
+    "value": "valeur",
+    "statePublic": "Public par conception : l'état d'un programme est une table de clés de 64 caractères hexadécimaux vers des valeurs de 64 caractères hexadécimaux (huit mots chacune), lue en direct depuis le nœud dans l'ordre des clés.",
+    "moreCells": "D'autres cellules suivent ; l'API les pagine à <code>/api/v1/programs/{id}/cells?after=…</code>.",
+    "recentCallsInvokes": "Calls et invokes récents",
+    "recentCalls": "Appels récents",
+    "empty": "Ce programme n'a pas encore été appelé"
+  },
+  "token": {
+    "initialMint": "Émission initiale",
+    "mint": "Émission",
+    "burn": "Destruction",
+    "height": "Hauteur",
+    "event": "Événement",
+    "transaction": "Transaction",
+    "change": "Variation",
+    "notFound": "Jeton introuvable",
+    "notFoundMessage": "Aucun jeton RPL ne correspond à « {id} ». Utilisez son index de registre, son identifiant hexadécimal de 64 caractères ou sa forme textuelle rpl1….",
+    "back": "Retour aux jetons",
+    "loadError": "Impossible de charger ce jeton.",
+    "totalSupply": "Offre totale",
+    "decimals": "Décimales",
+    "registryIndex": "Index de registre",
+    "authority": "Autorité",
+    "authorityKind": {
+      "none": "Aucune",
+      "key": "clé",
+      "program": "programme",
+      "bridge": "bridge"
+    },
+    "backingCount": {
+      "one": "{n} garantie",
+      "many": "{n} garanties",
+      "other": "{n} garanties"
+    },
+    "registration": "Enregistrement",
+    "deployTx": "Transaction de déploiement",
+    "notIndexed": "Non indexé (enregistré avant cette passe)",
+    "registeredAt": "Enregistré à",
+    "idHex": "Identifiant du jeton (hex)",
+    "idText": "Identifiant du jeton (rpl1…)",
+    "mintNonce": "Nonce d'émission",
+    "mintAuthority": "Autorité d'émission",
+    "signingKey": "Clé de signature",
+    "address": "Adresse",
+    "program": "Programme",
+    "backings": "Garanties ({count})",
+    "sourceChain": "Chaîne source",
+    "sourceToken": "Jeton source",
+    "sourceDecimals": "Décimales source",
+    "locked": "Verrouillé",
+    "mintedIn": "Émis en {window} / plafond",
+    "mintedToday": "Émis aujourd'hui / plafond",
+    "roomToMint": "Marge d'émission",
+    "roomToMintHelp": "Le plus gros dépôt que les plafonds admettent pour ce jeton en ce moment : son propre plafond moins ce qu'il a émis, et pas plus que ce qu'il reste à l'ensemble des jetons dans la fenêtre.",
+    "supplyHistory": "Historique de l'offre",
+    "empty": "Aucun événement public d'émission ou de destruction n'a encore été indexé pour ce jeton",
+    "historyHelp": "Chaque register_token (émission initiale), token_mint et token_burn désignant ce jeton, du plus ancien au plus récent — public par conception, puisque c'est ce qui rend l'offre totale vérifiable. Un transfert des notes de ce jeton est un simple transfert protégé et n'apparaît jamais ici."
+  },
+  "validator": {
+    "releaseEpoch": "Époque de libération",
+    "amount": "Montant",
+    "notFound": "Validateur introuvable",
+    "notFoundMessage": "« {address} » ne figure pas dans le registre des validateurs.",
+    "back": "Retour aux validateurs",
+    "loadError": "Impossible de charger ce validateur.",
+    "title": "Validateur",
+    "active": "Actif à cette époque",
+    "inactive": "Absent de l'ensemble actuel",
+    "stake": "Mise",
+    "rewards": "Récompenses",
+    "unwithdrawnFees": "frais non retirés",
+    "share": "Part de la mise active",
+    "blocksProposed": "Blocs proposés",
+    "lastAgo": "dernier {ago}",
+    "registerEntry": "Entrée du registre",
+    "address": "Adresse",
+    "payout": "Adresse de paiement",
+    "payoutUnknown": "Non fournie par ce nœud",
+    "nonce": "Nonce du registre",
+    "sortIndex": "Index de tri",
+    "lastProposed": "Dernier bloc proposé",
+    "never": "Jamais",
+    "unbonding": "File de déliaison",
+    "unbondingEmpty": "Aucune déliaison en cours",
+    "stakingTxs": "Transactions de staking",
+    "stakingEmpty": "Aucun bond, unbond, withdraw ou mint ne désigne ce validateur",
+    "recentBlocks": "Blocs récents",
+    "blocksEmpty": "Ce validateur n'a encore proposé aucun bloc"
+  },
+  "account": {
+    "title": "Aucun compte sur cette chaîne",
+    "shielded": "RAND est une chaîne entièrement protégée. Un solde est un ensemble de notes que seule la clé de visualisation de leur propriétaire peut ouvrir, et une transaction ne porte ni expéditeur, ni destinataire, ni montant : seulement des engagements, des annulateurs, des enveloppes scellées, les frais et une preuve.",
+    "nothingToShow": "L'explorateur n'a donc rien à montrer pour une adresse. Ce qui est public, c'est le registre des validateurs (mise, récompenses, file de déliaison), l'arbre des engagements et l'ensemble des annulateurs, les déploiements de programmes, les reçus d'appel et l'état propre du bridge.",
+    "isValidator": "Cette adresse est un validateur : <a href=\"{href}\">voir son entrée du registre →</a>",
+    "validators": "Validateurs →",
+    "notes": "Notes (arbre des engagements) →"
+  },
+  "viewing": {
+    "leaf": "Feuille",
+    "height": "Hauteur",
+    "transaction": "Transaction",
+    "genesis": "genèse",
+    "deposit": "dépôt",
+    "role": "Rôle",
+    "amount": "Montant",
+    "counterparty": "Contrepartie (pk)",
+    "status": "Statut",
+    "token": "Jeton",
+    "assetIndex": "actif n° {index}",
+    "spendable": "Solde dépensable",
+    "unspentNotes": "Notes non dépensées",
+    "title": "Mon historique",
+    "subtitle": "Analysez l'arbre des engagements avec votre clé de visualisation. L'explorateur ne voit jamais la clé ; chaque enveloppe est ouverte dans votre navigateur.",
+    "scanTitle": "Analyser avec une clé de visualisation",
+    "scanned": {
+      "one": "{scanned} feuille analysée sur {n}",
+      "many": "{scanned} feuilles analysées sur {n}",
+      "other": "{scanned} feuilles analysées sur {n}"
+    },
+    "spendableHelp": "notes non dépensées reçues, RAND ; jetons ci-dessous",
+    "notesReceived": "Notes reçues",
+    "unspentCount": "{count} non dépensées",
+    "notesSent": "Notes envoyées",
+    "address": "Adresse",
+    "pk": "pk {pk}…",
+    "shieldedAddress": "Adresse protégée :",
+    "empty": "Cette clé n'ouvre aucune note sur la chaîne",
+    "footnote": "Chaque ligne a été déchiffrée dans ce navigateur et son engagement recalculé à partir du texte en clair. Une note de monnaie rendue apparaît comme reçue."
+  },
+  "legal": {
+    "label": "Mentions légales",
+    "effective": "En vigueur le {date}",
+    "contents": "Sommaire",
+    "seeAlso": "Voir aussi : <a href=\"{href}\">{label}</a>."
+  },
+  "privacy": {
+    "metaTitle": "Politique de confidentialité — RandScan",
+    "metaDescription": "Ce que RandScan collecte, ce qu'il ne voit jamais, et combien de temps il conserve ce qu'il détient.",
+    "title": "Politique de confidentialité",
+    "effective": "2 octobre 2026",
+    "intro": "RandScan affiche un registre public et ne conserve presque rien sur les personnes qui le consultent. Cette page indique précisément ce que l'explorateur voit, ce qu'il stocke, ce qu'il ne voit jamais, et combien de temps tout est conservé.",
+    "sections": [
+      {
+        "id": "scope",
+        "title": "Qui nous sommes et ce que couvre cette politique",
+        "body": [
+          "RandScan (randscan.org) est l'explorateur de blocs de Rand Protocol, exploité par l'équipe Rand Protocol (« nous »). Il indexe le registre public du réseau Rand Protocol et l'affiche sous forme de pages web, d'une API JSON et d'un flux WebSocket. Cette politique couvre le site web, l'API à l'adresse randscan.org/api et les comptes que vous pouvez créer pour obtenir une clé d'API.",
+          "Le code source de l'explorateur est publié sous licence MIT ; tout ce qui est décrit ici peut donc être vérifié par rapport à ce que fait réellement le logiciel."
+        ]
+      },
+      {
+        "id": "no-tracking",
+        "title": "Ce que nous ne faisons pas",
+        "body": [
+          "RandScan n'exécute aucun outil d'analyse d'audience, aucune publicité et aucun script de suivi. Les polices sont servies depuis notre propre serveur. Aucun JavaScript tiers n'est chargé sur aucune page. Il n'y a pas de bandeau de cookies, car il n'y a rien à consentir : les seuls cookies sont la langue que vous choisissez dans le menu, si vous en choisissez une, et la session de connexion décrite ci-dessous, qui n'est déposée qu'après votre connexion.",
+          "Nous ne vendons, ne louons ni ne partageons de données personnelles avec qui que ce soit pour son propre compte."
+        ]
+      },
+      {
+        "id": "chain-data",
+        "title": "Données publiques de la blockchain",
+        "body": [
+          "Presque tout ce que RandScan affiche est une copie du registre de Rand Protocol : blocs, transactions, notes, validateurs, programmes, jetons et activité du bridge. Ce registre est public par conception et répliqué par chaque nœud du réseau. Nous ne l'avons pas collecté auprès de vous, nous ne pouvons pas le modifier, et nous ne pouvons pas en supprimer d'entrées.",
+          "Rand Protocol est une chaîne blindée. Les montants, les expéditeurs et les destinataires des transactions sont masqués sur le registre lui-même, et l’explorateur n’affiche que ce que la chaîne rend public : les engagements, les nullifiers et les preuves de chaque transaction, ainsi que l’ouverture publique des notes que la chaîne calcule elle-même, comme les frais et les créations de la passerelle."
+        ]
+      },
+      {
+        "id": "viewing-keys",
+        "title": "Les clés de visualisation restent dans votre navigateur",
+        "body": [
+          "La page <a href=\"/viewing\">Historique</a> et l’ouvreur de notes vous permettent de coller une clé de visualisation, une clé de transaction ou un fichier de clés de portefeuille pour consulter votre propre activité blindée. Le déchiffrement s’exécute dans la page, dans un module WebAssembly compilé à partir du code propre à l’explorateur. Une clé collée n’est conservée que dans la mémoire de la page. Elle n’est jamais incluse dans une requête envoyée à nos serveurs, jamais écrite dans un cookie ni dans le stockage local, et elle disparaît lorsque vous fermez ou rechargez la page.",
+          "La page récupère bien les enveloppes chiffrées dont elle a besoin auprès de notre API, comme le peut tout visiteur. Nous voyons donc quelles transactions un navigateur a demandées, mais pas lesquelles ont été ouvertes ni ce qu’elles contenaient."
+        ]
+      },
+      {
+        "id": "visitors",
+        "title": "Ce que comporte chaque visite",
+        "body": [
+          "Comme tout serveur web, le nôtre reçoit votre adresse IP, la page ou le point d’accès que vous avez demandé et les en-têtes envoyés par votre navigateur. Nous utilisons l’adresse IP à deux fins :",
+          "- Limitation de débit. Le trafic anonyme est limité par adresse IP. Le compteur est conservé dans la mémoire du serveur pendant une fenêtre d’une minute et n’est pas écrit dans une base de données.",
+          "- Exploitation du service. Les journaux du serveur et des processus peuvent enregistrer les requêtes pendant que nous diagnostiquons des problèmes. Ils restent sur le serveur et sont supprimés par rotation après une courte période.",
+          "Lors d’une première visite sur la page d’accueil, et seulement alors, le pays de votre adresse est recherché dans une copie de la base de données de pays de DB-IP hébergée sur notre propre serveur, afin de choisir la langue dans laquelle le site s’ouvre. Le résultat n’est pas conservé et rien n’est envoyé à personne. Une langue choisie dans le menu est conservée dans un cookie nommé <code>lang</code> pendant un an et prévaut dès lors sur le pays. IP Geolocation by <a href=\"https://db-ip.com\">DB-IP</a>, sous licence CC BY 4.0.",
+          "Votre choix de thème (sombre ou clair) est conservé dans le stockage local de votre navigateur sous la clé <code>randscan-theme</code>. Il ne quitte jamais votre appareil."
+        ]
+      },
+      {
+        "id": "map",
+        "title": "Les tuiles de carte des pages Nœuds et Provers",
+        "body": [
+          "Les pages <a href=\"/nodes\">Nœuds</a> et <a href=\"/provers\">Provers</a> affichent une carte du monde. Les tuiles du fond de carte sont chargées par votre navigateur directement depuis le service de tuiles ArcGIS Online d’Esri ; Esri reçoit donc votre adresse IP et les coordonnées des tuiles, comme pour n’importe quelle carte. Aucune autre page ne charge quoi que ce soit auprès d’un tiers.",
+          "Les marqueurs de cette carte situent les pairs du réseau et les hôtes des provers délégués. Ce sont des adresses de serveurs que le réseau publie lui-même, et non des visiteurs. Notre indexeur les recherche via le service de géolocalisation ipwho.is et met en cache la ville, le pays et le fournisseur qu’il renvoie. Les adresses des visiteurs ne sont jamais envoyées à un service de géolocalisation."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "Comptes et clés API",
+        "body": [
+          "Vous pouvez tout utiliser sur RandScan sans compte. Un compte n’existe que pour émettre des clés API avec un quota de requêtes plus élevé. Si vous en créez un, nous conservons :",
+          "- votre adresse e-mail et l’heure de création du compte ;",
+          "- un hachage Argon2id de votre mot de passe. Nous ne pouvons pas lire le mot de passe lui-même, et nous ne l’envoyons jamais nulle part ;",
+          "- pour chaque clé API, son nom, les premiers caractères de la clé pour que vous la reconnaissiez, un hachage SHA-256 du secret, sa date de création et sa dernière utilisation. Le secret est affiché une seule fois et n’est pas conservé ;",
+          "- une session de connexion : un jeton aléatoire dans le cookie <code>randscan_session</code>, HttpOnly et SameSite, avec un hachage de celui-ci dans notre base de données. Une session dure 30 jours à compter de sa dernière utilisation et est supprimée lorsque vous vous déconnectez.",
+          "Les requêtes effectuées avec une clé API sont comptées pour cette clé aux fins de la limitation de débit, dans la même fenêtre mémoire d’une minute que le trafic anonyme. Nous n’enregistrons pas quels points d’accès une clé a appelés ni ce qu’elle a demandé."
+        ]
+      },
+      {
+        "id": "email",
+        "title": "E-mail",
+        "body": [
+          "Nous n’envoyons qu’un seul type d’e-mail : un lien de réinitialisation du mot de passe, et uniquement lorsque vous en faites la demande. Il est acheminé via Resend (resend.com), qui traite votre adresse e-mail et le message pour le remettre. Le lien de réinitialisation expire au bout d’une heure. Nous n’envoyons ni lettres d’information ni notifications, et nous n’utilisons pas votre adresse à d’autres fins."
+        ]
+      },
+      {
+        "id": "hosting",
+        "title": "Où les données sont conservées",
+        "body": [
+          "RandScan fonctionne sur des serveurs loués auprès de DigitalOcean, à Singapour. La base de données contenant les comptes, les identifiants hachés et les sessions se trouve sur ce serveur. Les sauvegardes, lorsqu’elles sont effectuées, contiennent les mêmes données aux mêmes fins. En utilisant le service, vous acceptez que vos données soient traitées à cet endroit, où que vous soyez."
+        ]
+      },
+      {
+        "id": "retention",
+        "title": "Combien de temps nous conservons les données",
+        "body": [
+          "- Compteurs de limitation de débit : une minute, en mémoire.",
+          "- Journaux du serveur : une courte période, puis suppression par rotation.",
+          "- Sessions : 30 jours à compter de la dernière utilisation, ou jusqu’à votre déconnexion.",
+          "- Le cookie <code>lang</code>, la langue que vous avez choisie dans le menu : un an, dans votre navigateur.",
+          "- Jetons de réinitialisation du mot de passe : une heure.",
+          "- Comptes et clés API : jusqu’à ce que vous nous demandiez de les supprimer.",
+          "- Données publiques de la chaîne : aussi longtemps que l’explorateur fonctionne. C’est le registre."
+        ]
+      },
+      {
+        "id": "rights",
+        "title": "Vos choix et vos droits",
+        "body": [
+          "Vous pouvez révoquer n’importe quelle clé API et fermer n’importe quelle session depuis votre <a href=\"/dashboard\">tableau de bord</a>. Pour consulter les données conservées sur votre compte, les corriger, ou faire supprimer le compte et ses clés, <a href=\"#contact\">contactez-nous</a> depuis l’adresse e-mail du compte. Nous agirons dans un délai de 30 jours. Il n’existe pas encore de bouton de suppression en libre-service ; nous en ajouterons un.",
+          "Selon l’endroit où vous vivez, vous pouvez disposer de droits supplémentaires en vertu de lois telles que le RGPD ou le CCPA, y compris le droit d’introduire une réclamation auprès d’une autorité de contrôle. Rien ici ne les limite."
+        ]
+      },
+      {
+        "id": "contact",
+        "title": "Contact et modifications",
+        "body": [
+          "Les questions sur cette politique ou les demandes concernant votre compte doivent être adressées à l’équipe Rand Protocol via le dépôt de l’explorateur à l’adresse <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>.",
+          "Lorsque cette politique change, le nouveau texte apparaît ici avec une nouvelle date d’entrée en vigueur. Les modifications qui réduisent votre confidentialité seront annoncées sur l’explorateur avant leur prise d’effet. Cette version est entrée en vigueur le {effective}."
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "Conditions d’utilisation — RandScan",
+    "metaDescription": "Les conditions dans lesquelles RandScan, l’explorateur de Rand Protocol, son API et ses comptes sont proposés.",
+    "title": "Conditions d’utilisation",
+    "effective": "1er octobre 2026",
+    "intro": "RandScan est une fenêtre gratuite et open source sur un registre public. Ces conditions précisent ce qu’est le service et ce qu’il n’est pas, comment son API et ses comptes peuvent être utilisés, et les limites de ce que nous promettons.",
+    "sections": [
+      {
+        "id": "agreement",
+        "title": "L’accord",
+        "body": [
+          "Ces conditions régissent votre utilisation de RandScan (randscan.org) : le site web, l’API JSON à randscan.org/api, le flux WebSocket, ainsi que les comptes et les clés API proposés par son intermédiaire. RandScan est exploité par l’équipe Rand Protocol (« nous »). En utilisant l’un quelconque de ces éléments, vous acceptez ces conditions. Si vous ne les acceptez pas, n’utilisez pas le service.",
+          "La <a href=\"/privacy\">Politique de confidentialité</a> explique ce que le service collecte et fait partie de ces conditions."
+        ]
+      },
+      {
+        "id": "service",
+        "title": "Ce qu’est RandScan, et ce qu’il n’est pas",
+        "body": [
+          "RandScan est un explorateur de blocs. Il lit le registre public du réseau Rand Protocol à partir d’un nœud complet, l’indexe et le présente. C’est une fenêtre sur la chaîne, et non une partie de celle-ci.",
+          "- Ce n’est pas un portefeuille. Il ne détient ni fonds, ni clés de dépense, ni la garde de quoi que ce soit, et il ne peut ni créer, ni signer, ni diffuser de transactions en votre nom.",
+          "- Ce n’est pas le pont. La page <a href=\"/bridge\">Pont</a> décrit l’activité du pont enregistrée sur la chaîne Rand. Le pont lui-même est exploité par ses gardiens selon leurs propres conditions ; les dépôts, les approbations et le règlement ont lieu sur les chaînes sources et doivent y être vérifiés.",
+          "- Ce n’est pas un conseil. Rien sur RandScan ne constitue un conseil financier, d’investissement, juridique ou fiscal, et rien ne constitue une offre ou une sollicitation d’achat ou de vente d’un actif quelconque."
+        ]
+      },
+      {
+        "id": "accuracy",
+        "title": "Exactitude des données",
+        "body": [
+          "Nous nous efforçons de présenter la chaîne fidèlement, et le code de l’explorateur est ouvert à la vérification de tous. Néanmoins, ce que vous voyez est une copie produite par un logiciel, et elle peut être erronée ou en retard :",
+          "- l’indexeur peut accuser du retard sur la chaîne, ou s’arrêter pendant le redémarrage du nœud qu’il lit ;",
+          "- un bloc affiché par l’explorateur peut être remplacé si la chaîne se réorganise ;",
+          "- lorsque le réseau passe à une nouvelle chaîne, l’historique de l’explorateur est réinitialisé au nouveau bloc de genèse, et les données de la chaîne précédente ne sont plus servies ;",
+          "- une chaîne protégée masque par conception les montants et les parties ; l’explorateur ne montre donc nécessairement que ce que le registre rend public, et les libellés tels que les noms de jetons proviennent des listes propres à l’explorateur, et non de la chaîne ;",
+          "- les emplacements, versions et états des nœuds et des provers sont des observations, non des garanties.",
+          "Les décisions qui dépendent de l’état de la chaîne doivent être vérifiées auprès d’un nœud que vous exploitez ou en lequel vous avez confiance. Nous ne promettons pas qu’un chiffre affiché sur RandScan soit exact ou à jour."
+        ]
+      },
+      {
+        "id": "viewing",
+        "title": "Clés de consultation et ouverture des notes",
+        "body": [
+          "La page <a href=\"/viewing\">Historique</a> ouvre les notes protégées avec une clé que vous collez. L’ouverture s’exécute dans votre navigateur et la clé ne nous est pas envoyée, comme le décrit la Politique de confidentialité. Vous restez responsable des clés que vous manipulez : ne les collez que sur un appareil et un navigateur de confiance, préférez une clé de consultation à une clé de dépense chaque fois que cela suffit, et sachez que nous ne pouvons ni récupérer une clé ni annuler ce que voit une personne qui l’a obtenue. Les résultats de l’ouverture sont une lecture de la chaîne faite au mieux et comportent les mêmes réserves que tous les autres chiffres présentés ici."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "Comptes et clés API",
+        "body": [
+          "Vous n’avez pas besoin de compte pour utiliser RandScan. Un compte permet d’obtenir des clés API avec un quota de requêtes plus élevé. Si vous en créez un :",
+          "- vous devez fournir une adresse e-mail que vous contrôlez et garder votre mot de passe secret ;",
+          "- une clé API est un identifiant d’accès. Gardez-la hors du code côté client et des dépôts publics, et révoquez-la depuis votre <a href=\"/dashboard\">tableau de bord</a> si elle fuite. Tout ce qui est fait avec votre clé est réputé fait par vous ;",
+          "- vous pouvez détenir jusqu’à 10 clés actives, et un compte par personne ou par système est la règle ;",
+          "- vous ne pouvez pas partager, vendre ou mutualiser des clés pour dépasser le quota, ni créer des comptes par des moyens automatisés.",
+          "Nous pouvons suspendre ou supprimer un compte, ou révoquer ses clés, s’il enfreint ces conditions, fait l’objet d’un usage abusif ou est resté inactif pendant longtemps. Vous pouvez cesser d’utiliser le service et nous demander de supprimer votre compte à tout moment."
+        ]
+      },
+      {
+        "id": "quotas",
+        "title": "Quotas et usage acceptable",
+        "body": [
+          "Les points d’accès publics en lecture sont gratuits. Le trafic anonyme est limité par adresse IP et le trafic avec clé par clé ; les chiffres actuels sont publiés dans la <a href=\"https://github.com/randprotocol/randscan.org/blob/main/docs/api.md\">documentation de l’API</a> et peuvent changer. Au-delà de la limite, le service répond par HTTP 429 et un en-tête Retry-After, et les clients doivent le respecter.",
+          "Vous vous engagez à ne pas :",
+          "- contourner les limites de débit, par exemple en alternant les adresses ou les clés, ou en multipliant les comptes ;",
+          "- sonder, analyser, surcharger ou perturber de toute autre manière le service, ses serveurs ou le nœud qui le sous-tend ;",
+          "- utiliser le service pour enfreindre la loi, porter atteinte aux droits d’autrui, ou harceler ou désanonymiser des personnes ;",
+          "- présenter les données de RandScan comme les vôtres sans mention de la source, ou laisser entendre que nous cautionnons un produit qui les utilise.",
+          "La lecture en masse des données publiques est admise dans la limite des quotas. Si vous en avez besoin de plus, exploitez votre propre nœud et indexeur ; le logiciel est libre."
+        ]
+      },
+      {
+        "id": "ip",
+        "title": "Logiciel, données et marques",
+        "body": [
+          "Le code source de l’explorateur est publié sous licence MIT, et vous pouvez l’utiliser selon ces termes. Les données de la chaîne présentées sur RandScan sont publiques et n’appartiennent à personne ; prenez-les, en mentionnant leur provenance. Le nom et la marque RandScan ainsi que le nom et la marque Rand Protocol identifient ce service et ce réseau, et ne peuvent pas être utilisés pour suggérer qu’une chose nous appartient alors que ce n’est pas le cas."
+        ]
+      },
+      {
+        "id": "third-parties",
+        "title": "Tiers",
+        "body": [
+          "RandScan renvoie vers d’autres sites et chaînes, et les pages de cartes chargent des tuiles de fond de carte depuis ArcGIS Online d’Esri. Ces services ont leurs propres conditions. Nous ne les contrôlons pas et ne sommes pas responsables de ce qu’ils font ou affichent."
+        ]
+      },
+      {
+        "id": "warranty",
+        "title": "Absence de garantie",
+        "body": [
+          "RandScan est fourni « en l’état » et « selon disponibilité », sans garantie d’aucune sorte, expresse ou implicite, notamment d’exactitude, de disponibilité, d’adéquation à un usage particulier ou d’absence de contrefaçon. Il est exploité par une petite équipe au mieux de ses moyens ; il peut être indisponible, peut évoluer et peut être retiré, avec ou sans préavis."
+        ]
+      },
+      {
+        "id": "liability",
+        "title": "Limitation de responsabilité",
+        "body": [
+          "Dans toute la mesure permise par la loi, nous ne sommes pas responsables des pertes ou dommages découlant de votre utilisation de RandScan, de l’impossibilité de l’utiliser, ou de tout ce qui y est affiché. Cela comprend la perte de fonds, le manque à gagner, la perte de données, et toute perte indirecte ou consécutive, quelle qu’en soit la cause, même si nous avons été informés de cette possibilité. En particulier, nous ne sommes pas responsables des décisions prises sur la base des données de l’explorateur, des transactions sur quelque chaîne que ce soit, ni des actes de tiers. Lorsque la responsabilité ne peut être exclue, elle est limitée au montant que vous nous avez payé pour le service, soit zéro.",
+          "Certaines juridictions n’autorisent pas certaines exclusions. Rien ici ne vous retire les droits que la loi vous reconnaît et auxquels il est impossible de renoncer."
+        ]
+      },
+      {
+        "id": "changes",
+        "title": "Modifications de ces conditions",
+        "body": [
+          "Nous pouvons modifier ces conditions. Le texte en vigueur se trouve toujours à l’adresse randscan.org/terms, avec sa date d’entrée en vigueur. Si une modification est substantielle, nous l’indiquerons sur l’explorateur avant qu’elle ne prenne effet. Utiliser le service après une modification vaut acceptation des nouvelles conditions. Cette version est entrée en vigueur le {effective}."
+        ]
+      },
+      {
+        "id": "general",
+        "title": "Dispositions générales",
+        "body": [
+          "Si une partie de ces conditions est jugée inapplicable, le reste continue de s’appliquer. Le fait de ne pas agir face à un manquement ne vaut pas renonciation. Ces conditions et la Politique de confidentialité constituent l’intégralité de l’accord entre vous et nous au sujet de RandScan. Les questions sont à adresser à l’équipe Rand Protocol via <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>."
+        ]
+      }
+    ]
+  },
+  "home": {
+    "title": "Explorateur Rand Protocol",
+    "chain": "Chaîne {id}",
+    "connecting": "Connexion au réseau…",
+    "blockHeight": "Hauteur de bloc",
+    "nodeSyncing": "Nœud en synchronisation",
+    "inSync": "Synchronisé",
+    "validators": "Validateurs",
+    "activeStake": "mise active",
+    "transactions": "Transactions",
+    "programs": {
+      "one": "{n} programme",
+      "many": "{n} de programmes",
+      "other": "{n} programmes"
+    },
+    "notes": "Notes",
+    "spent": "{count} dépensées",
+    "avgBlockTime": "Temps de bloc moyen",
+    "peers": "Pairs",
+    "mempool": "Mempool",
+    "epoch": "Époque",
+    "epochValue": {
+      "one": "{epoch} ({n} bloc)",
+      "many": "{epoch} ({n} de blocs)",
+      "other": "{epoch} ({n} blocs)"
+    },
+    "currentLeader": "Leader actuel",
+    "facts": {
+      "totalSupply": "Offre totale {amount}",
+      "supplyUnavailable": "Audit de l’offre indisponible",
+      "view": "vue {view}",
+      "treeRoot": "racine de l’arbre",
+      "bundleGuest": "bundle guest",
+      "faucetOn": "faucet activé",
+      "faucetOff": "faucet désactivé",
+      "confidentialOn": "appels confidentiels activés",
+      "confidentialOff": "appels confidentiels désactivés",
+      "decimals": {
+        "one": "{symbol} a {n} décimale",
+        "many": "{symbol} a {n} de décimales",
+        "other": "{symbol} a {n} décimales"
+      },
+      "genesis": "genèse",
+      "node": "nœud {version}",
+      "nodeSha": "nœud {version} ({sha})"
+    },
+    "limits": {
+      "programs": {
+        "one": "Limites : programmes {n} mot",
+        "many": "Limites : programmes {n} de mots",
+        "other": "Limites : programmes {n} mots"
+      },
+      "proofs": "preuves {size}",
+      "blocks": "blocs {size}",
+      "callEnvelopes": "enveloppes d’appel {size}",
+      "publicInput": {
+        "one": "entrée publique {n} mot",
+        "many": "entrée publique {n} de mots",
+        "other": "entrée publique {n} mots"
+      },
+      "publicInputOff": "entrée publique désactivée",
+      "noteEnvelopesMemo": "enveloppes de notes {bytes} B (avec mémo)",
+      "noteEnvelopesNoMemo": "enveloppes de notes {bytes} B (sans mémo)",
+      "v6On": "règles v0.6 activées",
+      "v6Off": "règles v0.6 désactivées",
+      "authGuest": "auth invité",
+      "none": "aucune",
+      "proofWindow": {
+        "one": "fenêtre de preuve de {n} bloc",
+        "many": "fenêtre de preuve de {n} blocs",
+        "other": "fenêtre de preuve de {n} blocs"
+      },
+      "bindingsGenesis": "liaisons sur le hachage de genèse",
+      "bindingsChainId": "liaisons sur l'identifiant de chaîne"
+    },
+    "network": {
+      "testnet": "Réseau : testnet (le marqueur de genèse)",
+      "mainnet": "Réseau : mainnet",
+      "admission": "nouveaux validateurs admis par le vote de l'ensemble (<a href=\"/validators\">clés admises</a>)",
+      "slashing": {
+        "one": "pénalisation de l'équivocation de {percent} de la mise, emprisonnement de {n} époque",
+        "many": "pénalisation de l'équivocation de {percent} de la mise, emprisonnement de {n} époques",
+        "other": "pénalisation de l'équivocation de {percent} de la mise, emprisonnement de {n} époques"
+      },
+      "slashingOff": "pénalisation de l'équivocation désactivée"
+    },
+    "gas": {
+      "circuit": "Gas : la section propre à la chaîne, mesurée dans le circuit",
+      "policy": "Gas : la politique de ce nœud, tarifée d'après l'en-tête de preuve",
+      "perGas": "{amount} par gas",
+      "perKiB": "{amount} par KiB",
+      "ceilings": "plafonds {gas} / gas, {byte} / KiB",
+      "ceilingsPaying": "plafonds {gas} / gas, {byte} / KiB (seuls les octets payants font bouger le prix de l'octet)",
+      "bundleLimit": "chaque bundle déclare {gas} gas",
+      "pricesMove": "les prix varient de {percent} % par bloc selon le remplissage",
+      "pricesFixed": "prix fixes",
+      "programState": "état de programme activé : {fee} par cellule créée, au plus {reads} lectures, {writes} écritures et {payouts} paiements par invocation"
+    },
+    "latestBlocks": "Derniers blocs",
+    "latestTransactions": "Dernières transactions",
+    "viewAll": "Tout voir →"
+  },
+  "blocks": {
+    "title": "Blocs",
+    "error": "Impossible de charger les blocs.",
+    "indexed": {
+      "one": "{n} bloc indexé",
+      "many": "{n} blocs indexés",
+      "other": "{n} blocs indexés"
+    },
+    "loading": "Chargement des blocs…"
+  },
+  "transactions": {
+    "title": "Transactions",
+    "kind": "Type",
+    "allKinds": "Tous les types",
+    "kinds": {
+      "transfer": "Transfert (blindé)",
+      "mint": "Émission (faucet)",
+      "deploy": "Déploiement",
+      "call": "Appel (confidentiel)",
+      "bond": "Mise en dépôt",
+      "unbond": "Retrait de dépôt",
+      "withdraw": "Retrait",
+      "bridge_attest": "Pont entrant (attestation)",
+      "bridge_burn": "Pont sortant (destruction)",
+      "register_token": "Jeton enregistré",
+      "token_mint": "Émission de jeton",
+      "set_authority": "Autorité du jeton modifiée",
+      "token_burn": "Destruction de jeton",
+      "pause_mints": "Émissions du pont suspendues",
+      "unpause_mints": "Émissions du pont reprises",
+      "register_bridged_token": "Jeton ponté répertorié",
+      "list_backing": "Garantie répertoriée",
+      "invoke": "Invocation (état de programme)",
+      "admit_validator": "Validateur admis (vote)",
+      "slash_equivocation": "Équivocation pénalisée",
+      "rotate_pq_guardians": "Gardiens PQ renouvelés",
+      "rotate_pause_key": "Clé de pause renouvelée",
+      "rotate_pq_guardians_v2": "Renouvellement des gardiens PQ (différé)",
+      "rotate_pause_key_v2": "Renouvellement de la clé de pause (différé)",
+      "cancel_rotation": "Renouvellement annulé",
+      "other": "Autre"
+    },
+    "error": "Impossible de charger les transactions.",
+    "count": {
+      "one": "{n} transaction",
+      "many": "{n} transactions",
+      "other": "{n} transactions"
+    },
+    "countOfKind": {
+      "one": "{n} transaction de type {kind}",
+      "many": "{n} transactions de type {kind}",
+      "other": "{n} transactions de type {kind}"
+    },
+    "loading": "Chargement des transactions…",
+    "empty": "Aucune transaction trouvée",
+    "emptyOfKind": "Aucune transaction {kind} trouvée"
+  },
+  "notes": {
+    "title": "Notes",
+    "columns": {
+      "leaf": "Feuille",
+      "commitment": "Engagement",
+      "height": "Hauteur",
+      "createdBy": "Créée par"
+    },
+    "genesis": "genèse",
+    "deposit": "dépôt",
+    "error": "Impossible de charger l'arbre d'engagements.",
+    "leaves": {
+      "one": "{n} feuille dans l'arbre d'engagements",
+      "many": "{n} feuilles dans l'arbre d'engagements",
+      "other": "{n} feuilles dans l'arbre d'engagements"
+    },
+    "loading": "Chargement des notes…",
+    "created": "Notes créées",
+    "createdSub": "feuilles de l'arbre",
+    "spent": "Notes dépensées",
+    "spentSub": "nullifiers publiés",
+    "treeRoot": "Racine de l'arbre",
+    "treeRootSub": "l'ancre sur laquelle un portefeuille produit sa preuve",
+    "empty": "Aucune feuille indexée pour l'instant",
+    "help": "Chaque note est un engagement envers un propriétaire et un montant cachés. Une feuille indique quelle transaction l'a créée lorsque l'engagement figurait sur le réseau ; les notes de genèse, de retrait et de dépôt via le pont ne sont pas liées. La feuille qu'un nullifier dépense n'est jamais publique."
+  },
+  "programs": {
+    "title": "Programmes",
+    "columns": {
+      "program": "Programme",
+      "deployedAt": "Déployé à",
+      "words": "Mots",
+      "calls": "Appels",
+      "lastCalled": "Dernier appel"
+    },
+    "never": "Jamais",
+    "error": "Impossible de charger les programmes.",
+    "deployed": {
+      "one": "{n} programme déployé",
+      "many": "{n} programmes déployés",
+      "other": "{n} programmes déployés"
+    },
+    "loading": "Chargement des programmes…",
+    "empty": "Aucun programme déployé pour l'instant"
+  },
+  "tokens": {
+    "title": "Jetons",
+    "authority": {
+      "none": "Aucune (offre fixe)",
+      "key": "Signée par clé",
+      "bridge": {
+        "one": "Pont ({n} garantie)",
+        "many": "Pont ({n} garanties)",
+        "other": "Pont ({n} garanties)"
+      },
+      "program": "Programme"
+    },
+    "columns": {
+      "token": "Jeton",
+      "index": "Indice",
+      "decimals": "Décimales",
+      "authority": "Autorité",
+      "totalSupply": "Offre totale",
+      "registeredAt": "Enregistré à",
+      "tokenId": "Identifiant du jeton"
+    },
+    "error": "Impossible de charger le registre des jetons.",
+    "standard": "Le standard de jeton RPL",
+    "disabled": "Cette chaîne n'a pas de registre de jetons : aucun jeton RPL n'a été enregistré, et le nœud de cette version est antérieur au RPC des jetons. Chaque transfert est en RAND.",
+    "registered": {
+      "one": "{n} jeton RPL enregistré",
+      "many": "{n} jetons RPL enregistrés",
+      "other": "{n} jetons RPL enregistrés"
+    },
+    "registeredWithFee": {
+      "one": "{n} jeton RPL enregistré · frais d'enregistrement {fee} RAND",
+      "many": "{n} jetons RPL enregistrés · frais d'enregistrement {fee} RAND",
+      "other": "{n} jetons RPL enregistrés · frais d'enregistrement {fee} RAND"
+    },
+    "loading": "Chargement du registre des jetons…",
+    "empty": "Aucun jeton RPL n'a encore été enregistré",
+    "help": "L'enregistrement d'un jeton et ses émissions sont publics par conception (spéc. §4) : le montant et le symbole affichés ici sont exacts. Ce qui est privé, c'est qui détient les notes d'un jeton et entre qui un transfert les a déplacées : un transfert de n'importe quel jeton est indiscernable d'un simple paiement en RAND sur les pages publiques, et l'indice d'un jeton dans le registre n'apparaît jamais sur le bundle d'un transfert."
+  },
+  "validators": {
+    "title": "Validateurs",
+    "columns": {
+      "validator": "Validateur",
+      "epochSet": "Ensemble de l'époque",
+      "stake": "Mise",
+      "rewards": "Récompenses",
+      "unbonding": "Retrait de dépôt",
+      "share": "Part",
+      "blocksProposed": "Blocs proposés",
+      "lastProposed": "Dernière proposition"
+    },
+    "active": "Actif",
+    "inactive": "Inactif",
+    "never": "Jamais",
+    "error": "Impossible de charger le registre des validateurs.",
+    "subtitle": "{active} actifs sur {total} enregistrés · {stake}",
+    "activeStake": "mise active",
+    "loading": "Chargement des validateurs…",
+    "empty": "Aucun validateur signalé",
+    "admission": "Les nouveaux validateurs sont admis par le vote de l'ensemble (audit v6) : une mise en dépôt qui enregistre une nouvelle clé nécessite d'abord un <code>admit_validator</code>.",
+    "noneAdmitted": "Aucune clé n'est admise en attente d'enregistrement.",
+    "admittedWaiting": {
+      "one": "{n} admise, pas encore enregistrée :",
+      "many": "{n} admises, pas encore enregistrées :",
+      "other": "{n} admises, pas encore enregistrées :"
+    },
+    "help": "Le registre est le seul endroit où cette chaîne stocke des montants en clair. Les validateurs actifs forment l'ensemble qui exécute l'époque en cours ; le leader de la vue v est l'entrée active v mod n dans l'ordre des adresses."
+  },
+  "provers": {
+    "title": "Prouveurs",
+    "subtitle": "Prouveurs délégués : où un portefeuille incapable de produire sa propre preuve envoie son bundle, et où se trouvent ces machines",
+    "error": "Impossible de charger les prouveurs.",
+    "columns": {
+      "host": "Hôte",
+      "prover": "Prouveur",
+      "location": "Localisation",
+      "network": "Réseau"
+    },
+    "notLocated": "Pas encore localisé",
+    "status": {
+      "answering": "Répond",
+      "notChecked": "Pas encore vérifié",
+      "notAnswering": "Ne répond pas"
+    },
+    "panel": {
+      "endpoint": "Point d'accès",
+      "operator": "Opérateur",
+      "fingerprint": "Empreinte",
+      "endpointReports": "le point d'accès signale {fingerprint}",
+      "endpointReportsOther": "le point d'accès signale une autre clé",
+      "capacity": "Capacité",
+      "capacityValue": {
+        "one": "{proving} en preuve · {depth} en attente · {n} emplacement",
+        "many": "{proving} en preuve · {depth} en attente · {n} emplacements",
+        "other": "{proving} en preuve · {depth} en attente · {n} emplacements"
+      },
+      "capacityNote": "(un bundle à la fois par membre)",
+      "fee": "Frais",
+      "feeValue": "{amount} par bundle",
+      "free": "Gratuit",
+      "proves": "Produit",
+      "jobs": "tâches {kinds}",
+      "provesValue": "{jobs} sur {backend} · version {version}",
+      "unknownBuild": "inconnue",
+      "lastChecked": "Dernière vérification",
+      "lastAnswered": "dernière réponse {time}",
+      "error": "Erreur",
+      "pairing": "Appairage"
+    },
+    "stats": {
+      "provers": "Prouveurs",
+      "answering": "{count} répondent",
+      "hosts": "Hôtes de prouveurs",
+      "countries": "Pays",
+      "slots": "Emplacements de tâches",
+      "slotsSub": "libres et occupés, prouveurs répondants"
+    },
+    "hosts": "Hôtes de prouveurs",
+    "empty": "Aucun prouveur n'est connu de cet explorateur",
+    "hostsHelp": "Un pool répond à une seule adresse et confie chaque tâche à un hôte membre disposant d'un emplacement libre ; un hôte figure donc ici d'après la liste propre à l'explorateur, et non découvert sur le réseau. Les localisations proviennent de l'adresse IP publique de chaque hôte ; les adresses elles-mêmes ne sont pas affichées.",
+    "help": "Un prouveur délégué produit la preuve du bundle d'un portefeuille à partir d'une tâche scellée à sa clé. Il reçoit la clé de visualisation du portefeuille, jamais sa clé de dépense : celui qui l'exploite peut lire l'historique de ce portefeuille, et rien de plus. Chacun peut exécuter le sien (<code>rand-prover</code>) et y appairer un portefeuille à la place."
+  },
+  "nodes": {
+    "title": "Nœuds",
+    "subtitle": "Nœuds complets exécutant Rand Protocol, localisés par adresse de pair",
+    "error": "Impossible de charger la liste des pairs depuis le nœud.",
+    "columns": {
+      "role": "Rôle",
+      "peerId": "ID du pair",
+      "address": "Adresse",
+      "location": "Localisation",
+      "network": "Réseau",
+      "connected": "Connecté"
+    },
+    "roles": {
+      "validator": "Validateur",
+      "observer": "Observateur",
+      "peer": "Pair"
+    },
+    "thisNode": "Ce nœud",
+    "unknownLocation": "Localisation inconnue",
+    "stats": {
+      "nodes": "Nœuds",
+      "geolocated": "Géolocalisés",
+      "withoutLocation": "{count} sans localisation",
+      "countries": "Pays"
+    },
+    "peers": "Pairs",
+    "empty": "Aucun pair n'est actuellement connecté"
+  },
+  "search": {
+    "title": "Recherche",
+    "subtitle": "Trouver des blocs, transactions, programmes, notes et validateurs",
+    "help": "Recherchez par hauteur de bloc ; par hachage de 64 caractères, qui peut être un bloc, une transaction, un identifiant de programme, un engagement de note ou un nullifier ; ou par adresse de validateur en base58. Cette chaîne n'a pas de comptes.",
+    "searching": "Recherche de « {query} »…",
+    "resultsFor": "Résultats pour « {query} »",
+    "error": "La requête de recherche a échoué.",
+    "noResults": "Aucun résultat",
+    "nothingMatches": "Rien sur la chaîne ne correspond à « {query} ».",
+    "resultsCount": {
+      "one": "{n} résultat pour « {query} »",
+      "many": "{n} résultats pour « {query} »",
+      "other": "{n} résultats pour « {query} »"
+    },
+    "types": {
+      "block": "Bloc",
+      "transaction": "Transaction",
+      "validator": "Validateur",
+      "program": "Programme",
+      "note": "Note",
+      "nullifier": "Nullifier"
+    }
+  },
+  "dashboard": {
+    "account": "Compte",
+    "title": "Clés API",
+    "signOut": "Se déconnecter",
+    "requestFailed": "La requête a échoué",
+    "newKey": {
+      "title": "Nouvelle clé",
+      "copyNow": "Copiez votre clé maintenant. Par sécurité, elle n'est affichée qu'une seule fois ; si vous la perdez, révoquez-la et créez-en une autre."
+    },
+    "create": {
+      "title": "Créer une clé",
+      "name": "Nom",
+      "placeholder": "p. ex. surveillant des dépôts d'une bourse",
+      "submit": "Nouvelle clé",
+      "limits": "Jusqu'à 10 clés actives. Les requêtes avec clé disposent de 600 requêtes par minute ; le trafic anonyme en a 60 par IP. Voir le <a href=\"https://github.com/randprotocol/randscan/blob/main/docs/api.md\">guide de l'API</a>."
+    },
+    "activeKeys": "Clés actives ({count})",
+    "keysError": "Impossible de charger vos clés.",
+    "noActiveKeys": "Aucune clé active pour l'instant.",
+    "activeKeyMeta": {
+      "one": "créée {created} · dernière utilisation {lastUsed} · {n} requête",
+      "many": "créée {created} · dernière utilisation {lastUsed} · {n} requêtes",
+      "other": "créée {created} · dernière utilisation {lastUsed} · {n} requêtes"
+    },
+    "revoke": "Révoquer",
+    "revokedKeys": "Clés révoquées ({count})",
+    "revokedKeyMeta": {
+      "one": "révoquée {revoked} · {n} requête",
+      "many": "révoquée {revoked} · {n} requêtes",
+      "other": "révoquée {revoked} · {n} requêtes"
+    },
+    "changePassword": "Changer le mot de passe",
+    "email": "E-mail",
+    "memberSince": "Membre depuis",
+    "lastSignIn": "Dernière connexion"
+  }
+}

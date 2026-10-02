@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { LOCALE_CODES, localeInfo } from '../src/i18n/locales.js';
-import { flat, marks, NEVER, isPlural, pluralCategories } from '../scripts/i18n/dict.mjs';
+import { flat, marks, formMarks, NEVER, isPlural, pluralCategories } from '../scripts/i18n/dict.mjs';
 
 const read = (c) => JSON.parse(readFileSync(new URL(`../src/i18n/messages/${c}.json`, import.meta.url), 'utf8'));
 const en = flat(read('en'));
@@ -13,7 +13,8 @@ const translatable = (k, v) => !NEVER.test(k) && (isPlural(v) || (typeof v === '
 for (const code of LOCALE_CODES.filter((c) => c !== 'en')) {
   test(`${code}: complete, same placeholders and tags, every plural form`, () => {
     const tr = flat(read(code));
-    const cats = pluralCategories(localeInfo(code).tag);
+    const tag = localeInfo(code).tag;
+    const cats = pluralCategories(tag);
     const missing = [];
     const bad = [];
     for (const [k, v] of Object.entries(en)) {
@@ -21,7 +22,7 @@ for (const code of LOCALE_CODES.filter((c) => c !== 'en')) {
       const t = tr[k];
       if (isPlural(v)) {
         if (!isPlural(t) || cats.some((c) => typeof t[c] !== 'string' || !t[c].trim())) missing.push(k);
-        else if (cats.some((c) => marks(t[c]) !== marks(v.other))) bad.push(k);
+        else if (cats.some((c) => formMarks(tag, c, t[c]) !== formMarks(tag, c, v.other))) bad.push(k);
       } else if (typeof t !== 'string' || !t.trim()) missing.push(k);
       else if (marks(t) !== marks(v)) bad.push(k);
     }

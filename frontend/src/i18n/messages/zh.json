@@ -1,1 +1,1447 @@
-{}
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Rand Protocol 浏览器",
+    "metaDescription": "在 Rand Protocol 网络上浏览区块、交易、账户、验证者和保密程序。",
+    "language": "语言",
+    "englishGoverns": "本译文仅为方便阅读而提供;如有出入,以英文文本为准。",
+    "loading": "加载中…",
+    "retry": "重试",
+    "copy": "复制",
+    "copied": "已复制",
+    "live": "实时",
+    "offline": "离线",
+    "notFound": "未找到",
+    "backToDashboard": "返回仪表盘",
+    "somethingWrong": "出错了",
+    "apiUnreachable": "无法连接到浏览器 API,请重试。",
+    "previousPage": "上一页",
+    "nextPage": "下一页"
+  },
+  "fmt": {
+    "units": "单位",
+    "assetUnits": "资产 #{index} 的 {units} 个单位",
+    "bridged": "{tokens} 个代币({units} 个单位)",
+    "chain": "链 {id}",
+    "unknownLocation": "未知位置"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "仪表盘",
+      "blocks": "区块",
+      "transactions": "交易",
+      "notes": "票据",
+      "history": "历史",
+      "validators": "验证者",
+      "provers": "证明者",
+      "programs": "程序",
+      "tokens": "代币",
+      "bridge": "跨链桥",
+      "nodes": "节点"
+    },
+    "apiKeys": "API 密钥",
+    "signIn": "登录",
+    "toggleNav": "切换导航"
+  },
+  "footer": {
+    "blurb": "RandScan 是 Rand Protocol 的浏览器。",
+    "privacy": "隐私",
+    "terms": "条款"
+  },
+  "bridge": {
+    "title": "跨链桥",
+    "subtitle": "代币在 Ethereum、BSC、Solana 和 Tron 上锁定,并在此铸造为屏蔽票据。跨链价值以票据形式存在,因此没有余额:只有转入了什么和转出了什么。",
+    "loadError": "无法加载跨链桥状态。",
+    "noSection": "链 {chain} 的创世区块中没有跨链桥部分:尚无守护者、资产登记表和跨链票据。下方的来源链和获批代币,是运行带有跨链桥部分的链之后,跨链桥将接受的内容。",
+    "byChain": "按来源链划分的跨链代币",
+    "openOn": "在 {chain} 浏览器中打开",
+    "openOnChain": "在链浏览器中打开",
+    "floorTitle": "创世时设定的重放下限。序号低于该值的锁定,要么已在本链所分叉自的链上铸造,要么是运营方在重新部署的合约上自行锁定的,在此永不铸造。",
+    "stats": {
+      "in": "转入",
+      "inSub": "已证明的存款",
+      "out": "转出",
+      "outSub": "已释放的销毁",
+      "assets": "已见资产",
+      "noActive": "尚无活跃的来源链",
+      "from": "来自 {chains}",
+      "approved": "获批代币",
+      "approvedSub": "四条链上的 USDT 和 USDC"
+    },
+    "activity": {
+      "token": "代币",
+      "asset": "资产",
+      "in": "转入",
+      "out": "转出",
+      "fees": "销毁手续费",
+      "feesTitle": "v0.6.8 起,跨链桥手续费从该币种的销毁中以 zUSD 票据形式留存;“转出”仅统计已释放并离开锁定余额的部分。",
+      "outstanding": "当前在 Rand 上",
+      "locked": "已锁定(登记表)",
+      "minted": "已铸造 / 上限",
+      "inLast": "最近 {window}",
+      "today": "今天",
+      "headroom": "可铸造额度",
+      "headroomMissing": "v0.6.7 之后的节点才提供。",
+      "headroomTitle": "上限当前允许该币种存入的最大金额:其自身上限减去已铸造量,且不超过所有代币在窗口期内合计剩余的额度。",
+      "last": "最近活动",
+      "notApproved": "不在获批列表中",
+      "na": "不适用",
+      "naTitle": "存款只公布其铸造的代币,而不公布锁定的是哪种来源币种,因此无法归属到多币种代币中的某一种币种。",
+      "transactions": {
+        "other": "{n} 笔交易"
+      }
+    },
+    "source": {
+      "contract": "跨链桥合约",
+      "noContract": "此链尚未登记跨链桥合约",
+      "floor": "从序号 {sequence} 起的锁定",
+      "inOut": "转入 {in},转出 {out}",
+      "out": "转出 {out}",
+      "empty": "尚未从 {name} 跨链任何资产 · 链 ID {chain}"
+    },
+    "tokens": {
+      "title": "获批代币",
+      "intro": "跨链桥只接受这些代币,别无其他。请仅发送到该代币所在链上的跨链桥合约;合约会拒绝任何其他代币的存款,而在错误的链上存入获批代币,在 Rand 上则是另一种资产。",
+      "empty": "没有获批代币",
+      "noteOn": "{chain} 上的 {symbol}:",
+      "decimalsNote": "无论代币在原链上的精度如何,Rand 上的金额始终为 8 位小数;跨链桥合约在转入和转出时进行换算。登记表将每个地址存储为 32 字节的字:Ethereum、BSC 或 Tron 地址在左侧补零,Solana 的 mint 则保持原样。",
+      "token": "代币",
+      "chain": "链",
+      "address": "合约地址",
+      "decimals": "小数位数",
+      "onRand": "Rand 上为 8",
+      "status": "状态",
+      "allowed": "允许",
+      "discontinued": "已停用"
+    },
+    "registry": {
+      "title": "资产登记表",
+      "empty": "尚未登记任何跨链资产",
+      "note": "节点自身的登记表,在每种资产首次存款时填入。索引是跨链票据所携带的资产字;索引 0 是 RAND,永不在登记表中。",
+      "index": "索引",
+      "sourceChain": "来源链",
+      "token": "代币",
+      "unknown": "未知",
+      "tokenAddress": "代币地址(32 字节)",
+      "assetId": "资产 ID"
+    },
+    "state": {
+      "title": "跨链桥状态",
+      "mintPause": "铸造暂停",
+      "paused": "已暂停 — 拒绝转账证明(销毁和轮换仍可进行)",
+      "notPaused": "未暂停",
+      "pauseNonce": "暂停 / 取消暂停 nonce",
+      "listNonce": "列表 nonce",
+      "registrationFee": "登记费",
+      "pqGuardians": "PQ 守护者({count})",
+      "pqGuardiansText": {
+        "other": "{n} 个 Dilithium2 密钥,与下方的经典守护者集合按索引一一对应。每次存款证明以及每项需要法定人数的治理操作,都由该集合共同签名;轮换永远不会改变它。"
+      },
+      "pauseKey": "暂停密钥",
+      "outboundEmitter": "出站发送方",
+      "guardianSet": "守护者集合",
+      "guardians": "守护者({count})",
+      "messagesEmitted": "已发出消息",
+      "nextIndex": "下一个资产索引",
+      "fees": "跨链桥手续费",
+      "feeRates": "转入 {in} / 转出 {out}",
+      "feeBps": "({in} / {out} bps),以 zUSD 票据形式铸造给",
+      "feesCollected": "迄今已收取:存款 <code>{deposits}</code>,销毁 <code>{burns}</code>。存款锁定其总额,并铸造收款人的票据以及手续费票据;销毁释放销毁额减去手续费,并将手续费铸造回来,因此供应量 = Σ 锁定量 = 托管量仍然成立。手续费票据没有信封。",
+      "rotationRules": "轮换规则",
+      "rotationDelay": "轮换在提交后 {delay} 生效",
+      "rotationDelayPossession": "轮换在提交后 {delay} 生效,并且必须附带每位新持有者的持有证明",
+      "pendingPauseKey": "待处理的暂停密钥轮换,生效时间 <code>{at}</code>",
+      "pendingPq": "待处理的 PQ 守护者轮换,生效时间 <code>{at}</code>",
+      "noPending": "没有待处理的轮换",
+      "rotationNonce": "轮换 nonce",
+      "mintCapAll": "铸造上限,所有代币",
+      "mintCapPer": "每 {window},涵盖所有代币的全部支撑资产合计",
+      "mintedInWindow": "本窗口期已铸造 <code>{minted}</code>,还可再铸造 <code>{room}</code>",
+      "trustedEmitters": "可信发送方({count})",
+      "asStored": "按链上存储形式",
+      "floorMinted": "从序号 {sequence} 起的锁定已铸造"
+    }
+  },
+  "auth": {
+    "login": {
+      "metaTitle": "登录 — RandScan"
+    },
+    "signup": {
+      "metaTitle": "创建账户 — RandScan"
+    },
+    "form": {
+      "intro": "有了账户,您就可以创建请求配额更高的 API 密钥。",
+      "email": "电子邮箱",
+      "password": "密码",
+      "minLength": "至少 10 个字符。",
+      "forgotLink": "忘记密码?",
+      "pleaseWait": "请稍候…",
+      "requestFailed": "请求失败",
+      "login": {
+        "title": "登录",
+        "button": "登录",
+        "alt": "还没有账户?",
+        "altLabel": "立即创建"
+      },
+      "signup": {
+        "title": "创建账户",
+        "button": "创建账户",
+        "alt": "已经注册?",
+        "altLabel": "登录",
+        "terms": "创建账户即表示您接受<a href=\"/terms\">服务条款</a>和<a href=\"/privacy\">隐私政策</a>。"
+      }
+    },
+    "forgot": {
+      "metaTitle": "忘记密码 — RandScan",
+      "title": "忘记密码?",
+      "intro": "请输入您的账户邮箱,我们将发送一个用于设置新密码的链接。该链接一小时内有效。",
+      "sent": "如果 <code>{email}</code> 对应的账户存在,重置链接已在发送途中。如果几分钟内未收到,请检查垃圾邮件文件夹。",
+      "backToSignIn": "返回登录",
+      "button": "发送重置链接",
+      "remembered": "想起来了?",
+      "signIn": "登录"
+    },
+    "reset": {
+      "metaTitle": "重置密码 — RandScan",
+      "title": "重置密码",
+      "missingToken": "此链接缺少令牌。请打开邮件中的链接,或重新申请一个。",
+      "requestLink": "申请新链接",
+      "choose": "设置新密码",
+      "signedOut": "您将在所有其他设备上退出登录。",
+      "newPassword": "新密码",
+      "confirm": "确认新密码",
+      "mismatch": "两次输入的密码不一致。",
+      "button": "设置新密码",
+      "expired": "链接已过期?",
+      "requestNew": "申请新链接"
+    },
+    "change": {
+      "current": "当前密码",
+      "done": "密码已更改。其他设备已退出登录。",
+      "button": "更改密码"
+    }
+  },
+  "components": {
+    "dataTable": {
+      "empty": "暂无数据"
+    },
+    "tables": {
+      "blocks": {
+        "height": "高度",
+        "hash": "Hash",
+        "proposer": "提议者",
+        "txs": "交易数",
+        "view": "查看",
+        "age": "时间",
+        "empty": "尚未索引任何区块"
+      },
+      "txs": {
+        "hash": "Tx hash",
+        "kind": "类型",
+        "height": "高度",
+        "action": "操作",
+        "fee": "手续费",
+        "age": "时间",
+        "empty": "未找到交易",
+        "hiddenTitle": "发送方、接收方和金额均隐藏在捆绑包内",
+        "shielded": "屏蔽",
+        "noFeeTitle": "验证者签名的操作:无捆绑包,无手续费"
+      }
+    },
+    "search": {
+      "placeholder": "按高度、哈希、地址或程序搜索",
+      "ariaLabel": "搜索浏览器"
+    },
+    "theme": {
+      "toLight": "切换到浅色主题",
+      "toDark": "切换到深色主题",
+      "light": "浅色主题",
+      "dark": "深色主题"
+    },
+    "nodeMap": {
+      "thisNode": "{role} · 本节点",
+      "connected": "已连接 {time}",
+      "copyPeerId": "复制对等节点 ID"
+    },
+    "openedNotes": {
+      "received": "已接收",
+      "sent": "已发送",
+      "openedWithTxKey": "已用交易密钥打开",
+      "unspent": "未花费",
+      "spentIn": "花费于",
+      "leaf": "叶子 #{n}",
+      "feeHint": "跨链桥手续费票据:它没有信封(不对任何人加密),因此只有手续费收款人的查看密钥能找到它,方法是根据公开字段重建它",
+      "notIndexed": "信封尚未索引",
+      "notOpened": "此密钥未能打开(或为虚拟槽位,不对任何人加密)",
+      "amount": "金额",
+      "owner": "所有者(pk)",
+      "createdBy": "创建者(pk)",
+      "noteTime": "票据时间",
+      "commitment": "承诺",
+      "verifiedRebuilt": "已验证 ✓(使用此密钥的 pk 根据公开字段重建,并与叶子一致)",
+      "verifiedRecomputed": "已验证 ✓(根据明文重新计算)",
+      "nullifier": "作废标识",
+      "status": "状态",
+      "noTranscript": "此调用未发布输入记录。",
+      "transcriptNotOpened": "此密钥未能打开输入记录。",
+      "caller": "调用者",
+      "auditor": "审计者",
+      "openedWithCallKey": "已用调用密钥打开",
+      "callInputs": "调用输入",
+      "privateInputs": "私有输入",
+      "salt": "盐值",
+      "faithful": "与 H_IN 一致 ✓",
+      "falseTranscript": "与 H_IN 不匹配:调用方发布了虚假的输入记录"
+    },
+    "txOpener": {
+      "noNotes": "此交易未创建带信封的票据(没有密钥可以打开的内容)。"
+    },
+    "keyPanel": {
+      "title": "使用密钥打开",
+      "kinds": {
+        "viewing": "查看密钥 (nk)",
+        "spend": "花费密钥",
+        "tx": "交易密钥",
+        "call": "调用密钥"
+      },
+      "kindsLower": {
+        "viewing": "查看密钥 (nk)",
+        "spend": "花费密钥",
+        "tx": "交易密钥",
+        "call": "调用密钥"
+      },
+      "invalidWithFile": "密钥为 64 位十六进制字符,或钱包密钥文件 (wallet.key.json) 的内容。",
+      "invalidKinds": "{kinds}为 64 位十六进制字符。",
+      "placeholderFile": "64 位十六进制字符,或粘贴 wallet.key.json",
+      "placeholder": "64 位十六进制字符",
+      "keyFileDetected": "已检测到密钥文件",
+      "opening": "正在打开…",
+      "open": "打开",
+      "remember": "在此标签页中记住",
+      "preferViewing": "建议使用查看密钥:花费密钥可以转移资金。此页面在本地派生查看密钥,并且只在内存中保留查看密钥。"
+    }
+  },
+  "kinds": {
+    "transfer": {
+      "label": "转账(隐私)",
+      "short": "转账"
+    },
+    "mint": {
+      "label": "铸造(水龙头)",
+      "short": "铸造"
+    },
+    "deploy": {
+      "label": "部署",
+      "short": "部署"
+    },
+    "call": {
+      "label": "调用(机密)",
+      "short": "调用"
+    },
+    "bond": {
+      "label": "质押",
+      "short": "质押"
+    },
+    "unbond": {
+      "label": "解除质押",
+      "short": "解除质押"
+    },
+    "withdraw": {
+      "label": "提取",
+      "short": "提取"
+    },
+    "bridge_attest": {
+      "label": "跨链转入(证明)",
+      "short": "跨链转入"
+    },
+    "bridge_burn": {
+      "label": "跨链转出(销毁)",
+      "short": "跨链转出"
+    },
+    "register_token": {
+      "label": "代币已注册",
+      "short": "注册代币"
+    },
+    "token_mint": {
+      "label": "代币铸造",
+      "short": "代币铸造"
+    },
+    "set_authority": {
+      "label": "代币权限已变更",
+      "short": "设置权限"
+    },
+    "token_burn": {
+      "label": "代币销毁",
+      "short": "代币销毁"
+    },
+    "pause_mints": {
+      "label": "跨链铸造已暂停",
+      "short": "暂停铸造"
+    },
+    "unpause_mints": {
+      "label": "跨链铸造已恢复",
+      "short": "恢复铸造"
+    },
+    "register_bridged_token": {
+      "label": "跨链代币已上架",
+      "short": "上架代币"
+    },
+    "list_backing": {
+      "label": "储备已上架",
+      "short": "上架储备"
+    },
+    "invoke": {
+      "label": "调用(程序状态)",
+      "short": "调用"
+    },
+    "admit_validator": {
+      "label": "验证者已准入(投票)",
+      "short": "准入"
+    },
+    "slash_equivocation": {
+      "label": "双重签名已罚没",
+      "short": "罚没"
+    },
+    "rotate_pq_guardians": {
+      "label": "PQ 守护者已轮换",
+      "short": "轮换 PQ"
+    },
+    "rotate_pause_key": {
+      "label": "暂停密钥已轮换",
+      "short": "轮换暂停"
+    },
+    "rotate_pq_guardians_v2": {
+      "label": "PQ 守护者轮换(延迟生效)",
+      "short": "轮换 PQ"
+    },
+    "rotate_pause_key_v2": {
+      "label": "暂停密钥轮换(延迟生效)",
+      "short": "轮换暂停"
+    },
+    "cancel_rotation": {
+      "label": "轮换已取消",
+      "short": "取消轮换"
+    },
+    "other": {
+      "label": "其他",
+      "short": "其他"
+    }
+  },
+  "roles": {
+    "validator": "验证者",
+    "observer": "观察者",
+    "peer": "对等节点"
+  },
+  "block": {
+    "notFound": "未找到区块",
+    "notFoundMessage": "没有与“{id}”匹配的区块。可按高度或 64 位哈希查询区块。",
+    "back": "返回区块列表",
+    "loadError": "无法加载此区块。",
+    "title": "区块 #{height}",
+    "overview": "概览",
+    "height": "高度",
+    "hash": "Hash",
+    "parent": "父区块",
+    "genesis": "创世区块(无父区块)",
+    "proposer": "提议者",
+    "timestamp": "时间戳",
+    "view": "视图",
+    "justifyView": "证明视图",
+    "transactions": "交易",
+    "txRoot": "交易根",
+    "stateRoot": "状态根",
+    "txHeading": "交易({count})",
+    "previous": "← 上一区块",
+    "empty": "此区块不包含任何交易"
+  },
+  "tx": {
+    "notFound": "未找到交易",
+    "notFoundMessage": "没有与“{hash}”匹配的交易。仅索引已提交的交易。",
+    "back": "返回交易列表",
+    "loadError": "无法加载此交易。",
+    "title": "交易",
+    "overview": "概览",
+    "hash": "Hash",
+    "kind": "类型",
+    "block": "区块",
+    "indexInBlock": "区块内索引",
+    "timestamp": "时间戳",
+    "fee": "手续费",
+    "noFee": "无(无捆绑包)",
+    "bundle": "捆绑包",
+    "bundleYes": "是:由发送方自己的票据支付,并通过 STARK 证明",
+    "bundleNo": "否:由验证者或守护者法定人数签名",
+    "chainId": "链 ID",
+    "kindDetails": "{kind}详情",
+    "program": "程序",
+    "callProofSize": "调用证明大小",
+    "inputTranscript": "输入记录",
+    "sealed": "已密封 {size}",
+    "amount": "金额",
+    "amountBurned": "销毁金额",
+    "asset": "资产",
+    "assetIndex": "资产 #{index}",
+    "recipient": "接收方",
+    "noteTime": "票据时间",
+    "token": "代币",
+    "name": "名称",
+    "symbol": "Symbol",
+    "decimals": "小数位数",
+    "authority": "权限",
+    "registryIndex": "注册表索引",
+    "mintNonce": "铸造 nonce",
+    "nonce": "Nonce",
+    "none": "无",
+    "sourceChain": "源链",
+    "sourceToken": "源代币",
+    "sourceDecimals": "源小数位数",
+    "pqCoSigners": "PQ 守护者联合签名者",
+    "bridgeFee": "跨链手续费",
+    "feeNoteLeaf": "给手续费接收方的票据,叶节点",
+    "cells": {
+      "key": "键",
+      "wrote": "写入",
+      "read": "读取",
+      "zerosDeleted": "全零——该单元已删除",
+      "zerosAbsent": "全零——该单元不存在"
+    },
+    "payout": {
+      "nth": "支出 {n}",
+      "to": "收款方",
+      "note": "票据"
+    },
+    "invoke": {
+      "nonePublished": "未发布",
+      "intoVault": "存入金库",
+      "noRand": "无 RAND",
+      "and": "以及",
+      "destroyed": "——已销毁(程序自身的代币)",
+      "deposited": "——已存入",
+      "cellsRead": "读取的单元({count})",
+      "cellsWritten": "写入的单元({count})",
+      "paidOut": "已支出({count})",
+      "minted": "已铸造({count})",
+      "none": "无",
+      "nothingLeft": "没有资产离开金库",
+      "nothing": "无",
+      "help": "该调用的证明恰好担保此次状态转换,账本已应用该转换:读取的单元必须与所示的值一致,否则交易会被拒绝;每笔支出都是链根据上述内容计算出的票据,因此接收方发现它的方式与发现铸造所得相同。谁存入是隐私的;转移了什么则是公开的。"
+    },
+    "bundlePanel": {
+      "anchor": "锚点",
+      "nullifierAsset": "作废符 {n}(资产)",
+      "nullifierRand": "作废符 {n}(RAND)",
+      "commitmentAsset": "承诺 {n}(资产)",
+      "commitmentRand": "承诺 {n}(RAND)",
+      "burned": "已销毁",
+      "nothingBurned": "未销毁任何资产",
+      "time": "时间(目标高度)",
+      "proofSize": "证明大小",
+      "envelopeSizes": "信封大小",
+      "authCommit": "授权承诺",
+      "authProofSize": "授权证明大小",
+      "authorisation": "授权",
+      "authInside": "包含在捆绑包证明内(此链上没有单独的授权证明)",
+      "help": "共四个槽位,含占位项:槽位 1–2 承载一种隐私资产(RAND 或任一 RPL 代币),槽位 3–4 始终为 RAND。没有公开的资产字段——RAND 的转账与任一 RPL 代币的转账形态相同,字段一一对应。证明和信封仅报告大小。",
+      "splitAuth": "拆分授权:捆绑包证明由查看密钥生成并发布授权承诺;另一个基于花费密钥的小型证明必须与之匹配,因此被委托的证明者永远不会持有花费密钥。"
+    },
+    "transfer": {
+      "help": "一笔普通的 RAND 或任一 RPL 代币的隐私转账——资产是隐私的,因此本页无法说明转移的是哪一种。最多花费两张票据,最多创建两张,外加手续费。谁向谁支付、金额多少、何种资产,只有双方以及他们提供查看密钥或交易密钥的人才知道。"
+    },
+    "mint": {
+      "depositNote": "存入票据",
+      "mintedBy": "铸造方",
+      "help": "testnet 水龙头存款。金额仅在这一笔交易中公开;其创建的票据此后与其他任何票据无法区分。"
+    },
+    "deploy": {
+      "wordsLength": "字数",
+      "words": {
+        "other": "{n} 个字"
+      }
+    },
+    "call": {
+      "nonePublished": "未发布(调用方选择了 --no-envelope)",
+      "help": "调用的隐私输入绝不会以明文形式离开钱包。发布输入记录后,只有调用方的查看密钥、单次调用密钥或调用方指定的审计方才能将其打开。"
+    },
+    "staking": {
+      "validator": "验证者",
+      "registration": "注册",
+      "newValidator": "新验证者",
+      "existingValidator": "现有验证者",
+      "registerNonce": "注册 nonce",
+      "bondHelp": "价值离开资金池(捆绑包的销毁部分),进入验证者的公开质押。",
+      "unbondHelp": "质押已转入解除质押队列,由验证者的密钥签名。",
+      "withdrawHelp": "已释放的质押和奖励合并为一张新票据,公开金额,发往验证者的收款地址。"
+    },
+    "bridgeBurn": {
+      "released": "在源链上已释放",
+      "relayerFee": "中继方手续费",
+      "destChain": "目标链",
+      "destAddress": "目标地址",
+      "coinRedeemed": "已赎回的代币",
+      "help": "一个隐藏资产捆绑包承载整个销毁操作:其 <code>burn_a</code> 和 <code>burn_asset</code> 即本操作的资产和金额,其手续费以 RAND 支付跨链手续费。"
+    },
+    "attest": {
+      "size": "证明消息大小",
+      "rotation": "守护者集合轮换,无存款",
+      "gross": "总额,锁定在源链上",
+      "deposited": "存入接收方的金额",
+      "commitment": "存款承诺",
+      "rotationShort": "——(轮换)",
+      "help": "由守护者签名的消息,将跨链资产作为票据存入接收方名下。金额仅在此处公开,其他地方均不公开。",
+      "feeHelp": "在链的跨链手续费规则下,总额被锁定并拆分为两张票据:接收方的票据,以及给手续费接收方的手续费票据。手续费票据没有信封,因此任何查看密钥都无法通过解密找到它;其所有者根据上述字段重建它。"
+    },
+    "registerToken": {
+      "initialMint": "初始铸造",
+      "amountTo": "{amount} 发往",
+      "help": "代币的注册及其初始铸造按设计是公开的,与跨链存款一样(规范 §4)——只有之后该代币票据的转账才是隐私的。"
+    },
+    "tokenMint": {
+      "help": "所铸造票据的每个字段都在此处(其发送方是链上固定的铸造标记),因此无论铸造方发布了何种信封,接收方都无需解密即可重建它。"
+    },
+    "setAuthority": {
+      "newAuthority": "新权限",
+      "renounced": "无(已放弃——此代币永远无法再铸造)"
+    },
+    "tokenBurn": {
+      "help": "持有者销毁:按设计是公开的,因为这使代币的总供应量可审计。同一代币的转账是普通的隐私转账——其资产保持隐私。"
+    },
+    "pause": {
+      "pauseHelp": "暂停期间,所有转入证明都会被拒绝;销毁和守护者集合轮换保持开放。仅由创世暂停密钥签名。",
+      "unpauseHelp": "解除暂停需要 PQ 守护者法定人数——暂停密钥永远无法单独解除暂停。"
+    },
+    "governance": {
+      "help": "由 PQ 守护者法定人数授权,使用提交者支付的 RAND 手续费捆绑包。"
+    },
+    "rotation": {
+      "nonce": "轮换 nonce",
+      "newSet": "新的 PQ 守护者集合",
+      "keys": {
+        "other": "{n} 个 Dilithium2 密钥"
+      },
+      "newPauseKey": "新的暂停密钥",
+      "possession": "持有证明",
+      "cancelled": "已取消",
+      "pendingPauseKey": "待生效的暂停密钥轮换",
+      "pendingGuardians": "待生效的 PQ 守护者轮换",
+      "cancelHelp": "已签名但尚未生效的轮换,在延迟期结束前被撤回(审计 v6,BRG-14)。",
+      "delayedHelp": "由当前 PQ 守护者法定人数签名,并附有每位新持有者的持有证明;除非被取消,否则在创世轮换延迟后生效(见跨链页面)。",
+      "help": "由轮换前集合的 PQ 守护者法定人数签名(跨链规则 v2)。"
+    },
+    "admit": {
+      "candidate": "候选者",
+      "voters": "投票者",
+      "validators": {
+        "other": "{n} 位验证者"
+      },
+      "votedBy": "投票方",
+      "help": "验证者集合的投票,允许此密钥通过质押注册,适用于通过投票准入验证者的链(审计 v6,STAKE-2)。无捆绑包,无手续费。"
+    },
+    "slash": {
+      "offender": "违规方",
+      "view": "视图",
+      "firstHeader": "第一个区块头",
+      "secondHeader": "第二个区块头",
+      "help": "同一验证者密钥为同一视图签署的两个区块头:这是领导者双重签名的证据,依据创世削减规则(audit v6,STAKE-1)予以削减。"
+    },
+    "receipt": {
+      "title": "回执",
+      "none": "尚未为此调用索引任何回执。",
+      "tier": "层级",
+      "position": "位置",
+      "index": "索引 {index}",
+      "hIn": "输入承诺(H_IN)",
+      "hPub": "公开输入(H_PUB)",
+      "hPubEmpty": "空——该程序部署时未设置公开输入",
+      "outputs": "输出",
+      "out": "输出 {index}",
+      "help": "仅记录八个公开输出字、不涉及任何其他变动:价值只通过为该调用付费的捆绑包流转。H_IN 是私有输入的加盐摘要,其本身不泄露任何信息。"
+    },
+    "unknownKind": {
+      "help": "此交易类型比当前浏览器版本更新。已按其哈希、捆绑包、手续费和区块建立索引;浏览器更新后将显示解码字段。"
+    }
+  },
+  "note": {
+    "notFound": "未找到票据",
+    "notFoundMessage": "没有与“{id}”匹配的树叶。可通过承诺(64 位十六进制)或叶索引查找票据;最近区块中的承诺可能尚未载入。",
+    "back": "返回票据列表",
+    "loadError": "无法加载此票据。",
+    "title": "票据 #{index}",
+    "leaf": "叶",
+    "leafIndex": "叶索引",
+    "commitment": "承诺",
+    "createdAt": "创建于高度",
+    "createdBy": "创建者",
+    "genesisDeposit": "创世存入票据",
+    "depositOffWire": "承诺不在链上传输的存入(提现或桥接证明)",
+    "openWithKey": "持有接收方或发送方的查看密钥,或此交易的密钥?<a href=\"{href}\">在交易页面使用密钥打开</a>。",
+    "sealed": "所有者和金额位于密封信封内,只有接收方和发送方的查看密钥才能打开。此票据是否已被花费同样不公开:无法将作废符与其叶匹配。"
+  },
+  "program": {
+    "notFound": "未找到程序",
+    "notFoundMessage": "没有与“{id}”匹配的程序。程序 ID 为 64 个字符的哈希。",
+    "back": "返回程序列表",
+    "loadError": "无法加载此程序。",
+    "title": "程序",
+    "calls": "调用",
+    "andInvokes": {
+      "other": "及 {n} 次 invoke"
+    },
+    "codeSize": "代码大小",
+    "words": {
+      "other": "{n} 个字"
+    },
+    "deployedAt": "部署于",
+    "lastCalled": "最近调用",
+    "callOrInvoke": "call 或 invoke",
+    "details": "详情",
+    "programId": "程序 ID",
+    "deployTx": "部署交易",
+    "deployedAtHeight": "部署高度",
+    "basePc": "基址 PC",
+    "wordsLength": "字长度",
+    "codeHash": "代码哈希",
+    "publicInput": "公开输入",
+    "noPublicInput": "无——调用按空输入检查",
+    "publicDigest": "公开摘要(H_PUB)",
+    "callCount": "调用次数",
+    "never": "从未",
+    "vault": "金库",
+    "vaultEmpty": "该程序没有持有任何资产。价值通过 invoke 的捆绑包进入其金库,并以 invoke 支付的票据形式流出。",
+    "asset": "资产 #{index}",
+    "stateCells": "状态单元({count})",
+    "noCells": "没有单元:尚未写入任何内容,或所有写入均为零。",
+    "key": "键",
+    "value": "值",
+    "statePublic": "按设计公开:程序的状态是 64 位十六进制键到 64 位十六进制值(各八个字)的映射,按键顺序从节点实时读取。",
+    "moreCells": "后面还有更多单元;API 通过 <code>/api/v1/programs/{id}/cells?after=…</code> 分页提供。",
+    "recentCallsInvokes": "最近的调用和 invoke",
+    "recentCalls": "最近的调用",
+    "empty": "该程序尚未被调用"
+  },
+  "token": {
+    "initialMint": "初始铸造",
+    "mint": "铸造",
+    "burn": "销毁",
+    "height": "高度",
+    "event": "事件",
+    "transaction": "交易",
+    "change": "变动",
+    "notFound": "未找到代币",
+    "notFoundMessage": "没有与“{id}”匹配的 RPL 代币。请使用其注册表索引、64 位十六进制 ID 或 rpl1… 文本形式。",
+    "back": "返回代币列表",
+    "loadError": "无法加载此代币。",
+    "totalSupply": "总供应量",
+    "decimals": "小数位数",
+    "registryIndex": "注册表索引",
+    "authority": "权限方",
+    "authorityKind": {
+      "none": "无",
+      "key": "密钥",
+      "program": "程序",
+      "bridge": "桥"
+    },
+    "backingCount": {
+      "other": "{n} 项储备"
+    },
+    "registration": "注册",
+    "deployTx": "部署交易",
+    "notIndexed": "未索引(在本次处理之前注册)",
+    "registeredAt": "注册于",
+    "idHex": "代币 ID(十六进制)",
+    "idText": "代币 ID(rpl1…)",
+    "mintNonce": "铸造 nonce",
+    "mintAuthority": "铸造权限",
+    "signingKey": "签名密钥",
+    "address": "地址",
+    "program": "程序",
+    "backings": "储备({count})",
+    "sourceChain": "源链",
+    "sourceToken": "源代币",
+    "sourceDecimals": "源小数位数",
+    "locked": "已锁定",
+    "mintedIn": "{window}内已铸造 / 上限",
+    "mintedToday": "今日已铸造 / 上限",
+    "roomToMint": "可铸造余量",
+    "roomToMintHelp": "当前上限允许存入该币种的最大额度:其自身上限减去已铸造量,且不超过所有代币在该时间窗口内的剩余总量。",
+    "supplyHistory": "供应量历史",
+    "empty": "尚未为该代币索引任何公开的铸造或销毁事件",
+    "historyHelp": "所有涉及该代币的 register_token(初始铸造)、token_mint 和 token_burn,按时间从旧到新排列——按设计公开,因为这使总供应量可审计。该代币票据的转账属于普通屏蔽转账,不会出现在此处。"
+  },
+  "validator": {
+    "releaseEpoch": "释放纪元",
+    "amount": "金额",
+    "notFound": "未找到验证者",
+    "notFoundMessage": "“{address}”不在验证者注册表中。",
+    "back": "返回验证者列表",
+    "loadError": "无法加载此验证者。",
+    "title": "验证者",
+    "active": "本纪元活跃",
+    "inactive": "不在当前验证者集合中",
+    "stake": "质押",
+    "rewards": "奖励",
+    "unwithdrawnFees": "未提取的手续费",
+    "share": "占活跃质押的份额",
+    "blocksProposed": "已提议区块",
+    "lastAgo": "最近 {ago}",
+    "registerEntry": "注册条目",
+    "address": "地址",
+    "payout": "收款地址",
+    "payoutUnknown": "此节点未提供",
+    "nonce": "注册 nonce",
+    "sortIndex": "排序索引",
+    "lastProposed": "最近提议的区块",
+    "never": "从未",
+    "unbonding": "解绑队列",
+    "unbondingEmpty": "没有正在解绑的质押",
+    "stakingTxs": "质押交易",
+    "stakingEmpty": "没有涉及该验证者的绑定、解绑、提取或铸造",
+    "recentBlocks": "最近的区块",
+    "blocksEmpty": "该验证者尚未提议任何区块"
+  },
+  "account": {
+    "title": "此链上没有账户",
+    "shielded": "RAND 是完全屏蔽的链。余额是一组只有其所有者的查看密钥才能打开的票据,交易不包含发送方、接收方或金额:只有承诺、作废符、密封信封、手续费和证明。",
+    "nothingToShow": "因此,浏览器无法显示任何地址的信息。公开的内容包括验证者注册表(质押、奖励、解绑队列)、承诺树和作废符集合、程序部署、调用回执以及桥自身的状态。",
+    "isValidator": "该地址是验证者:<a href=\"{href}\">查看其注册条目 →</a>",
+    "validators": "验证者 →",
+    "notes": "票据(承诺树)→"
+  },
+  "viewing": {
+    "leaf": "叶",
+    "height": "高度",
+    "transaction": "交易",
+    "genesis": "创世",
+    "deposit": "存入",
+    "role": "角色",
+    "amount": "金额",
+    "counterparty": "对手方(pk)",
+    "status": "状态",
+    "token": "代币",
+    "assetIndex": "资产 #{index}",
+    "spendable": "可花费余额",
+    "unspentNotes": "未花费票据",
+    "title": "我的历史",
+    "subtitle": "使用您的查看密钥扫描承诺树。浏览器从不接触该密钥;每个信封都在您的浏览器中打开。",
+    "scanTitle": "使用查看密钥扫描",
+    "scanned": {
+      "other": "已扫描 {scanned} / {n} 个叶"
+    },
+    "spendableHelp": "已收到的未花费票据,RAND;代币见下方",
+    "notesReceived": "已收到的票据",
+    "unspentCount": "{count} 个未花费",
+    "notesSent": "已发送的票据",
+    "address": "地址",
+    "pk": "pk {pk}…",
+    "shieldedAddress": "屏蔽地址:",
+    "empty": "此密钥无法打开链上的任何票据",
+    "footnote": "每一行都已在此浏览器中解密,并根据明文重新计算了其承诺。找零票据显示为已收到。"
+  },
+  "legal": {
+    "label": "法律",
+    "effective": "生效日期 {date}",
+    "contents": "目录",
+    "seeAlso": "另请参阅<a href=\"{href}\">{label}</a>。"
+  },
+  "privacy": {
+    "metaTitle": "隐私政策 — RandScan",
+    "metaDescription": "RandScan 收集什么、从不接触什么,以及保留已有数据的时长。",
+    "title": "隐私政策",
+    "effective": "2026 年 10 月 2 日",
+    "intro": "RandScan 展示的是公开账本,几乎不保存任何关于查看者的信息。本页准确说明浏览器能看到什么、存储什么、从不接触什么,以及任何数据的保留时长。",
+    "sections": [
+      {
+        "id": "scope",
+        "title": "我们是谁以及本政策的适用范围",
+        "body": [
+          "RandScan(randscan.org)是 Rand Protocol 的区块浏览器,由 Rand Protocol 团队(“我们”)运营。它为 Rand Protocol 网络的公开账本建立索引,并以网页、JSON API 和 WebSocket 推送的形式展示。本政策适用于网站、randscan.org/api 上的 API,以及您为获取 API 密钥而创建的账户。",
+          "浏览器的源代码以 MIT 许可证发布,因此此处所述的一切都可以对照软件的实际行为进行核实。"
+        ]
+      },
+      {
+        "id": "no-tracking",
+        "title": "我们不做的事",
+        "body": [
+          "RandScan 不运行任何分析、广告或跟踪脚本。字体由我们自己的服务器提供。任何页面均不加载第三方 JavaScript。我们没有 Cookie 横幅,因为没有需要征得同意的内容:仅有的 Cookie 是您从菜单中选择的语言(如果您选择了的话),以及下文所述的登录会话,后者仅在您登录后才会设置。",
+          "我们不会为任何人自身的目的出售、出租或与其共享个人数据。"
+        ]
+      },
+      {
+        "id": "chain-data",
+        "title": "公开区块链数据",
+        "body": [
+          "RandScan 展示的几乎所有内容都是 Rand Protocol 账本的副本:区块、交易、票据、验证者、程序、代币和桥活动。该账本按设计是公开的,并由网络上的每个节点复制。这些数据不是我们从您这里收集的,我们无法更改,也无法从中删除条目。",
+          "Rand Protocol 是一条屏蔽链。交易金额、发送方和接收方在账本上均被隐藏,浏览器只显示链上公开的内容:每笔交易的承诺、作废符(nullifier)和证明,以及链自身计算出的票据公开明文,例如手续费和跨链铸造。"
+        ]
+      },
+      {
+        "id": "viewing-keys",
+        "title": "查看密钥保留在您的浏览器中",
+        "body": [
+          "<a href=\"/viewing\">历史记录</a>页面和票据打开工具允许您粘贴查看密钥、交易密钥或钱包密钥文件,以读取您自己的屏蔽活动。解密在页面内运行,使用由浏览器自身代码编译而成的 WebAssembly 模块。粘贴的密钥只保存在页面内存中。它绝不会包含在发往我们服务器的任何请求中,绝不会写入 Cookie 或本地存储,并在您关闭或重新加载页面后消失。",
+          "页面确实会像任何访客一样,从我们的 API 获取所需的加密信封。因此我们能看到浏览器请求了哪些交易,但看不到其中打开了哪些交易,也看不到它们的内容。"
+        ]
+      },
+      {
+        "id": "visitors",
+        "title": "每次访问都会涉及什么",
+        "body": [
+          "与任何网络服务器一样,我们的服务器会接收您的 IP 地址、您请求的页面或端点,以及浏览器发送的请求头。我们将 IP 地址用于两件事:",
+          "- 限速。匿名流量按 IP 地址限速。计数器保存在服务器内存中,窗口为一分钟,不会写入数据库。",
+          "- 运行服务。在我们诊断问题期间,服务器和进程日志可能会记录请求。这些日志保留在服务器上,并在短时间后轮转删除。",
+          "首次访问主页时(仅此一次),我们会在自己服务器上保存的 DB-IP 国家数据库副本中查询您地址所属的国家,以选择网站打开时使用的语言。查询结果不会被存储,也不会发送给任何人。您从菜单中选择的语言会保存在名为 <code>lang</code> 的 Cookie 中,有效期一年,此后优先于按国家选择的语言。IP 地理定位由 <a href=\"https://db-ip.com\">DB-IP</a> 提供,采用 CC BY 4.0 许可。",
+          "您选择的主题(深色或浅色)保存在浏览器的本地存储中,键名为 <code>randscan-theme</code>。它不会离开您的设备。"
+        ]
+      },
+      {
+        "id": "map",
+        "title": "节点和证明者页面上的地图图块",
+        "body": [
+          "<a href=\"/nodes\">节点</a>和<a href=\"/provers\">证明者</a>页面会绘制一幅世界地图。底图图块由您的浏览器直接从 Esri 的 ArcGIS Online 图块服务加载,因此 Esri 会像处理任何地图请求一样收到您的 IP 地址和图块坐标。其他页面不会从第三方加载任何内容。",
+          "该地图上的标记用于定位网络中的对等节点和受委托证明者的主机。这些是网络自身发布的服务器地址,而不是访客。我们的索引器通过 ipwho.is 地理定位服务查询它们,并缓存其返回的城市、国家和服务商。访客的地址绝不会发送给地理定位服务。"
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "账户和 API 密钥",
+        "body": [
+          "无需账户即可使用 RandScan 上的全部功能。账户仅用于签发请求配额更高的 API 密钥。如果您创建账户,我们会存储:",
+          "- 您的电子邮件地址和账户创建时间;",
+          "- 您密码的 Argon2id 哈希值。我们无法读取密码本身,也绝不会将其发送到任何地方;",
+          "- 每个 API 密钥的名称、供您辨认的密钥前几个字符、密钥机密部分的 SHA-256 哈希值、创建时间和最后使用时间。机密部分仅显示一次,不会被存储;",
+          "- 登录会话:<code>randscan_session</code> Cookie 中的随机令牌(HttpOnly 和 SameSite),以及其保存在我们数据库中的哈希值。会话自最后一次使用起持续 30 天,并在您退出登录时删除。",
+          "使用 API 密钥发出的请求会计入该密钥以进行限速,所用的一分钟内存窗口与匿名流量相同。我们不会记录某个密钥调用了哪些端点或请求了什么内容。"
+        ]
+      },
+      {
+        "id": "email",
+        "title": "电子邮件",
+        "body": [
+          "我们只发送一种电子邮件:密码重置链接,且仅在您提出请求时发送。该邮件通过 Resend(resend.com)投递,Resend 会处理您的电子邮件地址和邮件内容以完成投递。重置链接一小时后失效。我们不发送新闻通讯或通知,也不会将您的地址用于任何其他用途。"
+        ]
+      },
+      {
+        "id": "hosting",
+        "title": "数据存放位置",
+        "body": [
+          "RandScan 运行在从 DigitalOcean 租用的位于新加坡的服务器上。存放账户、哈希凭据和会话的数据库就在该服务器上。备份(如有)出于相同目的保存相同的数据。使用本服务即表示您接受无论您身在何处,您的数据都将在该处被处理。"
+        ]
+      },
+      {
+        "id": "retention",
+        "title": "我们保留数据的时间",
+        "body": [
+          "- 限速计数器:一分钟,保存在内存中。",
+          "- 服务器日志:短时间,之后轮转删除。",
+          "- 会话:自最后一次使用起 30 天,或直到您退出登录。",
+          "- <code>lang</code> Cookie,即您从菜单中选择的语言:一年,保存在您的浏览器中。",
+          "- 密码重置令牌:一小时。",
+          "- 账户和 API 密钥:直到您要求我们删除。",
+          "- 公开链上数据:只要浏览器持续运行就会保留。它就是账本。"
+        ]
+      },
+      {
+        "id": "rights",
+        "title": "您的选择和权利",
+        "body": [
+          "您可以在<a href=\"/dashboard\">控制台</a>中撤销任何 API 密钥并退出任何会话。如需查看我们持有的有关您账户的数据、更正这些数据,或删除账户及其密钥,请使用账户对应的电子邮件地址<a href=\"#contact\">联系我们</a>。我们将在 30 天内处理。目前尚无自助删除按钮;我们会添加。",
+          "根据您所在的地区,您可能依据 GDPR 或 CCPA 等法律享有更多权利,包括向监管机构投诉的权利。本文任何内容均不限制这些权利。"
+        ]
+      },
+      {
+        "id": "contact",
+        "title": "联系方式和变更",
+        "body": [
+          "有关本政策的问题或有关您账户的请求,请通过浏览器的代码仓库提交给 Rand Protocol 团队:<a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>。",
+          "本政策变更时,新文本将连同新的生效日期显示在此处。会降低您隐私保护的变更将在生效前于浏览器上公布。本版本自 {effective} 起生效。"
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "服务条款 — RandScan",
+    "metaDescription": "RandScan(Rand Protocol 浏览器)及其 API 和账户的提供条款。",
+    "title": "服务条款",
+    "effective": "2026 年 10 月 1 日",
+    "intro": "RandScan 是一个免费、开源、通向公开账本的窗口。本条款说明该服务是什么、不是什么,其 API 和账户可以如何使用,以及我们承诺的限度。",
+    "sections": [
+      {
+        "id": "agreement",
+        "title": "协议",
+        "body": [
+          "本条款适用于您对 RandScan(randscan.org)的使用,包括网站、位于 randscan.org/api 的 JSON API、WebSocket 推送,以及通过它提供的账户和 API 密钥。RandScan 由 Rand Protocol 团队(“我们”)运营。使用其中任何部分即表示您接受本条款。如果您不接受,请勿使用本服务。",
+          "<a href=\"/privacy\">隐私政策</a>说明了本服务收集的内容,并构成本条款的一部分。"
+        ]
+      },
+      {
+        "id": "service",
+        "title": "RandScan 是什么,不是什么",
+        "body": [
+          "RandScan 是一个区块浏览器。它从全节点读取 Rand Protocol 网络的公开账本,对其建立索引并加以呈现。它是通向链的窗口,而不是链的一部分。",
+          "- 它不是钱包。它不持有资金、不持有花费密钥，也不托管任何资产，并且无法代您创建、签名或广播交易。",
+          "- 它不是桥。<a href=\"/bridge\">跨链桥</a>页面介绍记录在 Rand 链上的桥活动。桥本身由其守护者按其自身条款运营；存款、批准和结算均发生在源链上，应在源链上核实。",
+          "- 它不是建议。RandScan 上的任何内容都不构成财务、投资、法律或税务建议，也不构成买入或卖出任何资产的要约或招揽。"
+        ]
+      },
+      {
+        "id": "accuracy",
+        "title": "数据的准确性",
+        "body": [
+          "我们力求如实呈现区块链，且浏览器的代码对所有人开放，可供任何人核查。但您所看到的是由软件生成的副本，可能有误或有延迟：",
+          "- 索引器可能落后于链，或在其读取的节点重启期间停止；",
+          "- 如果链发生重组，浏览器曾显示的区块可能被替换；",
+          "- 当网络切换到新链时，浏览器的历史记录会重置为新的创世区块，之前那条链的数据不再提供；",
+          "- 隐私链在设计上隐藏金额和参与方，因此浏览器必然只能显示账本公开的内容，而代币名称等标签来自浏览器自己的列表，而非来自链；",
+          "- 节点和证明者的位置、版本及状态只是观察结果，不构成保证。",
+          "依赖链状态的决定，应对照您自己运行或信任的节点进行核查。我们不承诺 RandScan 上的任何数字是正确或最新的。"
+        ]
+      },
+      {
+        "id": "viewing",
+        "title": "查看密钥与票据打开器",
+        "body": [
+          "<a href=\"/viewing\">历史</a>页面使用您粘贴的密钥打开隐私票据。打开过程在您的浏览器中运行，密钥不会发送给我们，详见隐私政策。您仍须对自己处理的密钥负责：只在您信任的设备和浏览器上粘贴密钥，凡是查看密钥够用的地方就不要使用花费密钥，并请了解我们无法找回密钥，也无法撤销获得该密钥的人所能看到的内容。打开器的结果是对链的尽力解读，与此处其他所有数字一样，存在相同的局限。"
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "账户与 API 密钥",
+        "body": [
+          "使用 RandScan 无需账户。账户可获发请求配额更高的 API 密钥。如果您创建账户：",
+          "- 您必须提供由您掌控的电子邮件地址，并对密码保密；",
+          "- API 密钥是一种凭据。请勿将其放入客户端代码或公开仓库；如果泄露，请在您的<a href=\"/dashboard\">控制台</a>中将其撤销。使用您的密钥完成的一切操作都视为由您本人完成；",
+          "- 您最多可持有 10 个有效密钥，通常每人或每个系统只有一个账户；",
+          "- 您不得为超出配额而共享、出售或合并使用密钥，也不得通过自动化方式创建账户。",
+          "如果账户违反本条款、被滥用或长期未活动，我们可以暂停或删除该账户，或撤销其密钥。您可以随时停止使用本服务，并要求我们删除您的账户。"
+        ]
+      },
+      {
+        "id": "quotas",
+        "title": "配额与可接受的使用",
+        "body": [
+          "公开的读取端点免费。匿名流量按 IP 地址限制，带密钥的流量按密钥限制；当前数值公布在 <a href=\"https://github.com/randprotocol/randscan.org/blob/main/docs/api.md\">API 文档</a>中，可能会有变动。超出限制时，服务会返回 HTTP 429 和 Retry-After 标头，客户端应遵守。",
+          "您同意不得：",
+          "- 规避速率限制，例如轮换地址或密钥，或使用多个账户；",
+          "- 探测、扫描、使过载或以其他方式干扰本服务、其服务器或其背后的节点；",
+          "- 利用本服务违反法律、侵犯他人权利，或骚扰他人、对他人去匿名化；",
+          "- 不注明出处就将 RandScan 的数据当作您自己的数据展示，或暗示我们认可使用这些数据的某个产品。",
+          "在配额范围内批量读取公开数据是允许的。如果您需要更多，请运行您自己的节点和索引器；该软件是免费的。"
+        ]
+      },
+      {
+        "id": "ip",
+        "title": "软件、数据与标识",
+        "body": [
+          "浏览器的源代码以 MIT 许可证发布，您可以按该许可证的条款使用。RandScan 上显示的链数据是公开的，不属于任何人；您可以取用，但请注明来源。RandScan 的名称和标识以及 Rand Protocol 的名称和标识用于标示本服务和本网络，不得被用来暗示某项内容属于我们，而事实并非如此。"
+        ]
+      },
+      {
+        "id": "third-parties",
+        "title": "第三方",
+        "body": [
+          "RandScan 链接到其他网站和链，且地图页面从 Esri 的 ArcGIS Online 加载底图图块。这些服务有各自的条款。我们无法控制它们，也不对它们的行为或显示的内容负责。"
+        ]
+      },
+      {
+        "id": "warranty",
+        "title": "不作担保",
+        "body": [
+          "RandScan 按“现状”和“可用状态”提供，不附带任何明示或默示的担保，包括对准确性、可用性、适用于特定目的或不侵权的担保。它由一个小团队尽力运营；它可能无法使用、可能发生变化，也可能被撤下，且不论是否事先通知。"
+        ]
+      },
+      {
+        "id": "liability",
+        "title": "责任限制",
+        "body": [
+          "在法律允许的最大范围内，对于因您使用或无法使用 RandScan 或其上显示的任何内容而产生的任何损失或损害，我们概不负责。这包括资金损失、利润损失、数据损失，以及任何间接或后果性损失，无论由何种原因造成，即使我们已被告知有此可能。特别是，对于依据浏览器数据所作的决定、任何链上的交易或第三方的行为，我们不承担责任。在责任无法排除的情况下，责任以您为本服务向我们支付的金额为限，即零。",
+          "某些司法管辖区不允许某些免责。本条款的任何内容均不剥夺您依法享有且不可放弃的权利。"
+        ]
+      },
+      {
+        "id": "changes",
+        "title": "本条款的变更",
+        "body": [
+          "我们可能会变更本条款。当前文本始终位于 randscan.org/terms，并附有生效日期。如果变更属于重大变更，我们会在其生效前于浏览器上说明。变更后继续使用本服务，即表示您接受新条款。本版本自 {effective} 起生效。"
+        ]
+      },
+      {
+        "id": "general",
+        "title": "一般条款",
+        "body": [
+          "如果本条款的任何部分被认定为无法执行，其余部分仍然有效。我们未就违约采取行动并不构成弃权。本条款与隐私政策构成您与我们之间就 RandScan 达成的全部协议。如有疑问，请通过 <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a> 联系 Rand Protocol 团队。"
+        ]
+      }
+    ]
+  },
+  "home": {
+    "title": "Rand Protocol 浏览器",
+    "chain": "链 {id}",
+    "connecting": "正在连接网络…",
+    "blockHeight": "区块高度",
+    "nodeSyncing": "节点同步中",
+    "inSync": "已同步",
+    "validators": "验证者",
+    "activeStake": "活跃质押",
+    "transactions": "交易",
+    "programs": {
+      "other": "{n} 个程序"
+    },
+    "notes": "票据",
+    "spent": "已花费 {count}",
+    "avgBlockTime": "平均出块时间",
+    "peers": "对等节点",
+    "mempool": "内存池",
+    "epoch": "纪元",
+    "epochValue": {
+      "other": "{epoch}（{n} 个区块）"
+    },
+    "currentLeader": "当前领导者",
+    "facts": {
+      "totalSupply": "总供应量 {amount}",
+      "supplyUnavailable": "供应量审计不可用",
+      "view": "视图 {view}",
+      "treeRoot": "树根",
+      "bundleGuest": "捆绑 guest",
+      "faucetOn": "水龙头已启用",
+      "faucetOff": "水龙头已停用",
+      "confidentialOn": "机密调用已开启",
+      "confidentialOff": "机密调用已关闭",
+      "decimals": {
+        "other": "{symbol} 有 {n} 位小数"
+      },
+      "genesis": "创世",
+      "node": "节点 {version}",
+      "nodeSha": "节点 {version}（{sha}）"
+    },
+    "limits": {
+      "programs": {
+        "other": "限制：程序 {n} 字"
+      },
+      "proofs": "证明 {size}",
+      "blocks": "区块 {size}",
+      "callEnvelopes": "调用信封 {size}",
+      "publicInput": {
+        "other": "公开输入 {n} 字"
+      },
+      "publicInputOff": "公开输入已关闭",
+      "noteEnvelopesMemo": "备注笔记信封 {bytes} B(含备注)",
+      "noteEnvelopesNoMemo": "笔记信封 {bytes} B(无备注)",
+      "v6On": "v0.6 规则已启用",
+      "v6Off": "v0.6 规则未启用",
+      "authGuest": "访客授权",
+      "none": "无",
+      "proofWindow": {
+        "other": "证明窗口 {n} 个区块"
+      },
+      "bindingsGenesis": "绑定到创世哈希",
+      "bindingsChainId": "绑定到链 ID"
+    },
+    "network": {
+      "testnet": "网络:testnet(创世标记)",
+      "mainnet": "网络:主网",
+      "admission": "新验证者由验证者集合投票准入(<a href=\"/validators\">已准入密钥</a>)",
+      "slashing": {
+        "other": "双重签名罚没质押的 {percent},监禁 {n} 个纪元"
+      },
+      "slashingOff": "双重签名罚没已关闭"
+    },
+    "gas": {
+      "circuit": "Gas:链自身的 Gas 部分,在电路内计量",
+      "policy": "Gas:本节点的策略,按证明头定价",
+      "perGas": "每 Gas {amount}",
+      "perKiB": "每 KiB {amount}",
+      "ceilings": "上限 {gas} / Gas,{byte} / KiB",
+      "ceilingsPaying": "上限 {gas} / Gas,{byte} / KiB(仅付费字节会推动字节价格)",
+      "bundleLimit": "每个交易包声明 {gas} Gas",
+      "pricesMove": "价格每个区块按充盈度浮动 {percent}%",
+      "pricesFixed": "价格固定",
+      "programState": "程序状态已启用:每创建一个单元 {fee},每次调用最多 {reads} 次读取、{writes} 次写入和 {payouts} 次支付"
+    },
+    "latestBlocks": "最新区块",
+    "latestTransactions": "最新交易",
+    "viewAll": "查看全部 →"
+  },
+  "blocks": {
+    "title": "区块",
+    "error": "无法加载区块。",
+    "indexed": {
+      "other": "已索引 {n} 个区块"
+    },
+    "loading": "正在加载区块…"
+  },
+  "transactions": {
+    "title": "交易",
+    "kind": "类型",
+    "allKinds": "所有类型",
+    "kinds": {
+      "transfer": "转账(隐私)",
+      "mint": "铸造(水龙头)",
+      "deploy": "部署",
+      "call": "调用(保密)",
+      "bond": "质押",
+      "unbond": "解除质押",
+      "withdraw": "提取",
+      "bridge_attest": "跨链转入(证明)",
+      "bridge_burn": "跨链转出(销毁)",
+      "register_token": "代币已注册",
+      "token_mint": "代币铸造",
+      "set_authority": "代币权限已变更",
+      "token_burn": "代币销毁",
+      "pause_mints": "跨链铸造已暂停",
+      "unpause_mints": "跨链铸造已恢复",
+      "register_bridged_token": "跨链代币已上架",
+      "list_backing": "储备已上架",
+      "invoke": "调用(程序状态)",
+      "admit_validator": "验证者已准入(投票)",
+      "slash_equivocation": "双重签名已罚没",
+      "rotate_pq_guardians": "PQ 守护者已轮换",
+      "rotate_pause_key": "暂停密钥已轮换",
+      "rotate_pq_guardians_v2": "PQ 守护者轮换(延迟)",
+      "rotate_pause_key_v2": "暂停密钥轮换(延迟)",
+      "cancel_rotation": "轮换已取消",
+      "other": "其他"
+    },
+    "error": "无法加载交易。",
+    "count": {
+      "other": "{n} 笔交易"
+    },
+    "countOfKind": {
+      "other": "{n} 笔类型为 {kind} 的交易"
+    },
+    "loading": "正在加载交易…",
+    "empty": "未找到交易",
+    "emptyOfKind": "未找到{kind}交易"
+  },
+  "notes": {
+    "title": "笔记",
+    "columns": {
+      "leaf": "叶子",
+      "commitment": "承诺",
+      "height": "高度",
+      "createdBy": "创建者"
+    },
+    "genesis": "创世",
+    "deposit": "存入",
+    "error": "无法加载承诺树。",
+    "leaves": {
+      "other": "承诺树中有 {n} 个叶子"
+    },
+    "loading": "正在加载笔记…",
+    "created": "已创建笔记",
+    "createdSub": "树叶子",
+    "spent": "已花费笔记",
+    "spentSub": "已公布的作废符",
+    "treeRoot": "树根",
+    "treeRootSub": "钱包据以证明的锚点",
+    "empty": "尚未索引任何叶子",
+    "help": "每个笔记都是对隐藏所有者和金额的承诺。若承诺曾在网络上传输,叶子会显示创建它的交易;创世笔记、提取笔记和跨链存入笔记没有关联。某个作废符花费的是哪个叶子,永远不会公开。"
+  },
+  "programs": {
+    "title": "程序",
+    "columns": {
+      "program": "程序",
+      "deployedAt": "部署于",
+      "words": "字数",
+      "calls": "调用次数",
+      "lastCalled": "最近调用"
+    },
+    "never": "从未",
+    "error": "无法加载程序。",
+    "deployed": {
+      "other": "已部署 {n} 个程序"
+    },
+    "loading": "正在加载程序…",
+    "empty": "尚未部署任何程序"
+  },
+  "tokens": {
+    "title": "代币",
+    "authority": {
+      "none": "无(固定供应量)",
+      "key": "密钥签名",
+      "bridge": {
+        "other": "跨链桥({n} 项储备)"
+      },
+      "program": "程序"
+    },
+    "columns": {
+      "token": "代币",
+      "index": "索引",
+      "decimals": "小数位数",
+      "authority": "权限",
+      "totalSupply": "总供应量",
+      "registeredAt": "注册于",
+      "tokenId": "代币 ID"
+    },
+    "error": "无法加载代币注册表。",
+    "standard": "RPL 代币标准",
+    "disabled": "此链没有代币注册表:尚未注册任何 RPL 代币,且此版本的节点早于代币 RPC。所有转账均为 RAND。",
+    "registered": {
+      "other": "已注册 {n} 个 RPL 代币"
+    },
+    "registeredWithFee": {
+      "other": "已注册 {n} 个 RPL 代币 · 注册费 {fee} RAND"
+    },
+    "loading": "正在加载代币注册表…",
+    "empty": "尚未注册任何 RPL 代币",
+    "help": "代币的注册及其铸造按设计是公开的(规范 §4)——此处的数量和符号都是准确的。隐私的是谁持有代币的笔记,以及转账在谁之间进行:任何代币的转账在公开页面上都与普通 RAND 支付无法区分,代币的注册表索引也绝不会出现在转账的交易包中。"
+  },
+  "validators": {
+    "title": "验证者",
+    "columns": {
+      "validator": "验证者",
+      "epochSet": "纪元集合",
+      "stake": "质押",
+      "rewards": "奖励",
+      "unbonding": "解除质押中",
+      "share": "占比",
+      "blocksProposed": "已提议区块",
+      "lastProposed": "最近提议"
+    },
+    "active": "活跃",
+    "inactive": "不活跃",
+    "never": "从未",
+    "error": "无法加载验证者登记册。",
+    "subtitle": "已登记 {total} 个,其中 {active} 个活跃 · {stake}",
+    "activeStake": "活跃质押",
+    "loading": "正在加载验证者…",
+    "empty": "未报告任何验证者",
+    "admission": "新验证者由验证者集合投票准入(审计 v6):注册新密钥的质押需要先有一次 <code>admit_validator</code>。",
+    "noneAdmitted": "没有已准入且等待注册的密钥。",
+    "admittedWaiting": {
+      "other": "{n} 个已准入,尚未注册:"
+    },
+    "help": "登记册是此链唯一以明文存储金额的地方。活跃验证者是运行当前纪元的集合;视图 v 的领导者是按地址顺序排列的第 v mod n 个活跃条目。"
+  },
+  "provers": {
+    "title": "证明者",
+    "subtitle": "委托证明者:无法自行生成证明的钱包将其交易包发往何处,以及这些机器位于何处",
+    "error": "无法加载证明者。",
+    "columns": {
+      "host": "主机",
+      "prover": "证明者",
+      "location": "位置",
+      "network": "网络"
+    },
+    "notLocated": "尚未定位",
+    "status": {
+      "answering": "正常响应",
+      "notChecked": "尚未检查",
+      "notAnswering": "无响应"
+    },
+    "panel": {
+      "endpoint": "端点",
+      "operator": "运营者",
+      "fingerprint": "指纹",
+      "endpointReports": "端点报告的是 {fingerprint}",
+      "endpointReportsOther": "端点报告的是另一个密钥",
+      "capacity": "容量",
+      "capacityValue": {
+        "other": "{proving} 个正在证明 · {depth} 个等待中 · {n} 个槽位"
+      },
+      "capacityNote": "(每个成员一次处理一个交易包)",
+      "fee": "费用",
+      "feeValue": "每个交易包 {amount}",
+      "free": "免费",
+      "proves": "证明内容",
+      "jobs": "{kinds} 任务",
+      "provesValue": "{jobs},后端 {backend} · 版本 {version}",
+      "unknownBuild": "未知",
+      "lastChecked": "最近检查",
+      "lastAnswered": "最近响应 {time}",
+      "error": "错误",
+      "pairing": "配对"
+    },
+    "stats": {
+      "provers": "证明者",
+      "answering": "{count} 个正常响应",
+      "hosts": "证明者主机",
+      "countries": "国家/地区",
+      "slots": "任务槽位",
+      "slotsSub": "空闲与忙碌,正常响应的证明者"
+    },
+    "hosts": "证明者主机",
+    "empty": "此浏览器不知道任何证明者",
+    "hostsHelp": "证明者池在同一个地址响应,并将每个任务分派给有空闲槽位的成员主机,因此主机在此处的位置来自浏览器自己的列表,而非在网络上发现。位置来自各主机的公网 IP;地址本身不予显示。",
+    "help": "委托证明者根据以其密钥封装的任务,为钱包生成交易包证明。它会收到钱包的查看密钥,但绝不会收到花费密钥:运行它的人可以读取该钱包的历史记录,仅此而已。任何人都可以运行自己的证明者(<code>rand-prover</code>),并将钱包与之配对。"
+  },
+  "nodes": {
+    "title": "节点",
+    "subtitle": "运行 Rand Protocol 的全节点,按对等节点地址定位",
+    "error": "无法从节点加载对等节点列表。",
+    "columns": {
+      "role": "角色",
+      "peerId": "对等节点 ID",
+      "address": "地址",
+      "location": "位置",
+      "network": "网络",
+      "connected": "已连接"
+    },
+    "roles": {
+      "validator": "验证者",
+      "observer": "观察者",
+      "peer": "对等节点"
+    },
+    "thisNode": "本节点",
+    "unknownLocation": "位置未知",
+    "stats": {
+      "nodes": "节点",
+      "geolocated": "已定位",
+      "withoutLocation": "{count} 个无位置信息",
+      "countries": "国家/地区"
+    },
+    "peers": "对等节点",
+    "empty": "当前没有已连接的对等节点"
+  },
+  "search": {
+    "title": "搜索",
+    "subtitle": "查找区块、交易、程序、笔记和验证者",
+    "help": "可按区块高度搜索;可按 64 位字符的哈希搜索,它可以是区块、交易、程序 ID、笔记承诺或作废符;也可按 base58 验证者地址搜索。此链上没有账户。",
+    "searching": "正在搜索“{query}”…",
+    "resultsFor": "“{query}”的搜索结果",
+    "error": "搜索请求失败。",
+    "noResults": "无结果",
+    "nothingMatches": "链上没有与“{query}”匹配的内容。",
+    "resultsCount": {
+      "other": "“{query}”共有 {n} 条结果"
+    },
+    "types": {
+      "block": "区块",
+      "transaction": "交易",
+      "validator": "验证者",
+      "program": "程序",
+      "note": "笔记",
+      "nullifier": "作废符"
+    }
+  },
+  "dashboard": {
+    "account": "账户",
+    "title": "API 密钥",
+    "signOut": "退出登录",
+    "requestFailed": "请求失败",
+    "newKey": {
+      "title": "新密钥",
+      "copyNow": "请立即复制您的密钥。出于安全考虑,它只显示一次;如果丢失,请将其撤销并另外创建一个。"
+    },
+    "create": {
+      "title": "创建密钥",
+      "name": "名称",
+      "placeholder": "例如:交易所充值监控",
+      "submit": "新密钥",
+      "limits": "最多可有 10 个有效密钥。使用密钥的请求为每分钟 600 次;匿名流量为每个 IP 每分钟 60 次。请参阅 <a href=\"https://github.com/randprotocol/randscan/blob/main/docs/api.md\">API 指南</a>。"
+    },
+    "activeKeys": "有效密钥({count})",
+    "keysError": "无法加载您的密钥。",
+    "noActiveKeys": "暂无有效密钥。",
+    "activeKeyMeta": {
+      "other": "创建于 {created} · 最近使用 {lastUsed} · {n} 次请求"
+    },
+    "revoke": "撤销",
+    "revokedKeys": "已撤销密钥({count})",
+    "revokedKeyMeta": {
+      "other": "撤销于 {revoked} · {n} 次请求"
+    },
+    "changePassword": "修改密码",
+    "email": "电子邮箱",
+    "memberSince": "注册时间",
+    "lastSignIn": "最近登录"
+  }
+}

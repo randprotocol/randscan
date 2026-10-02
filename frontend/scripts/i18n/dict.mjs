@@ -44,3 +44,21 @@ export const marks = (s) =>
 export const NEVER = /(^|\.)(id|href|url|slug|code|symbol|hash|method|example|cmd|curl)$/;
 
 export const pluralCategories = (tag) => new Intl.PluralRules(tag).resolvedOptions().pluralCategories;
+
+/**
+ * Whether a plural form may leave out {n}: only when the form covers exactly one number (Arabic
+ * "zero"/"one"/"two", English "one"), so the words alone say how many. Russian "one" also covers
+ * 21, 31…, so its {n} must stay.
+ */
+export function nOptional(tag, category) {
+  const rules = new Intl.PluralRules(tag);
+  let hits = 0;
+  for (let i = 0; i <= 1000 && hits < 2; i++) if (rules.select(i) === category) hits++;
+  return hits === 1;
+}
+
+/** The marks of one plural form, without {n} where the form may leave it out. */
+export function formMarks(tag, category, s) {
+  const m = marks(s);
+  return nOptional(tag, category) ? m.split(' ').filter((x) => x !== '{n}').join(' ') : m;
+}

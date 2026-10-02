@@ -1,1 +1,1447 @@
-{}
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Peneroka Rand Protocol",
+    "metaDescription": "Terokai blok, transaksi, akaun, pengesah dan program sulit pada rangkaian Rand Protocol.",
+    "language": "Bahasa",
+    "englishGoverns": "Terjemahan ini disediakan untuk kemudahan; teks bahasa Inggeris adalah yang terpakai.",
+    "loading": "Memuatkan…",
+    "retry": "Cuba lagi",
+    "copy": "Salin",
+    "copied": "Disalin",
+    "live": "Langsung",
+    "offline": "Luar talian",
+    "notFound": "Tidak dijumpai",
+    "backToDashboard": "Kembali ke papan pemuka",
+    "somethingWrong": "Sesuatu telah berlaku",
+    "apiUnreachable": "API peneroka tidak dapat dicapai. Sila cuba lagi.",
+    "previousPage": "Halaman sebelumnya",
+    "nextPage": "Halaman seterusnya"
+  },
+  "fmt": {
+    "units": "unit",
+    "assetUnits": "{units} unit aset #{index}",
+    "bridged": "{tokens} token ({units} unit)",
+    "chain": "rantaian {id}",
+    "unknownLocation": "Lokasi tidak diketahui"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "Papan pemuka",
+      "blocks": "Blok",
+      "transactions": "Transaksi",
+      "notes": "Nota",
+      "history": "Sejarah",
+      "validators": "Pengesah",
+      "provers": "Pembukti",
+      "programs": "Program",
+      "tokens": "Token",
+      "bridge": "Jambatan",
+      "nodes": "Nod"
+    },
+    "apiKeys": "Kunci API",
+    "signIn": "Log masuk",
+    "toggleNav": "Togol navigasi"
+  },
+  "footer": {
+    "blurb": "RandScan ialah peneroka untuk Rand Protocol.",
+    "privacy": "Privasi",
+    "terms": "Terma"
+  },
+  "bridge": {
+    "title": "Jambatan",
+    "subtitle": "Token dikunci pada Ethereum, BSC, Solana dan Tron dan dicetak di sini sebagai nota terlindung. Nilai yang dijambatankan ialah nota, maka tiada baki: hanya apa yang masuk dan apa yang keluar.",
+    "loadError": "Tidak dapat memuatkan keadaan jambatan.",
+    "noSection": "Rantaian {chain} tidak mempunyai bahagian jambatan dalam genesisnya: tiada penjaga, tiada daftar aset dan tiada nota yang dijambatankan lagi. Rantaian sumber dan token yang diluluskan di bawah ialah apa yang akan diterima oleh jambatan setelah rantaian dengan bahagian jambatan berjalan.",
+    "byChain": "Token yang dijambatankan mengikut rantaian sumber",
+    "openOn": "Buka pada peneroka {chain}",
+    "openOnChain": "Buka pada peneroka rantaian",
+    "floorTitle": "Paras ulang main yang ditetapkan pada genesis. Kunci dengan jujukan yang lebih rendah telah pun dicetak pada rantaian tempat rantaian ini dipotong, atau milik operator sendiri pada kontrak yang dikerahkan semula, dan tidak akan dicetak di sini.",
+    "stats": {
+      "in": "Dijambatankan masuk",
+      "inSub": "deposit disahkan",
+      "out": "Dijambatankan keluar",
+      "outSub": "pembakaran dilepaskan",
+      "assets": "Aset dilihat",
+      "noActive": "belum ada rantaian sumber yang aktif",
+      "from": "daripada {chains}",
+      "approved": "Token diluluskan",
+      "approvedSub": "USDT dan USDC pada empat rantaian"
+    },
+    "activity": {
+      "token": "Token",
+      "asset": "Aset",
+      "in": "Dijambatankan masuk",
+      "out": "Dijambatankan keluar",
+      "fees": "Yuran pada pembakaran",
+      "feesTitle": "Yuran jambatan v0.6.8 disimpan sebagai nota zUSD daripada pembakaran syiling ini; 'Dijambatankan keluar' hanya mengira apa yang dilepaskan dan meninggalkan baki terkunci.",
+      "outstanding": "Pada Rand sekarang",
+      "locked": "Dikunci (daftar)",
+      "minted": "Dicetak / had",
+      "inLast": "dalam {window} yang lalu",
+      "today": "hari ini",
+      "headroom": "Ruang untuk dicetak",
+      "headroomMissing": "Disediakan oleh nod selepas v0.6.7.",
+      "headroomTitle": "Deposit terbesar yang dibenarkan oleh had untuk syiling ini sekarang: hadnya sendiri ditolak apa yang telah dicetaknya, dan tidak melebihi baki semua token bersama dalam tetingkap.",
+      "last": "Aktiviti terakhir",
+      "notApproved": "tiada dalam senarai yang diluluskan",
+      "na": "t/a",
+      "naTitle": "Deposit menerbitkan token yang dicetaknya, bukan syiling sumber yang dikunci, maka ia tidak boleh dikaitkan dengan satu syiling bagi token berbilang syiling.",
+      "transactions": {
+        "other": "{n} transaksi"
+      }
+    },
+    "source": {
+      "contract": "kontrak jambatan",
+      "noContract": "tiada kontrak jambatan didaftarkan untuk rantaian ini",
+      "floor": "kunci dari jujukan {sequence}",
+      "inOut": "{in} masuk, {out} keluar",
+      "out": "{out} keluar",
+      "empty": "Belum ada apa-apa yang dijambatankan daripada {name} · id rantaian {chain}"
+    },
+    "tokens": {
+      "title": "Token diluluskan",
+      "intro": "Jambatan menerima token ini dan tiada yang lain. Hantar hanya ke kontrak jambatan pada rantaian token itu sendiri; deposit mana-mana token lain ditolak oleh kontrak, dan deposit token yang diluluskan pada rantaian yang salah ialah aset yang berbeza pada Rand.",
+      "empty": "Tiada token diluluskan",
+      "noteOn": "{symbol} pada {chain}:",
+      "decimalsNote": "Jumlah pada Rand sentiasa mempunyai 8 tempat perpuluhan, walau berapa pun yang dimiliki token di asalnya; kontrak jambatan menukar semasa masuk dan keluar. Daftar menyimpan setiap alamat sebagai perkataan 32 bait: alamat Ethereum, BSC atau Tron dilapik sifar di kiri, mint Solana seperti sedia ada.",
+      "token": "Token",
+      "chain": "Rantaian",
+      "address": "Alamat kontrak",
+      "decimals": "Tempat perpuluhan",
+      "onRand": "8 pada Rand",
+      "status": "Status",
+      "allowed": "dibenarkan",
+      "discontinued": "dihentikan"
+    },
+    "registry": {
+      "title": "Daftar aset",
+      "empty": "Belum ada aset yang dijambatankan didaftarkan",
+      "note": "Daftar nod sendiri, diisi pada deposit pertama setiap aset. Indeks ialah perkataan aset yang dibawa oleh nota yang dijambatankan; indeks 0 ialah RAND dan tidak pernah ada dalam daftar.",
+      "index": "Indeks",
+      "sourceChain": "Rantaian sumber",
+      "token": "Token",
+      "unknown": "tidak diketahui",
+      "tokenAddress": "Alamat token (32 bait)",
+      "assetId": "ID aset"
+    },
+    "state": {
+      "title": "Keadaan jambatan",
+      "mintPause": "Jeda pencetakan",
+      "paused": "Dijeda — pengesahan pindahan ditolak (pembakaran dan pusingan kekal terbuka)",
+      "notPaused": "Tidak dijeda",
+      "pauseNonce": "Nonce jeda / nyahjeda",
+      "listNonce": "Nonce senarai",
+      "registrationFee": "Yuran pendaftaran",
+      "pqGuardians": "Penjaga PQ ({count})",
+      "pqGuardiansText": {
+        "other": "{n} kunci Dilithium2, sejajar indeks dengan set penjaga klasik di bawah. Setiap pengesahan deposit dan setiap tindakan tadbir urus yang memerlukan kuorum ditandatangani bersama oleh set ini; pusingan tidak pernah mengalihkannya."
+      },
+      "pauseKey": "Kunci jeda",
+      "outboundEmitter": "Pemancar keluar",
+      "guardianSet": "Set penjaga",
+      "guardians": "Penjaga ({count})",
+      "messagesEmitted": "Mesej dipancarkan",
+      "nextIndex": "Indeks aset seterusnya",
+      "fees": "Yuran jambatan",
+      "feeRates": "{in} masuk / {out} keluar",
+      "feeBps": "({in} / {out} bps), dicetak sebagai nota zUSD kepada",
+      "feesCollected": "dikutip setakat ini: <code>{deposits}</code> pada deposit, <code>{burns}</code> pada pembakaran. Deposit mengunci jumlah kasarnya dan mencetak nota penerima serta nota yuran; pembakaran melepaskan jumlah bakar ditolak yuran dan mencetak semula yuran itu, maka bekalan = Σ dikunci = jagaan masih berpegang. Nota yuran tidak mempunyai sampul.",
+      "rotationRules": "Peraturan pusingan",
+      "rotationDelay": "pusingan berkuat kuasa {delay} selepas ia dikomit",
+      "rotationDelayPossession": "pusingan berkuat kuasa {delay} selepas ia dikomit, dan mesti membawa bukti pemilikan setiap pemegang baharu",
+      "pendingPauseKey": "pusingan kunci jeda belum selesai, berkuat kuasa <code>{at}</code>",
+      "pendingPq": "pusingan penjaga PQ belum selesai, berkuat kuasa <code>{at}</code>",
+      "noPending": "tiada pusingan belum selesai",
+      "rotationNonce": "Nonce pusingan",
+      "mintCapAll": "Had pencetakan, semua token",
+      "mintCapPer": "setiap {window}, merentas setiap sandaran bagi setiap token bersama",
+      "mintedInWindow": "dicetak dalam tetingkap ini <code>{minted}</code>, ruang untuk <code>{room}</code> lagi",
+      "trustedEmitters": "Pemancar dipercayai ({count})",
+      "asStored": "seperti yang disimpan oleh rantaian",
+      "floorMinted": "kunci dicetak dari jujukan {sequence}"
+    }
+  },
+  "auth": {
+    "login": {
+      "metaTitle": "Log masuk — RandScan"
+    },
+    "signup": {
+      "metaTitle": "Cipta akaun — RandScan"
+    },
+    "form": {
+      "intro": "Akaun membolehkan anda mencipta kunci API dengan kuota permintaan yang lebih tinggi.",
+      "email": "E-mel",
+      "password": "Kata laluan",
+      "minLength": "Sekurang-kurangnya 10 aksara.",
+      "forgotLink": "Lupa kata laluan anda?",
+      "pleaseWait": "Sila tunggu…",
+      "requestFailed": "Permintaan gagal",
+      "login": {
+        "title": "Log masuk",
+        "button": "Log masuk",
+        "alt": "Belum ada akaun?",
+        "altLabel": "Cipta satu"
+      },
+      "signup": {
+        "title": "Cipta akaun",
+        "button": "Cipta akaun",
+        "alt": "Sudah berdaftar?",
+        "altLabel": "Log masuk",
+        "terms": "Dengan mencipta akaun, anda menerima <a href=\"/terms\">Terma Perkhidmatan</a> dan <a href=\"/privacy\">Dasar Privasi</a>."
+      }
+    },
+    "forgot": {
+      "metaTitle": "Lupa kata laluan — RandScan",
+      "title": "Lupa kata laluan anda?",
+      "intro": "Masukkan e-mel akaun anda dan kami akan menghantar pautan untuk memilih kata laluan baharu. Pautan ini berfungsi selama satu jam.",
+      "sent": "Jika akaun wujud untuk <code>{email}</code>, pautan tetapan semula sedang dihantar. Semak folder spam anda jika ia tidak sampai dalam beberapa minit.",
+      "backToSignIn": "Kembali ke log masuk",
+      "button": "Hantar pautan tetapan semula",
+      "remembered": "Sudah ingat?",
+      "signIn": "Log masuk"
+    },
+    "reset": {
+      "metaTitle": "Tetapkan semula kata laluan — RandScan",
+      "title": "Tetapkan semula kata laluan",
+      "missingToken": "Pautan ini tiada tokennya. Buka pautan daripada e-mel, atau minta yang baharu.",
+      "requestLink": "Minta pautan baharu",
+      "choose": "Pilih kata laluan baharu",
+      "signedOut": "Anda akan dilog keluar daripada setiap peranti lain.",
+      "newPassword": "Kata laluan baharu",
+      "confirm": "Sahkan kata laluan baharu",
+      "mismatch": "Kedua-dua kata laluan tidak sepadan.",
+      "button": "Tetapkan kata laluan baharu",
+      "expired": "Pautan tamat tempoh?",
+      "requestNew": "Minta yang baharu"
+    },
+    "change": {
+      "current": "Kata laluan semasa",
+      "done": "Kata laluan ditukar. Peranti lain telah dilog keluar.",
+      "button": "Tukar kata laluan"
+    }
+  },
+  "components": {
+    "dataTable": {
+      "empty": "Tiada data tersedia"
+    },
+    "tables": {
+      "blocks": {
+        "height": "Ketinggian",
+        "hash": "Hash",
+        "proposer": "Pencadang",
+        "txs": "Txs",
+        "view": "Lihat",
+        "age": "Usia",
+        "empty": "Belum ada blok diindeks"
+      },
+      "txs": {
+        "hash": "Tx hash",
+        "kind": "Jenis",
+        "height": "Ketinggian",
+        "action": "Tindakan",
+        "fee": "Yuran",
+        "age": "Usia",
+        "empty": "Tiada transaksi dijumpai",
+        "hiddenTitle": "Penghantar, penerima dan jumlah disembunyikan dalam bundle",
+        "shielded": "terlindung",
+        "noFeeTitle": "Tindakan ditandatangani pengesah: tiada bundle, tiada yuran"
+      }
+    },
+    "search": {
+      "placeholder": "Cari mengikut ketinggian, cincang, alamat atau program",
+      "ariaLabel": "Cari dalam peneroka"
+    },
+    "theme": {
+      "toLight": "Tukar ke tema cerah",
+      "toDark": "Tukar ke tema gelap",
+      "light": "Tema cerah",
+      "dark": "Tema gelap"
+    },
+    "nodeMap": {
+      "thisNode": "{role} · nod ini",
+      "connected": "Bersambung {time}",
+      "copyPeerId": "Salin id rakan"
+    },
+    "openedNotes": {
+      "received": "Diterima",
+      "sent": "Dihantar",
+      "openedWithTxKey": "Dibuka dengan kunci tx",
+      "unspent": "belum dibelanjakan",
+      "spentIn": "dibelanjakan dalam",
+      "leaf": "daun #{n}",
+      "feeHint": "nota yuran jambatan: ia tidak mempunyai sampul (dimeterai kepada tiada sesiapa), jadi hanya kunci pelihat penerima yuran menemuinya, dengan membinanya semula daripada medan awam",
+      "notIndexed": "sampul belum diindeks",
+      "notOpened": "tidak dibuka oleh kunci ini (atau slot palsu, dimeterai kepada tiada sesiapa)",
+      "amount": "Jumlah",
+      "owner": "Pemilik (pk)",
+      "createdBy": "Dicipta oleh (pk)",
+      "noteTime": "Masa nota",
+      "commitment": "Komitmen",
+      "verifiedRebuilt": "disahkan ✓ (dibina semula daripada medan awam dengan pk kunci ini, dan sama dengan daun)",
+      "verifiedRecomputed": "disahkan ✓ (dikira semula daripada teks biasa)",
+      "nullifier": "Nullifier",
+      "status": "Status",
+      "noTranscript": "Panggilan ini tidak menerbitkan transkrip input.",
+      "transcriptNotOpened": "Transkrip input tidak dibuka oleh kunci ini.",
+      "caller": "Pemanggil",
+      "auditor": "Juruaudit",
+      "openedWithCallKey": "Dibuka dengan kunci panggilan",
+      "callInputs": "Input panggilan",
+      "privateInputs": "Input persendirian",
+      "salt": "Salt",
+      "faithful": "setia kepada H_IN ✓",
+      "falseTranscript": "TIDAK sepadan dengan H_IN: pemanggil menerbitkan transkrip palsu"
+    },
+    "txOpener": {
+      "noNotes": "Transaksi ini tidak mencipta sebarang nota dengan sampul (tiada apa yang boleh dibuka oleh kunci)."
+    },
+    "keyPanel": {
+      "title": "Buka dengan kunci",
+      "kinds": {
+        "viewing": "Kunci pelihat (nk)",
+        "spend": "Kunci perbelanjaan",
+        "tx": "Kunci transaksi",
+        "call": "Kunci panggilan"
+      },
+      "kindsLower": {
+        "viewing": "kunci pelihat (nk)",
+        "spend": "kunci perbelanjaan",
+        "tx": "kunci transaksi",
+        "call": "kunci panggilan"
+      },
+      "invalidWithFile": "Kunci ialah 64 aksara heks, atau kandungan fail kunci dompet (wallet.key.json).",
+      "invalidKinds": "{kinds} ialah 64 aksara heks.",
+      "placeholderFile": "64 aksara heks, atau tampal wallet.key.json",
+      "placeholder": "64 aksara heks",
+      "keyFileDetected": "fail kunci dikesan",
+      "opening": "Membuka…",
+      "open": "Buka",
+      "remember": "ingat untuk tab ini",
+      "preferViewing": "Utamakan kunci pelihat: kunci perbelanjaan boleh memindahkan dana. Halaman ini menerbitkan kunci pelihat secara setempat dan hanya menyimpannya dalam memori."
+    }
+  },
+  "kinds": {
+    "transfer": {
+      "label": "Pindahan (terlindung)",
+      "short": "Pindahan"
+    },
+    "mint": {
+      "label": "Cetak (faucet)",
+      "short": "Cetak"
+    },
+    "deploy": {
+      "label": "Gunakan",
+      "short": "Gunakan"
+    },
+    "call": {
+      "label": "Panggilan (sulit)",
+      "short": "Panggilan"
+    },
+    "bond": {
+      "label": "Ikat",
+      "short": "Ikat"
+    },
+    "unbond": {
+      "label": "Nyahikat",
+      "short": "Nyahikat"
+    },
+    "withdraw": {
+      "label": "Keluarkan",
+      "short": "Keluarkan"
+    },
+    "bridge_attest": {
+      "label": "Jambatan masuk (perakuan)",
+      "short": "Jambatan masuk"
+    },
+    "bridge_burn": {
+      "label": "Jambatan keluar (bakar)",
+      "short": "Jambatan keluar"
+    },
+    "register_token": {
+      "label": "Token didaftarkan",
+      "short": "Daftar token"
+    },
+    "token_mint": {
+      "label": "Cetakan token",
+      "short": "Cetakan token"
+    },
+    "set_authority": {
+      "label": "Pihak berkuasa token diubah",
+      "short": "Tetapkan pihak berkuasa"
+    },
+    "token_burn": {
+      "label": "Pembakaran token",
+      "short": "Pembakaran token"
+    },
+    "pause_mints": {
+      "label": "Pencetakan jambatan dijeda",
+      "short": "Jeda pencetakan"
+    },
+    "unpause_mints": {
+      "label": "Pencetakan jambatan disambung semula",
+      "short": "Sambung pencetakan"
+    },
+    "register_bridged_token": {
+      "label": "Token jambatan disenaraikan",
+      "short": "Senarai token"
+    },
+    "list_backing": {
+      "label": "Sandaran disenaraikan",
+      "short": "Senarai sandaran"
+    },
+    "invoke": {
+      "label": "Panggil (keadaan program)",
+      "short": "Panggil"
+    },
+    "admit_validator": {
+      "label": "Pengesah diterima (undian)",
+      "short": "Terima"
+    },
+    "slash_equivocation": {
+      "label": "Equivocation dihukum potong",
+      "short": "Potong"
+    },
+    "rotate_pq_guardians": {
+      "label": "Penjaga PQ diputar",
+      "short": "Putar PQ"
+    },
+    "rotate_pause_key": {
+      "label": "Kunci jeda diputar",
+      "short": "Putar jeda"
+    },
+    "rotate_pq_guardians_v2": {
+      "label": "Putaran penjaga PQ (tertangguh)",
+      "short": "Putar PQ"
+    },
+    "rotate_pause_key_v2": {
+      "label": "Putaran kunci jeda (tertangguh)",
+      "short": "Putar jeda"
+    },
+    "cancel_rotation": {
+      "label": "Putaran dibatalkan",
+      "short": "Batal putaran"
+    },
+    "other": {
+      "label": "Lain-lain",
+      "short": "Lain-lain"
+    }
+  },
+  "roles": {
+    "validator": "Pengesah",
+    "observer": "Pemerhati",
+    "peer": "Rakan sebaya"
+  },
+  "block": {
+    "notFound": "Blok tidak ditemui",
+    "notFoundMessage": "Tiada blok sepadan dengan \"{id}\". Blok boleh dicari mengikut ketinggian atau cincangan 64 aksara.",
+    "back": "Kembali ke blok",
+    "loadError": "Tidak dapat memuatkan blok ini.",
+    "title": "Blok #{height}",
+    "overview": "Gambaran keseluruhan",
+    "height": "Ketinggian",
+    "hash": "Hash",
+    "parent": "Induk",
+    "genesis": "Genesis (tiada induk)",
+    "proposer": "Pencadang",
+    "timestamp": "Cap masa",
+    "view": "Pandangan",
+    "justifyView": "Pandangan pengesahan",
+    "transactions": "Transaksi",
+    "txRoot": "Punca transaksi",
+    "stateRoot": "Punca keadaan",
+    "txHeading": "Transaksi ({count})",
+    "previous": "← Blok sebelumnya",
+    "empty": "Blok ini tidak mengandungi sebarang transaksi"
+  },
+  "tx": {
+    "notFound": "Transaksi tidak ditemui",
+    "notFoundMessage": "Tiada transaksi sepadan dengan \"{hash}\". Hanya transaksi yang telah disahkan diindeks.",
+    "back": "Kembali ke transaksi",
+    "loadError": "Tidak dapat memuatkan transaksi ini.",
+    "title": "Transaksi",
+    "overview": "Gambaran keseluruhan",
+    "hash": "Hash",
+    "kind": "Jenis",
+    "block": "Blok",
+    "indexInBlock": "Indeks dalam blok",
+    "timestamp": "Cap masa",
+    "fee": "Yuran",
+    "noFee": "Tiada (tiada bundel)",
+    "bundle": "Bundel",
+    "bundleYes": "Ya: dibayar daripada nota milik pengirim sendiri, dibuktikan dengan STARK",
+    "bundleNo": "Tidak: ditandatangani oleh kuorum pengesah atau penjaga",
+    "chainId": "ID rantaian",
+    "kindDetails": "Butiran {kind}",
+    "program": "Program",
+    "callProofSize": "Saiz bukti panggilan",
+    "inputTranscript": "Transkrip input",
+    "sealed": "{size} dimeterai",
+    "amount": "Jumlah",
+    "amountBurned": "Jumlah dibakar",
+    "asset": "Aset",
+    "assetIndex": "aset #{index}",
+    "recipient": "Penerima",
+    "noteTime": "Masa nota",
+    "token": "Token",
+    "name": "Nama",
+    "symbol": "Symbol",
+    "decimals": "Perpuluhan",
+    "authority": "Pihak berkuasa",
+    "registryIndex": "Indeks pendaftaran",
+    "mintNonce": "Nonce cetakan",
+    "nonce": "Nonce",
+    "none": "Tiada",
+    "sourceChain": "Rantaian sumber",
+    "sourceToken": "Token sumber",
+    "sourceDecimals": "Perpuluhan sumber",
+    "pqCoSigners": "Penandatangan bersama penjaga PQ",
+    "bridgeFee": "Yuran jambatan",
+    "feeNoteLeaf": "nota kepada penerima yuran, daun",
+    "cells": {
+      "key": "kunci",
+      "wrote": "ditulis",
+      "read": "dibaca",
+      "zerosDeleted": "sifar — sel dipadamkan",
+      "zerosAbsent": "sifar — sel tidak wujud"
+    },
+    "payout": {
+      "nth": "pembayaran {n}",
+      "to": "kepada",
+      "note": "nota"
+    },
+    "invoke": {
+      "nonePublished": "Tiada yang diterbitkan",
+      "intoVault": "Ke dalam peti besi",
+      "noRand": "tiada RAND",
+      "and": "dan",
+      "destroyed": "— dimusnahkan (token milik program itu sendiri)",
+      "deposited": "— didepositkan",
+      "cellsRead": "Sel dibaca ({count})",
+      "cellsWritten": "Sel ditulis ({count})",
+      "paidOut": "Dibayar keluar ({count})",
+      "minted": "Dicetak ({count})",
+      "none": "tiada",
+      "nothingLeft": "tiada apa yang keluar dari peti besi",
+      "nothing": "tiada apa-apa",
+      "help": "Panggilan yang buktinya mengesahkan tepat peralihan ini, yang telah dilaksanakan oleh lejar: bacaan mesti memegang nilai yang ditunjukkan atau transaksi ditolak, dan setiap pembayaran ialah nota yang dikira oleh rantaian daripada kata-kata di atas, jadi penerimanya menemuinya sebagaimana mereka menemui cetakan. Siapa yang membayar masuk adalah peribadi; apa yang bergerak tidak."
+    },
+    "bundlePanel": {
+      "anchor": "Sauh",
+      "nullifierAsset": "Nullifier {n} (aset)",
+      "nullifierRand": "Nullifier {n} (RAND)",
+      "commitmentAsset": "Komitmen {n} (aset)",
+      "commitmentRand": "Komitmen {n} (RAND)",
+      "burned": "Dibakar",
+      "nothingBurned": "Tiada yang dibakar",
+      "time": "Masa (ketinggian sasaran)",
+      "proofSize": "Saiz bukti",
+      "envelopeSizes": "Saiz sampul",
+      "authCommit": "Komitmen pengesahan",
+      "authProofSize": "Saiz bukti pengesahan",
+      "authorisation": "Kebenaran",
+      "authInside": "Di dalam bukti bundel (tiada bukti pengesahan berasingan pada rantaian ini)",
+      "help": "Empat slot, termasuk dummy: slot 1–2 membawa aset peribadi (RAND atau mana-mana token RPL) dan slot 3–4 sentiasa RAND. Tiada medan aset awam — pindahan RAND dan pindahan mana-mana token RPL berbentuk sama, medan demi medan. Bukti dan sampul hanya dilaporkan mengikut saiz.",
+      "splitAuth": "Kebenaran terpisah: bukti bundel dibuat daripada kunci pelihat dan menerbitkan komitmen pengesahan; satu bukti kedua yang kecil ke atas kunci perbelanjaan mesti sepadan dengannya, supaya penjana bukti yang diwakilkan tidak pernah memegang kunci perbelanjaan."
+    },
+    "transfer": {
+      "help": "Pindahan terlindung biasa bagi RAND atau mana-mana token RPL — aset itu peribadi, jadi halaman ini tidak dapat menyatakan yang mana satu berpindah. Sehingga dua nota dibelanjakan, sehingga dua dicipta, dan yuran. Siapa membayar siapa, berapa banyak dan dalam aset apa hanya diketahui oleh kedua-dua pihak dan sesiapa yang diberi kunci pelihat atau kunci transaksi."
+    },
+    "mint": {
+      "depositNote": "Nota deposit",
+      "mintedBy": "Dicetak oleh",
+      "help": "Deposit faucet testnet. Jumlahnya awam dalam satu transaksi ini; nota yang dicipta tidak dapat dibezakan daripada nota lain selepas itu."
+    },
+    "deploy": {
+      "wordsLength": "Panjang perkataan",
+      "words": {
+        "other": "{n} perkataan"
+      }
+    },
+    "call": {
+      "nonePublished": "Tiada yang diterbitkan (pemanggil memilih --no-envelope)",
+      "help": "Input peribadi panggilan tidak pernah meninggalkan dompet secara terbuka. Apabila transkrip diterbitkan, ia hanya boleh dibuka dengan kunci pelihat pemanggil, kunci bagi setiap panggilan, atau juruaudit yang dinamakan oleh pemanggil."
+    },
+    "staking": {
+      "validator": "Pengesah",
+      "registration": "Pendaftaran",
+      "newValidator": "Pengesah baharu",
+      "existingValidator": "Pengesah sedia ada",
+      "registerNonce": "Nonce pendaftaran",
+      "bondHelp": "Nilai meninggalkan kolam (pembakaran bundel) ke dalam kepentingan awam pengesah.",
+      "unbondHelp": "Kepentingan dipindahkan ke baris gilir nyahikat, ditandatangani oleh kunci pengesah.",
+      "withdrawHelp": "Kepentingan dan ganjaran yang dilepaskan menjadi satu nota baharu berjumlah awam di alamat pembayaran pengesah."
+    },
+    "bridgeBurn": {
+      "released": "Dilepaskan pada rantaian sumber",
+      "relayerFee": "Yuran geganti",
+      "destChain": "Rantaian destinasi",
+      "destAddress": "Alamat destinasi",
+      "coinRedeemed": "Syiling ditebus",
+      "help": "Satu bundel aset tersembunyi membawa keseluruhan pembakaran: <code>burn_a</code> dan <code>burn_asset</code> miliknya ialah aset dan jumlah tindakan ini, dan yurannya membayar yuran jambatan dalam RAND."
+    },
+    "attest": {
+      "size": "Saiz perakuan",
+      "rotation": "Putaran set penjaga, tiada deposit",
+      "gross": "kasar, dikunci pada rantaian sumber",
+      "deposited": "Didepositkan kepada penerima",
+      "commitment": "Komitmen deposit",
+      "rotationShort": "— (putaran)",
+      "help": "Mesej yang ditandatangani penjaga yang mendepositkan aset jambatan sebagai nota untuk penerima. Jumlahnya awam di sini dan tidak di tempat lain.",
+      "feeHelp": "Di bawah yuran jambatan rantaian, jumlah kasar dikunci dan dipecahkan kepada dua nota: nota penerima, dan nota yuran kepada penerima yuran. Nota yuran tidak mempunyai sampul, jadi tiada kunci pelihat yang menemuinya melalui penyahsulitan; pemiliknya membinanya semula daripada medan di atas."
+    },
+    "registerToken": {
+      "initialMint": "Cetakan awal",
+      "amountTo": "{amount} kepada",
+      "help": "Pendaftaran token dan cetakan awalnya adalah awam secara reka bentuk, sebagaimana deposit jambatan (spec §4) — hanya pindahan nota token yang kemudian adalah terlindung."
+    },
+    "tokenMint": {
+      "help": "Setiap perkataan nota yang dicetak ada di sini (penghantarnya ialah teg cetakan tetap rantaian), jadi penerima membinanya semula tanpa apa-apa dinyahsulit, apa pun sampul yang diterbitkan oleh pencetak."
+    },
+    "setAuthority": {
+      "newAuthority": "Pihak berkuasa baharu",
+      "renounced": "Tiada (dilepaskan — token ini tidak boleh dicetak lagi selama-lamanya)"
+    },
+    "tokenBurn": {
+      "help": "Pembakaran pemegang: awam secara reka bentuk, kerana ia yang menjadikan bekalan keseluruhan token boleh diaudit. Pindahan token yang sama ialah pindahan terlindung biasa — asetnya kekal peribadi."
+    },
+    "pause": {
+      "pauseHelp": "Semasa dijeda, setiap perakuan pindahan ditolak; pembakaran dan putaran set penjaga kekal terbuka. Ditandatangani oleh kunci jeda genesis sahaja.",
+      "unpauseHelp": "Menamatkan jeda memerlukan kuorum penjaga PQ — kunci jeda tidak boleh sekali-kali menyambung semula dengan sendirinya."
+    },
+    "governance": {
+      "help": "Dibenarkan oleh kuorum penjaga PQ, pada bundel yuran RAND yang dibayar oleh penghantarnya."
+    },
+    "rotation": {
+      "nonce": "Nonce putaran",
+      "newSet": "Set penjaga PQ baharu",
+      "keys": {
+        "other": "{n} kunci Dilithium2"
+      },
+      "newPauseKey": "Kunci jeda baharu",
+      "possession": "Bukti pemilikan",
+      "cancelled": "Dibatalkan",
+      "pendingPauseKey": "putaran kunci jeda yang belum selesai",
+      "pendingGuardians": "putaran penjaga PQ yang belum selesai",
+      "cancelHelp": "Putaran yang ditandatangani tetapi belum berkuat kuasa, ditarik balik sebelum tempoh tangguhnya tamat (audit v6, BRG-14).",
+      "delayedHelp": "Ditandatangani oleh kuorum penjaga PQ semasa, dengan bukti pemilikan setiap pemegang baharu; ia berkuat kuasa selepas tempoh tangguh putaran genesis (lihat halaman jambatan) melainkan dibatalkan.",
+      "help": "Ditandatangani oleh kuorum penjaga PQ bagi set sebelum putaran (peraturan jambatan v2)."
+    },
+    "admit": {
+      "candidate": "Calon",
+      "voters": "Pengundi",
+      "validators": {
+        "other": "{n} pengesah"
+      },
+      "votedBy": "Diundi oleh",
+      "help": "Undian set pengesah yang membenarkan kunci ini mendaftar dengan ikatan, pada rantaian yang menerima pengesah melalui undian (audit v6, STAKE-2). Tanpa bundel dan tanpa yuran."
+    },
+    "slash": {
+      "offender": "Pelaku",
+      "view": "Pandangan",
+      "firstHeader": "Pengepala pertama",
+      "secondHeader": "Pengepala kedua",
+      "help": "Dua pengepala yang ditandatangani oleh satu kunci pengesah untuk view yang sama: bukti ketidakjujuran pemimpin (leader equivocation), yang dihukum potong (slash) mengikut peraturan pemotongan genesis (audit v6, STAKE-1)."
+    },
+    "receipt": {
+      "title": "Resit",
+      "none": "Tiada resit diindeks untuk panggilan atau invoke ini.",
+      "tier": "Peringkat",
+      "position": "Kedudukan",
+      "index": "indeks {index}",
+      "hIn": "Komitmen input (H_IN)",
+      "hPub": "Input awam (H_PUB)",
+      "hPubEmpty": "Kosong — program ini dilancarkan tanpa input awam",
+      "outputs": "Output",
+      "out": "output {index}",
+      "help": "Lapan perkataan output awam direkodkan dan tiada yang lain berubah: nilai hanya berpindah melalui bundle yang membayar panggilan itu. H_IN ialah digest bergaram bagi input persendirian dan tidak mendedahkan apa-apa dengan sendirinya."
+    },
+    "unknownKind": {
+      "help": "Jenis transaksi ini lebih baharu daripada binaan peneroka ini. Ia diindeks dengan hash, bundle, yuran dan bloknya; medan yang dinyahkod akan dipaparkan selepas peneroka dikemas kini."
+    }
+  },
+  "note": {
+    "notFound": "Nota tidak ditemui",
+    "notFoundMessage": "Tiada daun pokok yang sepadan dengan \"{id}\". Nota boleh dicari melalui komitmen (64 hex) atau indeks daun; komitmen daripada blok yang sangat baharu mungkin belum dimuatkan lagi.",
+    "back": "Kembali ke nota",
+    "loadError": "Tidak dapat memuatkan nota ini.",
+    "title": "Nota #{index}",
+    "leaf": "Daun",
+    "leafIndex": "Indeks daun",
+    "commitment": "Komitmen",
+    "createdAt": "Dicipta pada ketinggian",
+    "createdBy": "Dicipta oleh",
+    "genesisDeposit": "Nota deposit genesis",
+    "depositOffWire": "Deposit yang komitmennya tiada pada wayar (pengeluaran atau pengesahan jambatan)",
+    "openWithKey": "Memegang kunci pelihat penerima atau penghantar, atau kunci transaksi ini? <a href=\"{href}\">Buka dengan kunci pada halaman transaksi</a>.",
+    "sealed": "Pemilik dan jumlah berada di dalam sampul termeterai dan hanya boleh dibuka dengan kunci pelihat penerima dan penghantar. Sama ada nota ini telah dibelanjakan juga tidak awam: nullifier tidak dapat dipadankan dengan daunnya."
+  },
+  "program": {
+    "notFound": "Program tidak ditemui",
+    "notFoundMessage": "Tiada program yang sepadan dengan \"{id}\". ID program ialah hash 64 aksara.",
+    "back": "Kembali ke program",
+    "loadError": "Tidak dapat memuatkan program ini.",
+    "title": "Program",
+    "calls": "Panggilan",
+    "andInvokes": {
+      "other": "dan {n} invoke"
+    },
+    "codeSize": "Saiz kod",
+    "words": {
+      "other": "{n} perkataan"
+    },
+    "deployedAt": "Dilancarkan pada",
+    "lastCalled": "Terakhir dipanggil",
+    "callOrInvoke": "panggilan atau invoke",
+    "details": "Butiran",
+    "programId": "ID program",
+    "deployTx": "Transaksi pelancaran",
+    "deployedAtHeight": "Dilancarkan pada ketinggian",
+    "basePc": "PC asas",
+    "wordsLength": "Panjang perkataan",
+    "codeHash": "Hash kod",
+    "publicInput": "Input awam",
+    "noPublicInput": "Tiada — panggilan disemak terhadap input kosong",
+    "publicDigest": "Digest awam (H_PUB)",
+    "callCount": "Bilangan panggilan",
+    "never": "Tidak pernah",
+    "vault": "Peti besi",
+    "vaultEmpty": "Program ini tidak menyimpan apa-apa. Nilai memasuki peti besinya melalui bundle sesuatu invoke dan keluar sebagai nota yang dibayar oleh invoke itu.",
+    "asset": "Aset #{index}",
+    "stateCells": "Sel keadaan ({count})",
+    "noCells": "Tiada sel: tiada apa-apa yang ditulis, atau setiap penulisan ialah sifar.",
+    "key": "kunci",
+    "value": "nilai",
+    "statePublic": "Awam secara reka bentuk: keadaan program ialah peta kunci 64-hex kepada nilai 64-hex (lapan perkataan setiap satu), dibaca secara langsung daripada nod mengikut tertib kunci.",
+    "moreCells": "Terdapat lebih banyak sel; API membahagikannya kepada halaman di <code>/api/v1/programs/{id}/cells?after=…</code>.",
+    "recentCallsInvokes": "Panggilan dan invoke terkini",
+    "recentCalls": "Panggilan terkini",
+    "empty": "Program ini belum pernah dipanggil"
+  },
+  "token": {
+    "initialMint": "Pencetakan awal",
+    "mint": "Cetak",
+    "burn": "Bakar",
+    "height": "Ketinggian",
+    "event": "Peristiwa",
+    "transaction": "Transaksi",
+    "change": "Perubahan",
+    "notFound": "Token tidak ditemui",
+    "notFoundMessage": "Tiada token RPL yang sepadan dengan \"{id}\". Gunakan indeks daftarnya, id 64-hex atau bentuk teks rpl1….",
+    "back": "Kembali ke token",
+    "loadError": "Tidak dapat memuatkan token ini.",
+    "totalSupply": "Jumlah bekalan",
+    "decimals": "Perpuluhan",
+    "registryIndex": "Indeks daftar",
+    "authority": "Pihak berkuasa",
+    "authorityKind": {
+      "none": "Tiada",
+      "key": "kunci",
+      "program": "program",
+      "bridge": "jambatan"
+    },
+    "backingCount": {
+      "other": "{n} sokongan"
+    },
+    "registration": "Pendaftaran",
+    "deployTx": "Transaksi pelancaran",
+    "notIndexed": "Tidak diindeks (didaftarkan sebelum pas ini)",
+    "registeredAt": "Didaftarkan pada",
+    "idHex": "ID token (hex)",
+    "idText": "ID token (rpl1…)",
+    "mintNonce": "Nonce pencetakan",
+    "mintAuthority": "Pihak berkuasa pencetakan",
+    "signingKey": "Kunci tandatangan",
+    "address": "Alamat",
+    "program": "Program",
+    "backings": "Sokongan ({count})",
+    "sourceChain": "Rantaian sumber",
+    "sourceToken": "Token sumber",
+    "sourceDecimals": "Perpuluhan sumber",
+    "locked": "Dikunci",
+    "mintedIn": "Dicetak dalam {window} / had",
+    "mintedToday": "Dicetak hari ini / had",
+    "roomToMint": "Ruang untuk mencetak",
+    "roomToMintHelp": "Deposit terbesar yang dibenarkan oleh had untuk syiling ini sekarang: had miliknya sendiri tolak apa yang telah dicetaknya, dan tidak melebihi baki semua token bersama dalam tempoh itu.",
+    "supplyHistory": "Sejarah bekalan",
+    "empty": "Belum ada peristiwa pencetakan atau pembakaran awam yang diindeks untuk token ini",
+    "historyHelp": "Setiap register_token (pencetakan awal), token_mint dan token_burn yang menamakan token ini, dari yang terlama — awam secara reka bentuk, kerana inilah yang menjadikan jumlah bekalan boleh diaudit. Pemindahan nota token ini ialah pemindahan terlindung biasa dan tidak pernah dipaparkan di sini."
+  },
+  "validator": {
+    "releaseEpoch": "Epoch pelepasan",
+    "amount": "Jumlah",
+    "notFound": "Pengesah tidak ditemui",
+    "notFoundMessage": "\"{address}\" tiada dalam daftar pengesah.",
+    "back": "Kembali ke pengesah",
+    "loadError": "Tidak dapat memuatkan pengesah ini.",
+    "title": "Pengesah",
+    "active": "Aktif epoch ini",
+    "inactive": "Tiada dalam set semasa",
+    "stake": "Pertaruhan",
+    "rewards": "Ganjaran",
+    "unwithdrawnFees": "yuran belum dikeluarkan",
+    "share": "Bahagian pertaruhan aktif",
+    "blocksProposed": "Blok dicadangkan",
+    "lastAgo": "terakhir {ago}",
+    "registerEntry": "Entri daftar",
+    "address": "Alamat",
+    "payout": "Alamat pembayaran",
+    "payoutUnknown": "Tidak disediakan oleh nod ini",
+    "nonce": "Nonce daftar",
+    "sortIndex": "Indeks isihan",
+    "lastProposed": "Blok terakhir dicadangkan",
+    "never": "Tidak pernah",
+    "unbonding": "Baris gilir nyah-ikat",
+    "unbondingEmpty": "Tiada apa-apa sedang dinyah-ikat",
+    "stakingTxs": "Transaksi pertaruhan",
+    "stakingEmpty": "Tiada ikatan, nyah-ikat, pengeluaran atau pencetakan yang menamakan pengesah ini",
+    "recentBlocks": "Blok terkini",
+    "blocksEmpty": "Pengesah ini belum mencadangkan sebarang blok"
+  },
+  "account": {
+    "title": "Tiada akaun pada rantaian ini",
+    "shielded": "RAND ialah rantaian yang terlindung sepenuhnya. Baki ialah satu set nota yang hanya boleh dibuka oleh kunci pelihat pemiliknya, dan transaksi tidak membawa penghantar, penerima atau jumlah: hanya komitmen, nullifier, sampul termeterai, yuran dan satu bukti.",
+    "nothingToShow": "Oleh itu, tiada apa yang boleh dipaparkan oleh peneroka untuk sesuatu alamat. Yang awam ialah daftar pengesah (pertaruhan, ganjaran, baris gilir nyah-ikat), pokok komitmen dan set nullifier, pelancaran program, resit panggilan dan keadaan jambatan itu sendiri.",
+    "isValidator": "Alamat ini ialah pengesah: <a href=\"{href}\">lihat entri daftarnya →</a>",
+    "validators": "Pengesah →",
+    "notes": "Nota (pokok komitmen) →"
+  },
+  "viewing": {
+    "leaf": "Daun",
+    "height": "Ketinggian",
+    "transaction": "Transaksi",
+    "genesis": "genesis",
+    "deposit": "deposit",
+    "role": "Peranan",
+    "amount": "Jumlah",
+    "counterparty": "Pihak lawan (pk)",
+    "status": "Status",
+    "token": "Token",
+    "assetIndex": "aset #{index}",
+    "spendable": "Baki boleh dibelanjakan",
+    "unspentNotes": "Nota belum dibelanjakan",
+    "title": "Sejarah saya",
+    "subtitle": "Imbas pokok komitmen dengan kunci pelihat anda. Peneroka tidak pernah melihat kunci itu; setiap sampul dibuka dalam pelayar anda.",
+    "scanTitle": "Imbas dengan kunci pelihat",
+    "scanned": {
+      "other": "{scanned} daripada {n} daun diimbas"
+    },
+    "spendableHelp": "nota belum dibelanjakan yang diterima, RAND; token di bawah",
+    "notesReceived": "Nota diterima",
+    "unspentCount": "{count} belum dibelanjakan",
+    "notesSent": "Nota dihantar",
+    "address": "Alamat",
+    "pk": "pk {pk}…",
+    "shieldedAddress": "Alamat terlindung:",
+    "empty": "Kunci ini tidak membuka sebarang nota pada rantaian",
+    "footnote": "Setiap baris telah dinyahsulit dalam pelayar ini dan komitmennya dikira semula daripada teks biasa. Nota baki ditunjukkan sebagai diterima."
+  },
+  "legal": {
+    "label": "Perundangan",
+    "effective": "Berkuat kuasa {date}",
+    "contents": "Kandungan",
+    "seeAlso": "Lihat juga <a href=\"{href}\">{label}</a>."
+  },
+  "privacy": {
+    "metaTitle": "Dasar Privasi — RandScan",
+    "metaDescription": "Apa yang dikumpul oleh RandScan, apa yang tidak pernah dilihatnya, dan berapa lama ia menyimpan apa yang ada padanya.",
+    "title": "Dasar Privasi",
+    "effective": "2 Oktober 2026",
+    "intro": "RandScan memaparkan lejar awam dan hampir tidak menyimpan apa-apa tentang orang yang melihatnya. Halaman ini menyatakan dengan tepat apa yang dilihat oleh peneroka, apa yang disimpannya, apa yang tidak pernah dilihatnya, dan berapa lama apa-apa disimpan.",
+    "sections": [
+      {
+        "id": "scope",
+        "title": "Siapa kami dan apa yang dilitupi",
+        "body": [
+          "RandScan (randscan.org) ialah peneroka blok bagi Rand Protocol, dikendalikan oleh pasukan Rand Protocol (“kami”). Ia mengindeks lejar awam rangkaian Rand Protocol dan memaparkannya sebagai halaman web, API JSON dan suapan WebSocket. Dasar ini meliputi laman web, API di randscan.org/api dan akaun yang boleh anda cipta untuk mendapatkan kunci API.",
+          "Kod sumber peneroka ini diterbitkan di bawah lesen MIT, jadi segala yang diterangkan di sini boleh disemak berbanding apa yang sebenarnya dilakukan oleh perisian itu."
+        ]
+      },
+      {
+        "id": "no-tracking",
+        "title": "Apa yang kami tidak lakukan",
+        "body": [
+          "RandScan tidak menjalankan analitik, iklan atau skrip penjejakan. Fon disajikan daripada pelayan kami sendiri. Tiada JavaScript pihak ketiga dimuatkan pada mana-mana halaman. Tiada sepanduk kuki kerana tiada apa yang perlu dipersetujui: satu-satunya kuki ialah bahasa yang anda pilih daripada menu, jika anda memilihnya, dan sesi log masuk yang diterangkan di bawah, yang ditetapkan hanya selepas anda log masuk.",
+          "Kami tidak menjual, menyewakan atau berkongsi data peribadi dengan sesiapa pun untuk tujuan mereka sendiri."
+        ]
+      },
+      {
+        "id": "chain-data",
+        "title": "Data blockchain awam",
+        "body": [
+          "Hampir segala yang dipaparkan oleh RandScan ialah salinan lejar Rand Protocol: blok, transaksi, nota, pengesah, program, token dan aktiviti jambatan. Lejar itu awam secara reka bentuk dan direplikasi oleh setiap nod pada rangkaian. Kami tidak mengumpulnya daripada anda, kami tidak boleh mengubahnya, dan kami tidak boleh mengalih keluar entri daripadanya.",
+          "Rand Protocol ialah rantaian terlindung (shielded). Jumlah transaksi, penghantar dan penerima disembunyikan pada lejar itu sendiri, dan peneroka hanya memaparkan apa yang didedahkan secara awam oleh rantaian: komitmen, nullifier dan bukti bagi setiap transaksi, serta pembukaan awam bagi nota yang dikira oleh rantaian sendiri, seperti yuran dan pencetakan jambatan."
+        ]
+      },
+      {
+        "id": "viewing-keys",
+        "title": "Kunci tontonan kekal dalam pelayar anda",
+        "body": [
+          "Halaman <a href=\"/viewing\">Sejarah</a> dan pembuka nota membolehkan anda menampal kunci tontonan, kunci transaksi atau fail kunci dompet untuk membaca aktiviti terlindung anda sendiri. Penyahsulitan berjalan di dalam halaman, dalam modul WebAssembly yang dikompil daripada kod peneroka itu sendiri. Kunci yang ditampal hanya disimpan dalam memori halaman. Kunci itu tidak pernah disertakan dalam sebarang permintaan ke pelayan kami, tidak pernah ditulis ke dalam kuki atau storan setempat, dan hilang apabila anda menutup atau memuat semula halaman.",
+          "Halaman ini memang mengambil sampul tersulit yang diperlukannya daripada API kami, sama seperti mana-mana pelawat. Oleh itu, kami dapat melihat transaksi yang diminta oleh sesebuah pelayar, tetapi tidak yang mana satu dibuka atau apa kandungannya."
+        ]
+      },
+      {
+        "id": "visitors",
+        "title": "Apa yang terlibat dalam setiap lawatan",
+        "body": [
+          "Seperti mana-mana pelayan web, pelayan kami menerima alamat IP anda, halaman atau titik akhir yang anda minta dan pengepala yang dihantar oleh pelayar anda. Kami menggunakan alamat IP untuk dua perkara:",
+          "- Pengehadan kadar. Trafik tanpa nama dihadkan bagi setiap alamat IP. Pembilang disimpan dalam memori pelayan untuk tempoh satu minit dan tidak ditulis ke pangkalan data.",
+          "- Pengendalian perkhidmatan. Log pelayan dan proses mungkin merekodkan permintaan semasa kami mendiagnosis masalah. Log itu kekal di pelayan dan dibuang secara berkala selepas tempoh yang singkat.",
+          "Pada lawatan pertama ke halaman utama, dan hanya pada ketika itu, negara bagi alamat anda dicari dalam salinan pangkalan data negara DB-IP yang disimpan pada pelayan kami sendiri, untuk memilih bahasa yang digunakan apabila laman dibuka. Hasilnya tidak disimpan dan tiada apa-apa dihantar kepada sesiapa. Bahasa yang anda pilih daripada menu disimpan dalam kuki bernama <code>lang</code> selama setahun dan diutamakan berbanding negara selepas itu. IP Geolocation oleh <a href=\"https://db-ip.com\">DB-IP</a>, dilesenkan di bawah CC BY 4.0.",
+          "Pilihan tema anda (gelap atau cerah) disimpan dalam storan setempat pelayar anda di bawah kunci <code>randscan-theme</code>. Ia tidak pernah meninggalkan peranti anda."
+        ]
+      },
+      {
+        "id": "map",
+        "title": "Jubin peta pada Nod dan Prover",
+        "body": [
+          "Halaman <a href=\"/nodes\">Nod</a> dan <a href=\"/provers\">Prover</a> melukis peta dunia. Jubin peta asas dimuatkan oleh pelayar anda terus daripada perkhidmatan jubin ArcGIS Online milik Esri, jadi Esri menerima alamat IP anda dan koordinat jubin seperti yang berlaku bagi mana-mana peta. Tiada halaman lain yang memuatkan apa-apa daripada pihak ketiga.",
+          "Penanda pada peta itu menunjukkan lokasi rakan sebaya rangkaian dan hos prover yang diwakilkan. Itu ialah alamat pelayan yang diterbitkan oleh rangkaian itu sendiri, bukan pelawat. Pengindeks kami mencarinya melalui perkhidmatan geolokasi ipwho.is dan menyimpan cache bagi bandar, negara dan penyedia yang dikembalikan. Alamat pelawat tidak pernah dihantar kepada perkhidmatan geolokasi."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "Akaun dan kunci API",
+        "body": [
+          "Anda boleh menggunakan semua yang ada pada RandScan tanpa akaun. Akaun wujud hanya untuk mengeluarkan kunci API dengan kuota permintaan yang lebih tinggi. Jika anda membuat satu akaun, kami menyimpan:",
+          "- alamat e-mel anda dan masa akaun dibuat;",
+          "- cincangan Argon2id bagi kata laluan anda. Kami tidak dapat membaca kata laluan itu sendiri, dan kami tidak pernah menghantarnya ke mana-mana;",
+          "- bagi setiap kunci API, namanya, beberapa aksara pertama kunci itu supaya anda dapat mengenalinya, cincangan SHA-256 bagi rahsia, masa ia dibuat dan masa ia terakhir digunakan. Rahsia dipaparkan sekali sahaja dan tidak disimpan;",
+          "- sesi log masuk: token rawak dalam kuki <code>randscan_session</code>, HttpOnly dan SameSite, dengan cincangannya dalam pangkalan data kami. Sesi bertahan 30 hari dari penggunaan terakhirnya dan dipadam apabila anda log keluar.",
+          "Permintaan yang dibuat dengan kunci API dikira bagi kunci itu untuk pengehadan kadar, dalam tetingkap memori satu minit yang sama seperti trafik tanpa nama. Kami tidak merekodkan titik akhir mana yang dipanggil oleh sesuatu kunci atau apa yang diminta."
+        ]
+      },
+      {
+        "id": "email",
+        "title": "E-mel",
+        "body": [
+          "Kami hanya menghantar satu jenis e-mel: pautan tetapan semula kata laluan, dan hanya apabila anda memintanya. E-mel itu dihantar melalui Resend (resend.com), yang memproses alamat e-mel anda dan mesej tersebut untuk menghantarnya. Pautan tetapan semula tamat tempoh selepas satu jam. Kami tidak menghantar surat berita atau pemberitahuan, dan kami tidak menggunakan alamat anda untuk apa-apa tujuan lain."
+        ]
+      },
+      {
+        "id": "hosting",
+        "title": "Tempat data disimpan",
+        "body": [
+          "RandScan berjalan pada pelayan yang disewa daripada DigitalOcean, di Singapura. Pangkalan data yang menyimpan akaun, bukti kelayakan yang dicincang dan sesi terletak pada pelayan itu. Sandaran, jika ada, menyimpan data yang sama untuk tujuan yang sama. Dengan menggunakan perkhidmatan ini, anda bersetuju bahawa data anda diproses di sana, walau di mana pun anda berada."
+        ]
+      },
+      {
+        "id": "retention",
+        "title": "Berapa lama kami menyimpan sesuatu",
+        "body": [
+          "- Pembilang had kadar: satu minit, dalam memori.",
+          "- Log pelayan: tempoh yang singkat, kemudian dibuang secara berkala.",
+          "- Sesi: 30 hari dari penggunaan terakhir, atau sehingga anda log keluar.",
+          "- Kuki <code>lang</code>, bahasa yang anda pilih daripada menu: setahun, dalam pelayar anda.",
+          "- Token tetapan semula kata laluan: satu jam.",
+          "- Akaun dan kunci API: sehingga anda meminta kami memadamnya.",
+          "- Data rantaian awam: selagi peneroka berjalan. Ia ialah lejar."
+        ]
+      },
+      {
+        "id": "rights",
+        "title": "Pilihan dan hak anda",
+        "body": [
+          "Anda boleh membatalkan mana-mana kunci API dan log keluar daripada mana-mana sesi melalui <a href=\"/dashboard\">papan pemuka</a> anda. Untuk melihat data yang disimpan tentang akaun anda, membetulkannya, atau memadamkan akaun beserta kuncinya, <a href=\"#contact\">hubungi kami</a> daripada alamat e-mel pada akaun itu. Kami akan bertindak dalam tempoh 30 hari. Buat masa ini belum ada butang padam layan diri; kami akan menambahnya.",
+          "Bergantung pada tempat anda tinggal, anda mungkin mempunyai hak tambahan di bawah undang-undang seperti GDPR atau CCPA, termasuk hak untuk membuat aduan kepada pihak berkuasa penyelia. Tiada apa-apa di sini yang menghadkannya."
+        ]
+      },
+      {
+        "id": "contact",
+        "title": "Hubungan dan perubahan",
+        "body": [
+          "Soalan tentang dasar ini atau permintaan berkaitan akaun anda hendaklah dihantar kepada pasukan Rand Protocol melalui repositori peneroka di <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>.",
+          "Apabila dasar ini berubah, teks baharu akan muncul di sini dengan tarikh berkuat kuasa yang baharu. Perubahan yang mengurangkan privasi anda akan diumumkan pada peneroka sebelum ia berkuat kuasa. Versi ini berkuat kuasa pada {effective}."
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "Syarat Perkhidmatan — RandScan",
+    "metaDescription": "Syarat penawaran RandScan, peneroka Rand Protocol, API dan akaunnya.",
+    "title": "Syarat Perkhidmatan",
+    "effective": "1 Oktober 2026",
+    "intro": "RandScan ialah tingkap percuma dan sumber terbuka kepada lejar awam. Syarat ini menyatakan apa itu perkhidmatan ini, apa yang bukan, bagaimana API dan akaunnya boleh digunakan, serta had apa yang kami janjikan.",
+    "sections": [
+      {
+        "id": "agreement",
+        "title": "Perjanjian",
+        "body": [
+          "Syarat ini mengawal penggunaan RandScan (randscan.org) oleh anda: laman web, API JSON di randscan.org/api, suapan WebSocket, serta akaun dan kunci API yang ditawarkan melaluinya. RandScan dikendalikan oleh pasukan Rand Protocol (“kami”). Dengan menggunakan mana-mana bahagiannya, anda menerima syarat ini. Jika anda tidak menerimanya, jangan gunakan perkhidmatan ini.",
+          "<a href=\"/privacy\">Dasar Privasi</a> menerangkan apa yang dikumpulkan oleh perkhidmatan ini dan merupakan sebahagian daripada syarat ini."
+        ]
+      },
+      {
+        "id": "service",
+        "title": "Apa itu RandScan, dan apa yang bukan",
+        "body": [
+          "RandScan ialah peneroka blok. Ia membaca lejar awam rangkaian Rand Protocol daripada nod penuh, mengindeksnya, dan mempersembahkannya. Ia ialah tingkap kepada rantaian, bukan sebahagian daripadanya.",
+          "- Ia bukan dompet. Ia tidak menyimpan dana, tiada kunci perbelanjaan dan tiada jagaan ke atas apa-apa, dan ia tidak boleh mencipta, menandatangani atau menyiarkan transaksi bagi pihak anda.",
+          "- Ia bukan jambatan. Halaman <a href=\"/bridge\">Jambatan</a> menerangkan aktiviti jambatan yang direkodkan pada rantaian Rand. Jambatan itu sendiri dikendalikan oleh penjaganya di bawah terma mereka sendiri; deposit, kelulusan dan penyelesaian berlaku pada rantaian sumber, dan harus disahkan di sana.",
+          "- Ia bukan nasihat. Tiada apa-apa di RandScan merupakan nasihat kewangan, pelaburan, undang-undang atau cukai, dan tiada apa-apa merupakan tawaran atau pelawaan untuk membeli atau menjual sebarang aset."
+        ]
+      },
+      {
+        "id": "accuracy",
+        "title": "Ketepatan data",
+        "body": [
+          "Kami berusaha memaparkan rantaian dengan setia, dan kod peneroka ini terbuka untuk disemak oleh sesiapa sahaja. Namun, apa yang anda lihat ialah salinan yang dibuat oleh perisian, dan ia boleh tersilap atau lewat:",
+          "- pengindeks boleh ketinggalan di belakang rantaian, atau berhenti semasa nod yang dibacanya dimulakan semula;",
+          "- blok yang pernah dipaparkan oleh peneroka boleh diganti jika rantaian disusun semula;",
+          "- apabila rangkaian beralih ke rantaian baharu, sejarah peneroka ditetapkan semula kepada genesis baharu, dan data rantaian sebelumnya tidak lagi disediakan;",
+          "- rantaian terlindung menyembunyikan jumlah dan pihak yang terlibat secara reka bentuk, maka peneroka semestinya hanya memaparkan apa yang dijadikan umum oleh lejar, dan label seperti nama token datang daripada senarai milik peneroka sendiri, bukan daripada rantaian;",
+          "- lokasi, versi dan status nod serta prover ialah pemerhatian, bukan jaminan.",
+          "Keputusan yang bergantung pada keadaan rantaian harus disemak berdasarkan nod yang anda jalankan atau percayai. Kami tidak berjanji bahawa sebarang angka di RandScan adalah betul atau terkini."
+        ]
+      },
+      {
+        "id": "viewing",
+        "title": "Kunci pelihat dan pembuka nota",
+        "body": [
+          "Halaman <a href=\"/viewing\">Sejarah</a> membuka nota terlindung dengan kunci yang anda tampal. Pembukaan berjalan dalam pelayar anda dan kunci itu tidak dihantar kepada kami, seperti yang diterangkan dalam Dasar Privasi. Anda kekal bertanggungjawab ke atas kunci yang anda kendalikan: tampalkannya hanya pada peranti dan pelayar yang anda percayai, utamakan kunci pelihat berbanding kunci perbelanjaan di mana-mana yang memadai, dan fahami bahawa kami tidak dapat memulihkan kunci atau membatalkan apa yang boleh dilihat oleh seseorang yang memperolehnya. Hasil pembuka ialah bacaan rantaian secara usaha terbaik dan mempunyai kaveat yang sama seperti setiap angka lain di sini."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "Akaun dan API key",
+        "body": [
+          "Anda tidak memerlukan akaun untuk menggunakan RandScan. Akaun mengeluarkan API key dengan kuota permintaan yang lebih tinggi. Jika anda membuatnya:",
+          "- anda mesti memberikan alamat e-mel yang anda kawal, dan menjaga kata laluan anda daripada diketahui orang lain;",
+          "- API key ialah bukti kelayakan. Jauhkannya daripada kod sisi klien dan repositori awam, dan batalkannya daripada <a href=\"/dashboard\">papan pemuka</a> anda jika ia bocor. Segala yang dilakukan dengan kunci anda dianggap dilakukan oleh anda;",
+          "- anda boleh memegang sehingga 10 kunci aktif, dan satu akaun bagi setiap orang atau sistem ialah kebiasaannya;",
+          "- anda tidak boleh berkongsi, menjual atau mengumpulkan kunci untuk melebihi kuota, atau mencipta akaun dengan cara automatik.",
+          "Kami boleh menggantung atau memadam akaun, atau membatalkan kuncinya, jika ia melanggar terma ini, digunakan secara menyalahi, atau tidak aktif untuk tempoh yang lama. Anda boleh berhenti menggunakan perkhidmatan ini dan meminta kami memadam akaun anda pada bila-bila masa."
+        ]
+      },
+      {
+        "id": "quotas",
+        "title": "Kuota dan penggunaan yang boleh diterima",
+        "body": [
+          "Titik akhir baca awam adalah percuma. Trafik tanpa nama dihadkan bagi setiap alamat IP dan trafik berkunci bagi setiap kunci; angka semasa diterbitkan dalam <a href=\"https://github.com/randprotocol/randscan.org/blob/main/docs/api.md\">dokumentasi API</a> dan boleh berubah. Perkhidmatan ini menjawab dengan HTTP 429 dan pengepala Retry-After apabila had dilebihi, dan klien dijangka mematuhinya.",
+          "Anda bersetuju untuk tidak:",
+          "- mengelak had kadar, contohnya dengan menukar-nukar alamat atau kunci, atau dengan banyak akaun;",
+          "- menyiasat, mengimbas, membebankan atau mengganggu perkhidmatan, pelayannya atau nod di belakangnya dengan apa-apa cara;",
+          "- menggunakan perkhidmatan ini untuk melanggar undang-undang, mencabul hak sesiapa, atau mengganggu atau menyahanonimkan orang;",
+          "- mengemukakan data RandScan sebagai milik anda tanpa atribusi, atau mengisyaratkan bahawa kami menyokong produk yang menggunakannya.",
+          "Membaca data awam secara pukal dibenarkan dalam had kuota. Jika anda memerlukan lebih, jalankan nod dan pengindeks anda sendiri; perisian itu percuma."
+        ]
+      },
+      {
+        "id": "ip",
+        "title": "Perisian, data dan tanda",
+        "body": [
+          "Kod sumber peneroka dikeluarkan di bawah lesen MIT, dan anda boleh menggunakannya mengikut terma tersebut. Data rantaian yang dipaparkan di RandScan adalah awam dan bukan milik sesiapa; ambillah, dengan menyebut dari mana ia datang. Nama dan tanda RandScan serta nama dan tanda Rand Protocol mengenal pasti perkhidmatan ini dan rangkaian tersebut, dan tidak boleh digunakan untuk mengisyaratkan bahawa sesuatu itu milik kami apabila bukan."
+        ]
+      },
+      {
+        "id": "third-parties",
+        "title": "Pihak ketiga",
+        "body": [
+          "RandScan memaut ke tapak dan rantaian lain, dan halaman peta memuatkan jubin peta asas daripada ArcGIS Online milik Esri. Perkhidmatan tersebut mempunyai terma mereka sendiri. Kami tidak mengawalnya dan tidak bertanggungjawab atas apa yang mereka lakukan atau paparkan."
+        ]
+      },
+      {
+        "id": "warranty",
+        "title": "Tiada waranti",
+        "body": [
+          "RandScan disediakan “sebagaimana adanya” dan “sebagaimana tersedia”, tanpa waranti dalam apa-apa bentuk, nyata atau tersirat, termasuk ketepatan, ketersediaan, kesesuaian untuk tujuan tertentu atau tidak melanggar hak. Ia dikendalikan oleh pasukan kecil secara usaha terbaik; ia mungkin tidak tersedia, boleh berubah, dan boleh ditarik balik, dengan atau tanpa notis."
+        ]
+      },
+      {
+        "id": "liability",
+        "title": "Had liabiliti",
+        "body": [
+          "Setakat yang dibenarkan sepenuhnya oleh undang-undang, kami tidak bertanggungjawab atas sebarang kerugian atau kerosakan yang timbul daripada penggunaan anda, atau ketidakupayaan menggunakan, RandScan atau apa-apa yang dipaparkan padanya. Ini termasuk kehilangan dana, kehilangan keuntungan, kehilangan data, dan sebarang kerugian tidak langsung atau berbangkit, walau bagaimana pun disebabkan, dan walaupun kami telah dimaklumkan bahawa ia mungkin berlaku. Khususnya, kami tidak bertanggungjawab atas keputusan yang diambil berdasarkan data peneroka, atas transaksi pada mana-mana rantaian, atau atas tindakan pihak ketiga. Jika liabiliti tidak boleh dikecualikan, ia terhad kepada jumlah yang anda bayar kepada kami untuk perkhidmatan ini, iaitu tiada.",
+          "Sesetengah bidang kuasa tidak membenarkan pengecualian tertentu. Tiada apa-apa di sini menghapuskan hak yang anda ada di bawah undang-undang yang tidak boleh dilepaskan."
+        ]
+      },
+      {
+        "id": "changes",
+        "title": "Perubahan pada terma ini",
+        "body": [
+          "Kami boleh mengubah terma ini. Teks semasa sentiasa berada di randscan.org/terms bersama tarikh berkuat kuasanya. Jika perubahan itu ketara, kami akan menyatakannya pada peneroka sebelum ia berkuat kuasa. Menggunakan perkhidmatan ini selepas perubahan bermakna anda menerima terma baharu. Versi ini berkuat kuasa pada {effective}."
+        ]
+      },
+      {
+        "id": "general",
+        "title": "Am",
+        "body": [
+          "Jika mana-mana bahagian terma ini didapati tidak boleh dikuatkuasakan, selebihnya masih terpakai. Kegagalan kami bertindak terhadap sesuatu pelanggaran bukan satu pengetepian. Terma ini dan Dasar Privasi ialah keseluruhan perjanjian antara anda dengan kami mengenai RandScan. Soalan dihantar kepada pasukan Rand Protocol melalui <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>."
+        ]
+      }
+    ]
+  },
+  "home": {
+    "title": "Peneroka Rand Protocol",
+    "chain": "Rantaian {id}",
+    "connecting": "Menyambung ke rangkaian…",
+    "blockHeight": "Ketinggian blok",
+    "nodeSyncing": "Nod sedang menyegerak",
+    "inSync": "Disegerakkan",
+    "validators": "Pengesah",
+    "activeStake": "pertaruhan aktif",
+    "transactions": "Transaksi",
+    "programs": {
+      "other": "{n} program"
+    },
+    "notes": "Nota",
+    "spent": "{count} dibelanjakan",
+    "avgBlockTime": "Purata masa blok",
+    "peers": "Rakan setara",
+    "mempool": "Mempool",
+    "epoch": "Epok",
+    "epochValue": {
+      "other": "{epoch} ({n} blok)"
+    },
+    "currentLeader": "Peneraju semasa",
+    "facts": {
+      "totalSupply": "Jumlah bekalan {amount}",
+      "supplyUnavailable": "Audit bekalan tidak tersedia",
+      "view": "paparan {view}",
+      "treeRoot": "punca pokok",
+      "bundleGuest": "bundle guest",
+      "faucetOn": "faucet diaktifkan",
+      "faucetOff": "faucet dinyahaktifkan",
+      "confidentialOn": "panggilan sulit dihidupkan",
+      "confidentialOff": "panggilan sulit dimatikan",
+      "decimals": {
+        "other": "{symbol} mempunyai {n} perpuluhan"
+      },
+      "genesis": "genesis",
+      "node": "nod {version}",
+      "nodeSha": "nod {version} ({sha})"
+    },
+    "limits": {
+      "programs": {
+        "other": "Had: program {n} perkataan"
+      },
+      "proofs": "bukti {size}",
+      "blocks": "blok {size}",
+      "callEnvelopes": "sampul panggilan {size}",
+      "publicInput": {
+        "other": "input awam {n} perkataan"
+      },
+      "publicInputOff": "input awam dimatikan",
+      "noteEnvelopesMemo": "sampul nota {bytes} B (memo)",
+      "noteEnvelopesNoMemo": "sampul nota {bytes} B (tanpa memo)",
+      "v6On": "peraturan v0.6 dihidupkan",
+      "v6Off": "peraturan v0.6 dimatikan",
+      "authGuest": "pengesahan tetamu",
+      "none": "tiada",
+      "proofWindow": {
+        "other": "tetingkap bukti {n} blok"
+      },
+      "bindingsGenesis": "pengikatan ke atas cincang genesis",
+      "bindingsChainId": "pengikatan ke atas ID rantaian"
+    },
+    "network": {
+      "testnet": "Rangkaian: testnet (penanda genesis)",
+      "mainnet": "Rangkaian: mainnet",
+      "admission": "pengesah baharu diterima melalui undian set (<a href=\"/validators\">kunci yang diterima</a>)",
+      "slashing": {
+        "other": "penalti equivocation {percent} daripada kepentingan, dipenjarakan {n} epoch"
+      },
+      "slashingOff": "penalti equivocation dimatikan"
+    },
+    "gas": {
+      "circuit": "Gas: bahagian rantaian itu sendiri, diukur dalam litar",
+      "policy": "Gas: dasar nod ini, dihargai berdasarkan pengepala bukti",
+      "perGas": "{amount} setiap gas",
+      "perKiB": "{amount} setiap KiB",
+      "ceilings": "siling {gas} / gas, {byte} / KiB",
+      "ceilingsPaying": "siling {gas} / gas, {byte} / KiB (hanya bait berbayar yang menggerakkan harga bait)",
+      "bundleLimit": "setiap bundle mengisytiharkan {gas} gas",
+      "pricesMove": "harga bergerak {percent}% sebloknya mengikut tahap kepenuhan",
+      "pricesFixed": "harga tetap",
+      "programState": "keadaan program dihidupkan: {fee} setiap sel dicipta, paling banyak {reads} bacaan, {writes} penulisan dan {payouts} pembayaran setiap invoke"
+    },
+    "latestBlocks": "Blok terkini",
+    "latestTransactions": "Transaksi terkini",
+    "viewAll": "Lihat semua →"
+  },
+  "blocks": {
+    "title": "Blok",
+    "error": "Tidak dapat memuatkan blok.",
+    "indexed": {
+      "other": "{n} blok diindeks"
+    },
+    "loading": "Memuatkan blok…"
+  },
+  "transactions": {
+    "title": "Transaksi",
+    "kind": "Jenis",
+    "allKinds": "Semua jenis",
+    "kinds": {
+      "transfer": "Pindahan (terlindung)",
+      "mint": "Mint (faucet)",
+      "deploy": "Deploy",
+      "call": "Panggilan (sulit)",
+      "bond": "Ikat",
+      "unbond": "Nyahikat",
+      "withdraw": "Pengeluaran",
+      "bridge_attest": "Jambatan masuk (pengesahan)",
+      "bridge_burn": "Jambatan keluar (bakar)",
+      "register_token": "Token didaftarkan",
+      "token_mint": "Mint token",
+      "set_authority": "Autoriti token diubah",
+      "token_burn": "Bakar token",
+      "pause_mints": "Mint jambatan dijeda",
+      "unpause_mints": "Mint jambatan disambung semula",
+      "register_bridged_token": "Token jambatan disenaraikan",
+      "list_backing": "Sokongan disenaraikan",
+      "invoke": "Invoke (keadaan program)",
+      "admit_validator": "Pengesah diterima (undian)",
+      "slash_equivocation": "Equivocation dikenakan penalti",
+      "rotate_pq_guardians": "Penjaga PQ diputar",
+      "rotate_pause_key": "Kunci jeda diputar",
+      "rotate_pq_guardians_v2": "Putaran penjaga PQ (tertunda)",
+      "rotate_pause_key_v2": "Putaran kunci jeda (tertunda)",
+      "cancel_rotation": "Putaran dibatalkan",
+      "other": "Lain-lain"
+    },
+    "error": "Tidak dapat memuatkan transaksi.",
+    "count": {
+      "other": "{n} transaksi"
+    },
+    "countOfKind": {
+      "other": "{n} transaksi berjenis {kind}"
+    },
+    "loading": "Memuatkan transaksi…",
+    "empty": "Tiada transaksi ditemui",
+    "emptyOfKind": "Tiada transaksi {kind} ditemui"
+  },
+  "notes": {
+    "title": "Nota",
+    "columns": {
+      "leaf": "Daun",
+      "commitment": "Komitmen",
+      "height": "Ketinggian",
+      "createdBy": "Dicipta oleh"
+    },
+    "genesis": "genesis",
+    "deposit": "deposit",
+    "error": "Tidak dapat memuatkan pokok komitmen.",
+    "leaves": {
+      "other": "{n} daun dalam pokok komitmen"
+    },
+    "loading": "Memuatkan nota…",
+    "created": "Nota dicipta",
+    "createdSub": "daun pokok",
+    "spent": "Nota dibelanjakan",
+    "spentSub": "nullifier diterbitkan",
+    "treeRoot": "Punca pokok",
+    "treeRootSub": "sauh yang dibuktikan oleh dompet",
+    "empty": "Belum ada daun diindeks",
+    "help": "Setiap nota ialah komitmen kepada pemilik dan jumlah yang tersembunyi. Sesuatu daun menunjukkan transaksi yang mencipta nota itu apabila komitmen berada pada rangkaian; nota genesis, pengeluaran dan deposit jambatan tidak dipautkan. Daun mana yang dibelanjakan oleh sesuatu nullifier tidak pernah didedahkan kepada umum."
+  },
+  "programs": {
+    "title": "Program",
+    "columns": {
+      "program": "Program",
+      "deployedAt": "Di-deploy pada",
+      "words": "Perkataan",
+      "calls": "Panggilan",
+      "lastCalled": "Dipanggil terakhir"
+    },
+    "never": "Tidak pernah",
+    "error": "Tidak dapat memuatkan program.",
+    "deployed": {
+      "other": "{n} program di-deploy"
+    },
+    "loading": "Memuatkan program…",
+    "empty": "Belum ada program di-deploy"
+  },
+  "tokens": {
+    "title": "Token",
+    "authority": {
+      "none": "Tiada (bekalan tetap)",
+      "key": "Ditandatangani kunci",
+      "bridge": {
+        "other": "Jambatan ({n} sokongan)"
+      },
+      "program": "Program"
+    },
+    "columns": {
+      "token": "Token",
+      "index": "Indeks",
+      "decimals": "Perpuluhan",
+      "authority": "Autoriti",
+      "totalSupply": "Jumlah bekalan",
+      "registeredAt": "Didaftarkan pada",
+      "tokenId": "ID token"
+    },
+    "error": "Tidak dapat memuatkan daftar token.",
+    "standard": "Standard token RPL",
+    "disabled": "Rantaian ini tiada daftar token: tiada token RPL didaftarkan, dan nod binaan ini lebih lama daripada RPC token. Setiap pindahan ialah RAND.",
+    "registered": {
+      "other": "{n} token RPL didaftarkan"
+    },
+    "registeredWithFee": {
+      "other": "{n} token RPL didaftarkan · yuran pendaftaran {fee} RAND"
+    },
+    "loading": "Memuatkan daftar token…",
+    "empty": "Belum ada token RPL didaftarkan",
+    "help": "Pendaftaran token dan mint-nya adalah awam secara reka bentuk (spesifikasi §4) — jumlah dan simbol di sini adalah tepat. Yang peribadi ialah siapa pemegang nota token dan antara siapa sesuatu pindahan memindahkannya: pindahan mana-mana token tidak dapat dibezakan daripada pembayaran RAND biasa pada halaman awam, dan indeks daftar token tidak pernah muncul pada bundle pindahan."
+  },
+  "validators": {
+    "title": "Pengesah",
+    "columns": {
+      "validator": "Pengesah",
+      "epochSet": "Set epoch",
+      "stake": "Kepentingan",
+      "rewards": "Ganjaran",
+      "unbonding": "Nyahikat",
+      "share": "Bahagian",
+      "blocksProposed": "Blok dicadangkan",
+      "lastProposed": "Dicadangkan terakhir"
+    },
+    "active": "Aktif",
+    "inactive": "Tidak aktif",
+    "never": "Tidak pernah",
+    "error": "Tidak dapat memuatkan daftar pengesah.",
+    "subtitle": "{active} aktif daripada {total} didaftarkan · {stake}",
+    "activeStake": "kepentingan aktif",
+    "loading": "Memuatkan pengesah…",
+    "empty": "Tiada pengesah dilaporkan",
+    "admission": "Pengesah baharu diterima melalui undian set (audit v6): ikatan yang mendaftarkan kunci baharu memerlukan <code>admit_validator</code> terlebih dahulu.",
+    "noneAdmitted": "Tiada kunci yang diterima dan menunggu untuk didaftarkan.",
+    "admittedWaiting": {
+      "other": "{n} diterima, belum didaftarkan:"
+    },
+    "help": "Daftar ini ialah satu-satunya tempat rantaian ini menyimpan jumlah secara jelas. Pengesah aktif ialah set yang menjalankan epoch semasa; pemimpin paparan v ialah entri aktif v mod n mengikut susunan alamat."
+  },
+  "provers": {
+    "title": "Prover",
+    "subtitle": "Prover yang diwakilkan: tempat dompet yang tidak dapat membuktikan sendiri menghantar bundle-nya, dan lokasi mesin tersebut",
+    "error": "Tidak dapat memuatkan prover.",
+    "columns": {
+      "host": "Hos",
+      "prover": "Prover",
+      "location": "Lokasi",
+      "network": "Rangkaian"
+    },
+    "notLocated": "Belum dikesan lokasinya",
+    "status": {
+      "answering": "Menjawab",
+      "notChecked": "Belum disemak",
+      "notAnswering": "Tidak menjawab"
+    },
+    "panel": {
+      "endpoint": "Titik akhir",
+      "operator": "Pengendali",
+      "fingerprint": "Cap jari",
+      "endpointReports": "titik akhir melaporkan {fingerprint}",
+      "endpointReportsOther": "titik akhir melaporkan kunci lain",
+      "capacity": "Kapasiti",
+      "capacityValue": {
+        "other": "{proving} membuktikan · {depth} menunggu · {n} slot"
+      },
+      "capacityNote": "(satu bundle pada satu masa bagi setiap ahli)",
+      "fee": "Yuran",
+      "feeValue": "{amount} sebundle",
+      "free": "Percuma",
+      "proves": "Membuktikan",
+      "jobs": "tugas {kinds}",
+      "provesValue": "{jobs} pada {backend} · binaan {version}",
+      "unknownBuild": "tidak diketahui",
+      "lastChecked": "Disemak terakhir",
+      "lastAnswered": "menjawab terakhir {time}",
+      "error": "Ralat",
+      "pairing": "Pemadanan"
+    },
+    "stats": {
+      "provers": "Prover",
+      "answering": "{count} menjawab",
+      "hosts": "Hos prover",
+      "countries": "Negara",
+      "slots": "Slot tugas",
+      "slotsSub": "kosong dan sibuk, prover yang menjawab"
+    },
+    "hosts": "Hos prover",
+    "empty": "Tiada prover yang diketahui oleh penjelajah ini",
+    "hostsHelp": "Satu kolam menjawab pada satu alamat dan menyerahkan setiap tugas kepada hos ahli yang mempunyai slot kosong, jadi sesebuah hos diletakkan di sini mengikut senarai penjelajah itu sendiri, bukan ditemui pada rangkaian. Lokasi diperoleh daripada IP awam setiap hos; alamat itu sendiri tidak dipaparkan.",
+    "help": "Prover yang diwakilkan menghasilkan bukti bundle sesebuah dompet daripada tugas yang dimeteraikan kepada kuncinya. Ia dihantar kunci pemandangan dompet itu, tidak pernah kunci belanjanya: sesiapa yang menjalankannya boleh membaca sejarah dompet itu, dan tidak lebih. Sesiapa sahaja boleh menjalankan prover sendiri (<code>rand-prover</code>) dan memadankan dompet dengannya."
+  },
+  "nodes": {
+    "title": "Nod",
+    "subtitle": "Nod penuh yang menjalankan Rand Protocol, dikesan melalui alamat rakan sebaya",
+    "error": "Tidak dapat memuatkan senarai rakan sebaya daripada nod.",
+    "columns": {
+      "role": "Peranan",
+      "peerId": "ID rakan sebaya",
+      "address": "Alamat",
+      "location": "Lokasi",
+      "network": "Rangkaian",
+      "connected": "Bersambung"
+    },
+    "roles": {
+      "validator": "Pengesah",
+      "observer": "Pemerhati",
+      "peer": "Rakan sebaya"
+    },
+    "thisNode": "Nod ini",
+    "unknownLocation": "Lokasi tidak diketahui",
+    "stats": {
+      "nodes": "Nod",
+      "geolocated": "Dikesan geolokasi",
+      "withoutLocation": "{count} tanpa lokasi",
+      "countries": "Negara"
+    },
+    "peers": "Rakan sebaya",
+    "empty": "Tiada rakan sebaya bersambung buat masa ini"
+  },
+  "search": {
+    "title": "Carian",
+    "subtitle": "Cari blok, transaksi, program, nota dan pengesah",
+    "help": "Cari mengikut ketinggian blok; mengikut cincang 64 aksara, yang boleh jadi blok, transaksi, ID program, komitmen nota atau nullifier; atau mengikut alamat pengesah base58. Tiada akaun pada rantaian ini.",
+    "searching": "Mencari “{query}”…",
+    "resultsFor": "Hasil untuk “{query}”",
+    "error": "Permintaan carian gagal.",
+    "noResults": "Tiada hasil",
+    "nothingMatches": "Tiada apa pada rantaian yang sepadan dengan “{query}”.",
+    "resultsCount": {
+      "other": "{n} hasil untuk “{query}”"
+    },
+    "types": {
+      "block": "Blok",
+      "transaction": "Transaksi",
+      "validator": "Pengesah",
+      "program": "Program",
+      "note": "Nota",
+      "nullifier": "Nullifier"
+    }
+  },
+  "dashboard": {
+    "account": "Akaun",
+    "title": "Kunci API",
+    "signOut": "Log keluar",
+    "requestFailed": "Permintaan gagal",
+    "newKey": {
+      "title": "Kunci baharu",
+      "copyNow": "Salin kunci anda sekarang. Demi keselamatan, ia hanya dipaparkan sekali; jika hilang, batalkannya dan cipta yang lain."
+    },
+    "create": {
+      "title": "Cipta kunci",
+      "name": "Nama",
+      "placeholder": "cth. pemantau deposit pertukaran",
+      "submit": "Kunci baharu",
+      "limits": "Sehingga 10 kunci aktif. Permintaan berkunci mendapat 600 permintaan seminit; trafik tanpa nama mendapat 60 bagi setiap IP. Lihat <a href=\"https://github.com/randprotocol/randscan/blob/main/docs/api.md\">panduan API</a>."
+    },
+    "activeKeys": "Kunci aktif ({count})",
+    "keysError": "Tidak dapat memuatkan kunci anda.",
+    "noActiveKeys": "Belum ada kunci aktif.",
+    "activeKeyMeta": {
+      "other": "dicipta {created} · digunakan terakhir {lastUsed} · {n} permintaan"
+    },
+    "revoke": "Batalkan",
+    "revokedKeys": "Kunci dibatalkan ({count})",
+    "revokedKeyMeta": {
+      "other": "dibatalkan {revoked} · {n} permintaan"
+    },
+    "changePassword": "Tukar kata laluan",
+    "email": "E-mel",
+    "memberSince": "Ahli sejak",
+    "lastSignIn": "Log masuk terakhir"
+  }
+}

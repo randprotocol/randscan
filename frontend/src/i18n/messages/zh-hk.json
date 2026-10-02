@@ -1,1 +1,1447 @@
-{}
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Rand Protocol 瀏覽器",
+    "metaDescription": "瀏覽 Rand Protocol 網絡上的區塊、交易、帳戶、驗證者及保密程式。",
+    "language": "語言",
+    "englishGoverns": "本譯文僅供參考,內容以英文版本為準。",
+    "loading": "載入中…",
+    "retry": "重試",
+    "copy": "複製",
+    "copied": "已複製",
+    "live": "即時",
+    "offline": "離線",
+    "notFound": "找不到",
+    "backToDashboard": "返回儀表板",
+    "somethingWrong": "發生錯誤",
+    "apiUnreachable": "無法連接瀏覽器 API,請再試一次。",
+    "previousPage": "上一頁",
+    "nextPage": "下一頁"
+  },
+  "fmt": {
+    "units": "單位",
+    "assetUnits": "資產 #{index} 的 {units} 個單位",
+    "bridged": "{tokens} 個代幣({units} 個單位)",
+    "chain": "鏈 {id}",
+    "unknownLocation": "未知位置"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "儀表板",
+      "blocks": "區塊",
+      "transactions": "交易",
+      "notes": "票據",
+      "history": "歷史",
+      "validators": "驗證者",
+      "provers": "證明者",
+      "programs": "程式",
+      "tokens": "代幣",
+      "bridge": "跨鏈橋",
+      "nodes": "節點"
+    },
+    "apiKeys": "API 金鑰",
+    "signIn": "登入",
+    "toggleNav": "切換導覽"
+  },
+  "footer": {
+    "blurb": "RandScan 是 Rand Protocol 的瀏覽器。",
+    "privacy": "私隱",
+    "terms": "條款"
+  },
+  "bridge": {
+    "title": "跨鏈橋",
+    "subtitle": "代幣在 Ethereum、BSC、Solana 及 Tron 上鎖定,並在此以隱密票據鑄造。跨鏈價值以票據形式存在,因此沒有餘額:只有轉入及轉出的記錄。",
+    "loadError": "無法載入跨鏈橋狀態。",
+    "noSection": "鏈 {chain} 的創世區塊沒有跨鏈橋部分:尚無守護者、資產登記冊,亦無跨鏈票據。待運行具備跨鏈橋部分的鏈後,橋將接受下列來源鏈及已核准代幣。",
+    "byChain": "按來源鏈劃分的跨鏈代幣",
+    "openOn": "在 {chain} 瀏覽器中開啟",
+    "openOnChain": "在該鏈瀏覽器中開啟",
+    "floorTitle": "創世時設定的重放下限。序號低於此值的鎖定,已在本鏈所源自的鏈上鑄造,或屬營運者在重新部署的合約上的自有鎖定,絕不會在此鑄造。",
+    "stats": {
+      "in": "跨鏈轉入",
+      "inSub": "已證明的存款",
+      "out": "跨鏈轉出",
+      "outSub": "已釋出的銷毀",
+      "assets": "已見資產",
+      "noActive": "尚無啟用的來源鏈",
+      "from": "來自 {chains}",
+      "approved": "已核准代幣",
+      "approvedSub": "四條鏈上的 USDT 及 USDC"
+    },
+    "activity": {
+      "token": "代幣",
+      "asset": "資產",
+      "in": "跨鏈轉入",
+      "out": "跨鏈轉出",
+      "fees": "銷毀手續費",
+      "feesTitle": "v0.6.8 跨鏈橋手續費,以 zUSD 票據形式從此代幣的銷毀中保留;「跨鏈轉出」只計算已釋出並離開鎖定餘額的部分。",
+      "outstanding": "現存於 Rand",
+      "locked": "已鎖定(登記冊)",
+      "minted": "已鑄造 / 上限",
+      "inLast": "過去 {window}",
+      "today": "今日",
+      "headroom": "可鑄造餘額",
+      "headroomMissing": "v0.6.7 之後的節點方提供。",
+      "headroomTitle": "上限目前容許此代幣存入的最大金額:其自身上限減去已鑄造數量,且不超過所有代幣合計在該時段內的剩餘額度。",
+      "last": "最近活動",
+      "notApproved": "不在核准名單內",
+      "na": "不適用",
+      "naTitle": "存款只會公開其所鑄造的代幣,而不會公開鎖定的是哪種來源幣,因此無法歸屬於多幣代幣中的某一種幣。",
+      "transactions": {
+        "other": "{n} 宗交易"
+      }
+    },
+    "source": {
+      "contract": "跨鏈橋合約",
+      "noContract": "此鏈尚未登記跨鏈橋合約",
+      "floor": "自序號 {sequence} 起的鎖定",
+      "inOut": "轉入 {in},轉出 {out}",
+      "out": "轉出 {out}",
+      "empty": "尚未從 {name} 跨鏈任何資產 · 鏈 ID {chain}"
+    },
+    "tokens": {
+      "title": "已核准代幣",
+      "intro": "跨鏈橋只接受這些代幣,其他一概不接受。請只發送至代幣所屬鏈上的跨鏈橋合約;存入任何其他代幣均會被合約拒絕,而在錯誤的鏈上存入已核准代幣,則會成為 Rand 上的另一種資產。",
+      "empty": "沒有已核准代幣",
+      "noteOn": "{chain} 上的 {symbol}:",
+      "decimalsNote": "Rand 上的金額一律帶有 8 位小數,不論代幣在原鏈上為多少位;跨鏈橋合約會在轉入及轉出時進行換算。登記冊將每個地址儲存為 32 位元組字:Ethereum、BSC 或 Tron 地址以零在左側補足,Solana mint 則維持原樣。",
+      "token": "代幣",
+      "chain": "鏈",
+      "address": "合約地址",
+      "decimals": "小數位數",
+      "onRand": "在 Rand 上為 8",
+      "status": "狀態",
+      "allowed": "允許",
+      "discontinued": "已停用"
+    },
+    "registry": {
+      "title": "資產登記冊",
+      "empty": "尚未登記任何跨鏈資產",
+      "note": "節點自身的登記冊,於每項資產首次存入時填寫。索引是跨鏈票據所帶的資產字;索引 0 為 RAND,絕不會出現在登記冊中。",
+      "index": "索引",
+      "sourceChain": "來源鏈",
+      "token": "代幣",
+      "unknown": "未知",
+      "tokenAddress": "代幣地址(32 位元組)",
+      "assetId": "資產 ID"
+    },
+    "state": {
+      "title": "跨鏈橋狀態",
+      "mintPause": "鑄造暫停",
+      "paused": "已暫停 — 拒絕轉帳證明(銷毀及輪換仍可進行)",
+      "notPaused": "未暫停",
+      "pauseNonce": "暫停 / 恢復 nonce",
+      "listNonce": "名單 nonce",
+      "registrationFee": "登記費用",
+      "pqGuardians": "PQ 守護者({count})",
+      "pqGuardiansText": {
+        "other": "{n} 個 Dilithium2 金鑰,與下方的傳統守護者集合按索引對應。每項存款證明及每項需要法定人數的治理操作,均由此集合共同簽署;輪換絕不會更動它。"
+      },
+      "pauseKey": "暫停金鑰",
+      "outboundEmitter": "轉出發送者",
+      "guardianSet": "守護者集合",
+      "guardians": "守護者({count})",
+      "messagesEmitted": "已發出訊息",
+      "nextIndex": "下一個資產索引",
+      "fees": "跨鏈橋手續費",
+      "feeRates": "轉入 {in} / 轉出 {out}",
+      "feeBps": "({in} / {out} bps),以 zUSD 票據形式鑄造予",
+      "feesCollected": "迄今已收取:存款 <code>{deposits}</code>,銷毀 <code>{burns}</code>。存款會鎖定其總額,並鑄造收款人的票據及手續費票據;銷毀會釋出銷毀額減去手續費,並將手續費鑄回,因此供應量 = Σ 已鎖定 = 託管仍然成立。手續費票據沒有信封。",
+      "rotationRules": "輪換規則",
+      "rotationDelay": "輪換在提交後 {delay} 生效",
+      "rotationDelayPossession": "輪換在提交後 {delay} 生效,且必須附有每位新持有者的持有證明",
+      "pendingPauseKey": "待處理的暫停金鑰輪換,生效時間 <code>{at}</code>",
+      "pendingPq": "待處理的 PQ 守護者輪換,生效時間 <code>{at}</code>",
+      "noPending": "沒有待處理的輪換",
+      "rotationNonce": "輪換 nonce",
+      "mintCapAll": "鑄造上限,所有代幣",
+      "mintCapPer": "每 {window},涵蓋所有代幣的全部支持",
+      "mintedInWindow": "此時段已鑄造 <code>{minted}</code>,尚可再鑄造 <code>{room}</code>",
+      "trustedEmitters": "受信任發送者({count})",
+      "asStored": "按鏈上儲存的形式",
+      "floorMinted": "自序號 {sequence} 起已鑄造的鎖定"
+    }
+  },
+  "auth": {
+    "login": {
+      "metaTitle": "登入 — RandScan"
+    },
+    "signup": {
+      "metaTitle": "建立帳戶 — RandScan"
+    },
+    "form": {
+      "intro": "擁有帳戶後,您可建立請求配額較高的 API 金鑰。",
+      "email": "電郵",
+      "password": "密碼",
+      "minLength": "至少 10 個字元。",
+      "forgotLink": "忘記密碼?",
+      "pleaseWait": "請稍候…",
+      "requestFailed": "請求失敗",
+      "login": {
+        "title": "登入",
+        "button": "登入",
+        "alt": "還沒有帳戶?",
+        "altLabel": "建立帳戶"
+      },
+      "signup": {
+        "title": "建立帳戶",
+        "button": "建立帳戶",
+        "alt": "已經註冊?",
+        "altLabel": "登入",
+        "terms": "建立帳戶即表示您接受<a href=\"/terms\">服務條款</a>及<a href=\"/privacy\">私隱政策</a>。"
+      }
+    },
+    "forgot": {
+      "metaTitle": "忘記密碼 — RandScan",
+      "title": "忘記密碼?",
+      "intro": "請輸入您的帳戶電郵,我們會發送連結讓您選擇新密碼。該連結的有效期為一小時。",
+      "sent": "若 <code>{email}</code> 已有帳戶,重設連結正在發送途中。若數分鐘內仍未收到,請檢查垃圾郵件匣。",
+      "backToSignIn": "返回登入",
+      "button": "發送重設連結",
+      "remembered": "記起密碼了?",
+      "signIn": "登入"
+    },
+    "reset": {
+      "metaTitle": "重設密碼 — RandScan",
+      "title": "重設密碼",
+      "missingToken": "此連結缺少令牌。請開啟電郵中的連結,或重新申請。",
+      "requestLink": "申請新連結",
+      "choose": "選擇新密碼",
+      "signedOut": "您將在所有其他裝置上登出。",
+      "newPassword": "新密碼",
+      "confirm": "確認新密碼",
+      "mismatch": "兩次輸入的密碼不一致。",
+      "button": "設定新密碼",
+      "expired": "連結已過期?",
+      "requestNew": "申請新連結"
+    },
+    "change": {
+      "current": "目前密碼",
+      "done": "密碼已更改,其他裝置已登出。",
+      "button": "更改密碼"
+    }
+  },
+  "components": {
+    "dataTable": {
+      "empty": "沒有可用資料"
+    },
+    "tables": {
+      "blocks": {
+        "height": "高度",
+        "hash": "Hash",
+        "proposer": "提議者",
+        "txs": "交易數",
+        "view": "檢視",
+        "age": "時間",
+        "empty": "尚未索引任何區塊"
+      },
+      "txs": {
+        "hash": "Tx hash",
+        "kind": "類型",
+        "height": "高度",
+        "action": "操作",
+        "fee": "手續費",
+        "age": "時間",
+        "empty": "找不到交易",
+        "hiddenTitle": "發送者、接收者及金額均隱藏於交易包內",
+        "shielded": "隱密",
+        "noFeeTitle": "由驗證者簽署的操作:沒有交易包,沒有手續費"
+      }
+    },
+    "search": {
+      "placeholder": "按高度、哈希、地址或程式搜尋",
+      "ariaLabel": "搜尋瀏覽器"
+    },
+    "theme": {
+      "toLight": "切換至淺色主題",
+      "toDark": "切換至深色主題",
+      "light": "淺色主題",
+      "dark": "深色主題"
+    },
+    "nodeMap": {
+      "thisNode": "{role} · 本節點",
+      "connected": "已連接 {time}",
+      "copyPeerId": "複製對等節點 ID"
+    },
+    "openedNotes": {
+      "received": "已接收",
+      "sent": "已發送",
+      "openedWithTxKey": "以交易金鑰開啟",
+      "unspent": "未花費",
+      "spentIn": "花費於",
+      "leaf": "葉 #{n}",
+      "feeHint": "跨鏈橋手續費票據:它沒有信封(不向任何人加密),因此只有手續費收款人的檢視金鑰能找到它,方法是根據公開欄位重建",
+      "notIndexed": "信封尚未索引",
+      "notOpened": "此金鑰未能開啟(或為虛設位置,不向任何人加密)",
+      "amount": "金額",
+      "owner": "擁有者 (pk)",
+      "createdBy": "建立者 (pk)",
+      "noteTime": "票據時間",
+      "commitment": "承諾",
+      "verifiedRebuilt": "已驗證 ✓(以此金鑰的 pk 根據公開欄位重建,並與葉相符)",
+      "verifiedRecomputed": "已驗證 ✓(根據明文重新計算)",
+      "nullifier": "作廢符(nullifier)",
+      "status": "狀態",
+      "noTranscript": "此次呼叫沒有公開輸入記錄。",
+      "transcriptNotOpened": "此金鑰未能開啟輸入記錄。",
+      "caller": "呼叫者",
+      "auditor": "審計者",
+      "openedWithCallKey": "以呼叫金鑰開啟",
+      "callInputs": "呼叫輸入",
+      "privateInputs": "私有輸入",
+      "salt": "鹽值",
+      "faithful": "與 H_IN 一致 ✓",
+      "falseTranscript": "與 H_IN 不符:呼叫方發佈了虛假的記錄"
+    },
+    "txOpener": {
+      "noNotes": "此交易沒有建立任何附帶信封的票據(沒有可供密鑰開啟的內容)。"
+    },
+    "keyPanel": {
+      "title": "以密鑰開啟",
+      "kinds": {
+        "viewing": "檢視密鑰 (nk)",
+        "spend": "花費密鑰",
+        "tx": "交易密鑰",
+        "call": "呼叫密鑰"
+      },
+      "kindsLower": {
+        "viewing": "檢視密鑰 (nk)",
+        "spend": "花費密鑰",
+        "tx": "交易密鑰",
+        "call": "呼叫密鑰"
+      },
+      "invalidWithFile": "密鑰為 64 個十六進位字元,或錢包密鑰檔案 (wallet.key.json) 的內容。",
+      "invalidKinds": "{kinds}為 64 個十六進位字元。",
+      "placeholderFile": "64 個十六進位字元,或貼上 wallet.key.json",
+      "placeholder": "64 個十六進位字元",
+      "keyFileDetected": "已偵測到密鑰檔案",
+      "opening": "開啟中…",
+      "open": "開啟",
+      "remember": "在此分頁中記住",
+      "preferViewing": "建議使用檢視密鑰:花費密鑰可以轉移資金。本頁會在本機推導檢視密鑰,並只在記憶體中保留該密鑰。"
+    }
+  },
+  "kinds": {
+    "transfer": {
+      "label": "轉帳(隱私)",
+      "short": "轉帳"
+    },
+    "mint": {
+      "label": "鑄造(水龍頭)",
+      "short": "鑄造"
+    },
+    "deploy": {
+      "label": "部署",
+      "short": "部署"
+    },
+    "call": {
+      "label": "呼叫(保密)",
+      "short": "呼叫"
+    },
+    "bond": {
+      "label": "質押",
+      "short": "質押"
+    },
+    "unbond": {
+      "label": "解除質押",
+      "short": "解除質押"
+    },
+    "withdraw": {
+      "label": "提取",
+      "short": "提取"
+    },
+    "bridge_attest": {
+      "label": "跨鏈轉入(證明)",
+      "short": "跨鏈轉入"
+    },
+    "bridge_burn": {
+      "label": "跨鏈轉出(銷毀)",
+      "short": "跨鏈轉出"
+    },
+    "register_token": {
+      "label": "代幣已登記",
+      "short": "登記代幣"
+    },
+    "token_mint": {
+      "label": "代幣鑄造",
+      "short": "代幣鑄造"
+    },
+    "set_authority": {
+      "label": "代幣權限已變更",
+      "short": "設定權限"
+    },
+    "token_burn": {
+      "label": "代幣銷毀",
+      "short": "代幣銷毀"
+    },
+    "pause_mints": {
+      "label": "跨鏈鑄造已暫停",
+      "short": "暫停鑄造"
+    },
+    "unpause_mints": {
+      "label": "跨鏈鑄造已恢復",
+      "short": "恢復鑄造"
+    },
+    "register_bridged_token": {
+      "label": "跨鏈代幣已上架",
+      "short": "上架代幣"
+    },
+    "list_backing": {
+      "label": "儲備已上架",
+      "short": "上架儲備"
+    },
+    "invoke": {
+      "label": "調用(程式狀態)",
+      "short": "調用"
+    },
+    "admit_validator": {
+      "label": "驗證者已獲接納(投票)",
+      "short": "接納"
+    },
+    "slash_equivocation": {
+      "label": "雙重簽署已被罰沒",
+      "short": "罰沒"
+    },
+    "rotate_pq_guardians": {
+      "label": "PQ 守護者已輪換",
+      "short": "輪換 PQ"
+    },
+    "rotate_pause_key": {
+      "label": "暫停密鑰已輪換",
+      "short": "輪換暫停"
+    },
+    "rotate_pq_guardians_v2": {
+      "label": "PQ 守護者輪換(延遲)",
+      "short": "輪換 PQ"
+    },
+    "rotate_pause_key_v2": {
+      "label": "暫停密鑰輪換(延遲)",
+      "short": "輪換暫停"
+    },
+    "cancel_rotation": {
+      "label": "輪換已取消",
+      "short": "取消輪換"
+    },
+    "other": {
+      "label": "其他",
+      "short": "其他"
+    }
+  },
+  "roles": {
+    "validator": "驗證者",
+    "observer": "觀察者",
+    "peer": "對等節點"
+  },
+  "block": {
+    "notFound": "找不到區塊",
+    "notFoundMessage": "沒有區塊符合「{id}」。可按高度或 64 字元的雜湊值查詢區塊。",
+    "back": "返回區塊",
+    "loadError": "無法載入此區塊。",
+    "title": "區塊 #{height}",
+    "overview": "概覽",
+    "height": "高度",
+    "hash": "Hash",
+    "parent": "上一區塊",
+    "genesis": "創世區塊(無上一區塊)",
+    "proposer": "提議者",
+    "timestamp": "時間戳",
+    "view": "視圖",
+    "justifyView": "證明視圖",
+    "transactions": "交易",
+    "txRoot": "交易根",
+    "stateRoot": "狀態根",
+    "txHeading": "交易 ({count})",
+    "previous": "← 上一個區塊",
+    "empty": "此區塊不包含任何交易"
+  },
+  "tx": {
+    "notFound": "找不到交易",
+    "notFoundMessage": "沒有交易符合「{hash}」。只有已確認的交易才會被索引。",
+    "back": "返回交易",
+    "loadError": "無法載入此交易。",
+    "title": "交易",
+    "overview": "概覽",
+    "hash": "Hash",
+    "kind": "類型",
+    "block": "區塊",
+    "indexInBlock": "區塊內索引",
+    "timestamp": "時間戳",
+    "fee": "費用",
+    "noFee": "無(沒有捆綁包)",
+    "bundle": "捆綁包",
+    "bundleYes": "是:由發送者自己的票據支付,並以 STARK 證明",
+    "bundleNo": "否:由驗證者或守護者法定人數簽署",
+    "chainId": "鏈 ID",
+    "kindDetails": "{kind}詳情",
+    "program": "程式",
+    "callProofSize": "呼叫證明大小",
+    "inputTranscript": "輸入記錄",
+    "sealed": "已封存 {size}",
+    "amount": "金額",
+    "amountBurned": "銷毀金額",
+    "asset": "資產",
+    "assetIndex": "資產 #{index}",
+    "recipient": "收款人",
+    "noteTime": "票據時間",
+    "token": "代幣",
+    "name": "名稱",
+    "symbol": "Symbol",
+    "decimals": "小數位數",
+    "authority": "權限",
+    "registryIndex": "登記冊索引",
+    "mintNonce": "鑄造 nonce",
+    "nonce": "Nonce",
+    "none": "無",
+    "sourceChain": "來源鏈",
+    "sourceToken": "來源代幣",
+    "sourceDecimals": "來源小數位數",
+    "pqCoSigners": "PQ 守護者共同簽署者",
+    "bridgeFee": "跨鏈費用",
+    "feeNoteLeaf": "發給費用收款人的票據,葉節點",
+    "cells": {
+      "key": "鍵",
+      "wrote": "寫入",
+      "read": "讀取",
+      "zerosDeleted": "全為零 — 該儲存格已刪除",
+      "zerosAbsent": "全為零 — 該儲存格不存在"
+    },
+    "payout": {
+      "nth": "支付 {n}",
+      "to": "至",
+      "note": "票據"
+    },
+    "invoke": {
+      "nonePublished": "未發佈",
+      "intoVault": "存入金庫",
+      "noRand": "沒有 RAND",
+      "and": "及",
+      "destroyed": "— 已銷毀(程式自身的代幣)",
+      "deposited": "— 已存入",
+      "cellsRead": "讀取的儲存格 ({count})",
+      "cellsWritten": "寫入的儲存格 ({count})",
+      "paidOut": "已支付 ({count})",
+      "minted": "已鑄造 ({count})",
+      "none": "無",
+      "nothingLeft": "沒有任何資產離開金庫",
+      "nothing": "無",
+      "help": "一次呼叫,其證明恰好擔保此項狀態轉換,並已由帳本套用:讀取的內容必須與所示數值一致,否則交易會被拒絕;每筆支付都是鏈根據上述內容計算出的票據,因此收款人可像找到鑄造所得一樣找到它。誰存入屬私隱資料;資產如何流動則並非私隱。"
+    },
+    "bundlePanel": {
+      "anchor": "錨點",
+      "nullifierAsset": "作廢標記 {n}(資產)",
+      "nullifierRand": "作廢標記 {n} (RAND)",
+      "commitmentAsset": "承諾 {n}(資產)",
+      "commitmentRand": "承諾 {n} (RAND)",
+      "burned": "已銷毀",
+      "nothingBurned": "沒有銷毀",
+      "time": "時間(目標高度)",
+      "proofSize": "證明大小",
+      "envelopeSizes": "信封大小",
+      "authCommit": "授權承諾",
+      "authProofSize": "授權證明大小",
+      "authorisation": "授權",
+      "authInside": "包含在捆綁包證明內(此鏈上沒有獨立的授權證明)",
+      "help": "四個欄位(包括虛擬欄位):欄位 1–2 載有一項隱私資產(RAND 或任何 RPL 代幣),欄位 3–4 一律為 RAND。沒有公開的資產欄位 — RAND 的轉帳與任何 RPL 代幣的轉帳在形態上完全相同,逐欄一致。證明和信封只報告大小。",
+      "splitAuth": "分拆授權:捆綁包證明由檢視密鑰產生,並發佈授權承諾;另一個以花費密鑰產生的小型證明必須與之相符,因此委託的證明者從不持有花費密鑰。"
+    },
+    "transfer": {
+      "help": "一筆普通的 RAND 或任何 RPL 代幣隱私轉帳 — 資產屬私隱資料,因此本頁無法顯示轉移的是哪一種。最多花費兩張票據,最多建立兩張,另加費用。誰付款給誰、金額多少、屬何種資產,只有雙方,以及獲其提供檢視密鑰或交易密鑰的人才知道。"
+    },
+    "mint": {
+      "depositNote": "存款票據",
+      "mintedBy": "鑄造者",
+      "help": "一筆 testnet 水龍頭存款。金額只在這筆交易中公開;其後所建立的票據與其他任何票據無從分辨。"
+    },
+    "deploy": {
+      "wordsLength": "字詞長度",
+      "words": {
+        "other": "{n} 個字詞"
+      }
+    },
+    "call": {
+      "nonePublished": "未發佈(呼叫方選用了 --no-envelope)",
+      "help": "呼叫的私密輸入絕不會以明文離開錢包。記錄一經發佈,只有呼叫方的檢視密鑰、每次呼叫的密鑰,或呼叫方指定的審計者才能開啟。"
+    },
+    "staking": {
+      "validator": "驗證者",
+      "registration": "登記",
+      "newValidator": "新驗證者",
+      "existingValidator": "現有驗證者",
+      "registerNonce": "登記 nonce",
+      "bondHelp": "價值由資金池(捆綁包的銷毀)轉入驗證者的公開質押。",
+      "unbondHelp": "質押已轉入解除質押隊列,由驗證者的密鑰簽署。",
+      "withdrawHelp": "已釋放的質押和獎勵,在驗證者的支付地址上成為一張公開金額的新票據。"
+    },
+    "bridgeBurn": {
+      "released": "在來源鏈上釋放",
+      "relayerFee": "中繼者費用",
+      "destChain": "目的鏈",
+      "destAddress": "目的地址",
+      "coinRedeemed": "已贖回的幣",
+      "help": "一個隱藏資產的捆綁包承載整項銷毀:其 <code>burn_a</code> 和 <code>burn_asset</code> 即為此操作的資產和金額,其費用以 RAND 支付跨鏈費用。"
+    },
+    "attest": {
+      "size": "證明書大小",
+      "rotation": "守護者集合輪換,沒有存款",
+      "gross": "總額,已鎖定於來源鏈",
+      "deposited": "存入收款人",
+      "commitment": "存款承諾",
+      "rotationShort": "—(輪換)",
+      "help": "一則由守護者簽署的訊息,將跨鏈資產以票據形式存入收款人名下。金額只在此處公開,其他地方一概不公開。",
+      "feeHelp": "按鏈的跨鏈費用,總額會被鎖定並拆分為兩張票據:收款人的票據,以及發給費用收款人的費用票據。費用票據沒有信封,因此沒有檢視密鑰能透過解密找到它;其擁有者須根據上述欄位重建。"
+    },
+    "registerToken": {
+      "initialMint": "初始鑄造",
+      "amountTo": "{amount} 至",
+      "help": "代幣的登記及其初始鑄造按設計是公開的,跨鏈存款亦然(規格 §4) — 只有代幣票據其後的轉帳才屬隱私。"
+    },
+    "tokenMint": {
+      "help": "所鑄造票據的每個字詞都在此處(其發送者是鏈固定的鑄造標記),因此無論鑄造者發佈了何種信封,收款人都無須解密便可重建該票據。"
+    },
+    "setAuthority": {
+      "newAuthority": "新權限",
+      "renounced": "無(已放棄 — 此代幣永遠不能再鑄造)"
+    },
+    "tokenBurn": {
+      "help": "持有人銷毀:按設計是公開的,因為這使代幣的總供應量可供審計。同一代幣的轉帳是普通的隱私轉帳 — 其資產仍屬私隱資料。"
+    },
+    "pause": {
+      "pauseHelp": "暫停期間,所有轉帳證明都會被拒絕;銷毀和守護者集合輪換仍然開放。僅由創世暫停密鑰簽署。",
+      "unpauseHelp": "解除暫停需要 PQ 守護者法定人數 — 暫停密鑰永遠不能自行解除暫停。"
+    },
+    "governance": {
+      "help": "由 PQ 守護者法定人數授權,使用提交者支付的 RAND 費用捆綁包。"
+    },
+    "rotation": {
+      "nonce": "輪換 nonce",
+      "newSet": "新的 PQ 守護者集合",
+      "keys": {
+        "other": "{n} 個 Dilithium2 密鑰"
+      },
+      "newPauseKey": "新的暫停密鑰",
+      "possession": "持有證明",
+      "cancelled": "已取消",
+      "pendingPauseKey": "待生效的暫停密鑰輪換",
+      "pendingGuardians": "待生效的 PQ 守護者輪換",
+      "cancelHelp": "一項已簽署但尚未生效的輪換,在延遲期屆滿前被撤回(審計 v6,BRG-14)。",
+      "delayedHelp": "由現任 PQ 守護者法定人數簽署,並附有每位新持有者的持有證明;除非被取消,否則在創世輪換延遲期後生效(見跨鏈頁面)。",
+      "help": "由輪換前集合的 PQ 守護者法定人數簽署(跨鏈規則 v2)。"
+    },
+    "admit": {
+      "candidate": "候選者",
+      "voters": "投票者",
+      "validators": {
+        "other": "{n} 個驗證者"
+      },
+      "votedBy": "投票者為",
+      "help": "驗證者集合的投票,允許此密鑰憑質押登記,適用於以投票接納驗證者的鏈(審計 v6,STAKE-2)。不含捆綁包,亦無費用。"
+    },
+    "slash": {
+      "offender": "違規者",
+      "view": "視圖",
+      "firstHeader": "第一個區塊頭",
+      "secondHeader": "第二個區塊頭",
+      "help": "同一驗證者密鑰在同一視圖中簽署的兩個區塊頭:這是領導者雙重提案的證據,按創世罰沒規則(審計 v6,STAKE-1)予以罰沒。"
+    },
+    "receipt": {
+      "title": "回執",
+      "none": "此呼叫或調用尚未索引任何回執。",
+      "tier": "層級",
+      "position": "位置",
+      "index": "索引 {index}",
+      "hIn": "輸入承諾(H_IN)",
+      "hPub": "公開輸入(H_PUB)",
+      "hPubEmpty": "空——該程式部署時沒有公開輸入",
+      "outputs": "輸出",
+      "out": "輸出 {index}",
+      "help": "只記錄八個公開輸出字,其他一概不會變動:價值只會透過支付該呼叫費用的捆綁包轉移。H_IN 是私密輸入的加鹽摘要,單憑它不會洩露任何資料。"
+    },
+    "unknownKind": {
+      "help": "此交易類型比目前的瀏覽器版本更新。它已連同哈希、捆綁包、費用及區塊一併索引;瀏覽器更新後將顯示解碼後的欄位。"
+    }
+  },
+  "note": {
+    "notFound": "找不到票據",
+    "notFoundMessage": "沒有與「{id}」相符的樹葉。可按承諾(64 位十六進制)或葉索引查找票據;最近區塊的承諾可能尚未載入。",
+    "back": "返回票據列表",
+    "loadError": "無法載入此票據。",
+    "title": "票據 #{index}",
+    "leaf": "葉",
+    "leafIndex": "葉索引",
+    "commitment": "承諾",
+    "createdAt": "創建於區塊高度",
+    "createdBy": "創建者",
+    "genesisDeposit": "創世存款票據",
+    "depositOffWire": "承諾不在鏈上傳輸的存款(提款或跨鏈橋證明)",
+    "openWithKey": "持有接收方或發送方的查看密鑰,或此交易的密鑰?<a href=\"{href}\">在交易頁面用密鑰開啟</a>。",
+    "sealed": "擁有者和金額都在密封信封內,只有接收方和發送方的查看密鑰才能開啟。此票據是否已被花費同樣不公開:無法將作廢標記與其葉配對。"
+  },
+  "program": {
+    "notFound": "找不到程式",
+    "notFoundMessage": "沒有與「{id}」相符的程式。程式 id 為 64 個字元的哈希。",
+    "back": "返回程式列表",
+    "loadError": "無法載入此程式。",
+    "title": "程式",
+    "calls": "呼叫",
+    "andInvokes": {
+      "other": "及 {n} 次調用"
+    },
+    "codeSize": "程式碼大小",
+    "words": {
+      "other": "{n} 個字"
+    },
+    "deployedAt": "部署於",
+    "lastCalled": "最近呼叫",
+    "callOrInvoke": "呼叫或調用",
+    "details": "詳情",
+    "programId": "程式 id",
+    "deployTx": "部署交易",
+    "deployedAtHeight": "部署於區塊高度",
+    "basePc": "基準 PC",
+    "wordsLength": "字長度",
+    "codeHash": "程式碼哈希",
+    "publicInput": "公開輸入",
+    "noPublicInput": "無——呼叫按空輸入檢查",
+    "publicDigest": "公開摘要(H_PUB)",
+    "callCount": "呼叫次數",
+    "never": "從未",
+    "vault": "金庫",
+    "vaultEmpty": "該程式沒有持有任何資產。價值透過調用的捆綁包進入其金庫,並以調用支付的票據形式離開。",
+    "asset": "資產 #{index}",
+    "stateCells": "狀態單元({count})",
+    "noCells": "沒有單元:尚未寫入任何資料,或所有寫入均為零。",
+    "key": "鍵",
+    "value": "值",
+    "statePublic": "按設計公開:程式的狀態是 64 位十六進制鍵對 64 位十六進制值(各八個字)的映射,按鍵順序從節點即時讀取。",
+    "moreCells": "後面還有更多單元;API 在 <code>/api/v1/programs/{id}/cells?after=…</code> 分頁提供。",
+    "recentCallsInvokes": "最近的呼叫和調用",
+    "recentCalls": "最近的呼叫",
+    "empty": "此程式尚未被呼叫"
+  },
+  "token": {
+    "initialMint": "初始鑄造",
+    "mint": "鑄造",
+    "burn": "銷毀",
+    "height": "區塊高度",
+    "event": "事件",
+    "transaction": "交易",
+    "change": "變動",
+    "notFound": "找不到代幣",
+    "notFoundMessage": "沒有與「{id}」相符的 RPL 代幣。請使用其登記索引、64 位十六進制 id 或 rpl1… 文字形式。",
+    "back": "返回代幣列表",
+    "loadError": "無法載入此代幣。",
+    "totalSupply": "總供應量",
+    "decimals": "小數位數",
+    "registryIndex": "登記索引",
+    "authority": "授權方",
+    "authorityKind": {
+      "none": "無",
+      "key": "密鑰",
+      "program": "程式",
+      "bridge": "跨鏈橋"
+    },
+    "backingCount": {
+      "other": "{n} 項抵押"
+    },
+    "registration": "登記",
+    "deployTx": "部署交易",
+    "notIndexed": "未索引(於本次處理前登記)",
+    "registeredAt": "登記於",
+    "idHex": "代幣 id(十六進制)",
+    "idText": "代幣 id(rpl1…)",
+    "mintNonce": "鑄造 nonce",
+    "mintAuthority": "鑄造授權方",
+    "signingKey": "簽署密鑰",
+    "address": "地址",
+    "program": "程式",
+    "backings": "抵押({count})",
+    "sourceChain": "來源鏈",
+    "sourceToken": "來源代幣",
+    "sourceDecimals": "來源小數位數",
+    "locked": "已鎖定",
+    "mintedIn": "{window}內已鑄造 / 上限",
+    "mintedToday": "今日已鑄造 / 上限",
+    "roomToMint": "可鑄造空間",
+    "roomToMintHelp": "上限目前容許此幣種存入的最大金額:其自身上限減去已鑄造數量,且不超過所有代幣在該時段內合計剩餘的額度。",
+    "supplyHistory": "供應量歷史",
+    "empty": "此代幣尚未索引任何公開的鑄造或銷毀事件",
+    "historyHelp": "所有涉及此代幣的 register_token(初始鑄造)、token_mint 及 token_burn,最舊的在前——按設計公開,因為這正是總供應量可供審計的原因。此代幣票據的轉移屬一般隱私轉帳,不會在此顯示。"
+  },
+  "validator": {
+    "releaseEpoch": "釋放週期",
+    "amount": "金額",
+    "notFound": "找不到驗證者",
+    "notFoundMessage": "「{address}」不在驗證者登記冊內。",
+    "back": "返回驗證者列表",
+    "loadError": "無法載入此驗證者。",
+    "title": "驗證者",
+    "active": "本週期活躍",
+    "inactive": "不在目前集合內",
+    "stake": "質押",
+    "rewards": "獎勵",
+    "unwithdrawnFees": "未提取費用",
+    "share": "佔活躍質押比例",
+    "blocksProposed": "已提議區塊",
+    "lastAgo": "最近 {ago}",
+    "registerEntry": "登記冊條目",
+    "address": "地址",
+    "payout": "支付地址",
+    "payoutUnknown": "此節點未提供",
+    "nonce": "登記 nonce",
+    "sortIndex": "排序索引",
+    "lastProposed": "最近提議的區塊",
+    "never": "從未",
+    "unbonding": "解除質押隊列",
+    "unbondingEmpty": "沒有正在解除質押的項目",
+    "stakingTxs": "質押交易",
+    "stakingEmpty": "沒有涉及此驗證者的質押、解除質押、提取或鑄造",
+    "recentBlocks": "最近區塊",
+    "blocksEmpty": "此驗證者尚未提議任何區塊"
+  },
+  "account": {
+    "title": "此鏈沒有帳戶",
+    "shielded": "RAND 是完全隱私保護的鏈。餘額是一組只有其擁有者的查看密鑰才能開啟的票據,而交易不載有發送方、接收方或金額:只有承諾、作廢標記、密封信封、費用和證明。",
+    "nothingToShow": "因此瀏覽器無法顯示任何地址的資料。公開的內容包括驗證者登記冊(質押、獎勵、解除質押隊列)、承諾樹和作廢標記集、程式部署、呼叫回執以及跨鏈橋本身的狀態。",
+    "isValidator": "此地址是驗證者:<a href=\"{href}\">查看其登記冊條目 →</a>",
+    "validators": "驗證者 →",
+    "notes": "票據(承諾樹)→"
+  },
+  "viewing": {
+    "leaf": "葉",
+    "height": "區塊高度",
+    "transaction": "交易",
+    "genesis": "創世",
+    "deposit": "存款",
+    "role": "角色",
+    "amount": "金額",
+    "counterparty": "對手方(pk)",
+    "status": "狀態",
+    "token": "代幣",
+    "assetIndex": "資產 #{index}",
+    "spendable": "可花費餘額",
+    "unspentNotes": "未花費票據",
+    "title": "我的記錄",
+    "subtitle": "以查看密鑰掃描承諾樹。瀏覽器不會接觸該密鑰;所有信封都在你的瀏覽器中開啟。",
+    "scanTitle": "以查看密鑰掃描",
+    "scanned": {
+      "other": "已掃描 {scanned} / {n} 片葉"
+    },
+    "spendableHelp": "已收到的未花費票據,RAND;代幣見下",
+    "notesReceived": "已收票據",
+    "unspentCount": "{count} 張未花費",
+    "notesSent": "已發票據",
+    "address": "地址",
+    "pk": "pk {pk}…",
+    "shieldedAddress": "隱私地址:",
+    "empty": "此密鑰無法開啟鏈上的任何票據",
+    "footnote": "每一行都已在此瀏覽器中解密,其承諾亦已根據明文重新計算。找零票據會顯示為已收。"
+  },
+  "legal": {
+    "label": "法律",
+    "effective": "生效日期:{date}",
+    "contents": "目錄",
+    "seeAlso": "另請參閱<a href=\"{href}\">{label}</a>。"
+  },
+  "privacy": {
+    "metaTitle": "私隱政策 — RandScan",
+    "metaDescription": "RandScan 收集甚麼、從不接觸甚麼,以及所收集資料的保存期限。",
+    "title": "私隱政策",
+    "effective": "2026 年 10 月 2 日",
+    "intro": "RandScan 展示的是公開帳本,幾乎不保留任何瀏覽者的資料。本頁清楚說明瀏覽器會看到甚麼、儲存甚麼、從不接觸甚麼,以及任何資料的保存期限。",
+    "sections": [
+      {
+        "id": "scope",
+        "title": "我們是誰及本政策涵蓋範圍",
+        "body": [
+          "RandScan(randscan.org)是 Rand Protocol 的區塊瀏覽器,由 Rand Protocol 團隊(「我們」)營運。它為 Rand Protocol 網絡的公開帳本建立索引,並以網頁、JSON API 和 WebSocket 推送的形式展示。本政策涵蓋網站、randscan.org/api 的 API,以及你為取得 API 密鑰而可建立的帳戶。",
+          "瀏覽器的原始碼按 MIT 許可證公開,因此這裏所述的一切,都可對照軟件的實際行為查證。"
+        ]
+      },
+      {
+        "id": "no-tracking",
+        "title": "我們不做的事",
+        "body": [
+          "RandScan 不使用分析、廣告或追蹤腳本。字型由我們自己的伺服器提供。任何頁面都不會載入第三方 JavaScript。由於沒有需要同意的項目,所以沒有 cookie 橫幅:唯一的 cookie 是你從選單選擇的語言(如有選擇),以及下文所述的登入會話,而後者只會在你登入後才設定。",
+          "我們不會出售、出租或與任何人分享個人資料,供對方作自身用途。"
+        ]
+      },
+      {
+        "id": "chain-data",
+        "title": "公開區塊鏈資料",
+        "body": [
+          "RandScan 展示的幾乎所有內容,都是 Rand Protocol 帳本的副本:區塊、交易、票據、驗證者、程式、代幣及跨鏈橋活動。該帳本按設計公開,並由網絡上每個節點複製。這些資料並非我們從你處收集,我們無法更改,亦無法從中移除任何條目。",
+          "Rand Protocol 是屏蔽式區塊鏈。交易金額、發送方和接收方在帳本上均被隱藏,而瀏覽器只顯示鏈上公開的內容:每宗交易的承諾、作廢標記(nullifier)和證明,以及鏈自行計算並公開的票據公開開啟內容,例如手續費和跨鏈橋鑄造。"
+        ]
+      },
+      {
+        "id": "viewing-keys",
+        "title": "查看密鑰只留在你的瀏覽器中",
+        "body": [
+          "<a href=\"/viewing\">歷史記錄</a>頁面和票據開啟工具讓你貼上查看密鑰、交易密鑰或錢包密鑰檔案,以讀取你自己的屏蔽式活動。解密在頁面內進行,使用由瀏覽器自身程式碼編譯而成的 WebAssembly 模組。貼上的密鑰只保存在頁面的記憶體中,絕不會包含在任何發送至我們伺服器的請求內,也絕不會寫入 cookie 或本機儲存空間,並會在你關閉或重新載入頁面時消失。",
+          "頁面確實會從我們的 API 取得所需的加密信封,方式與任何訪客相同。因此,我們可以看到瀏覽器請求了哪些交易,但看不到其中哪些被開啟,也看不到內容是什麼。"
+        ]
+      },
+      {
+        "id": "visitors",
+        "title": "每次訪問涉及的資料",
+        "body": [
+          "與任何網絡伺服器一樣,我們的伺服器會接收你的 IP 位址、你請求的頁面或端點,以及你的瀏覽器發送的標頭。我們將 IP 位址用於兩個用途:",
+          "- 速率限制。匿名流量按 IP 位址設限。計數器保存在伺服器的記憶體中,時間窗口為一分鐘,不會寫入資料庫。",
+          "- 營運服務。在我們診斷問題期間,伺服器和進程日誌可能會記錄請求。這些日誌保留在伺服器上,並會在短時間後輪替清除。",
+          "首次訪問首頁時(僅限此時),我們會在自家伺服器上存放的 DB-IP 國家資料庫副本中查找你的位址所屬國家,以選擇網站開啟時使用的語言。查找結果不會被儲存,也不會發送給任何人。你從選單選擇的語言會以名為 <code>lang</code> 的 cookie 保存一年,此後優先於按國家作出的選擇。IP Geolocation by <a href=\"https://db-ip.com\">DB-IP</a>,根據 CC BY 4.0 授權。",
+          "你選擇的主題(深色或淺色)會以鍵名 <code>randscan-theme</code> 保存在瀏覽器的本機儲存空間中,絕不會離開你的裝置。"
+        ]
+      },
+      {
+        "id": "map",
+        "title": "節點和證明者頁面上的地圖圖塊",
+        "body": [
+          "<a href=\"/nodes\">節點</a>和<a href=\"/provers\">證明者</a>頁面會繪製一幅世界地圖。底圖圖塊由你的瀏覽器直接從 Esri 的 ArcGIS Online 圖塊服務載入,因此 Esri 會收到你的 IP 位址和圖塊座標,情況與任何地圖相同。其他頁面都不會從第三方載入任何內容。",
+          "該地圖上的標記顯示網絡對等節點和受委託證明者的主機位置。這些是網絡本身公佈的伺服器位址,並非訪客。我們的索引器透過 ipwho.is 地理定位服務查詢這些位址,並快取其返回的城市、國家和供應商。訪客的位址絕不會發送至地理定位服務。"
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "帳戶和 API 密鑰",
+        "body": [
+          "你無需帳戶即可使用 RandScan 的所有功能。帳戶只用於發出請求配額較高的 API 密鑰。如果你建立帳戶,我們會儲存:",
+          "- 你的電郵地址和帳戶建立時間;",
+          "- 你密碼的 Argon2id 雜湊值。我們無法讀取密碼本身,也絕不會將其發送到任何地方;",
+          "- 每個 API 密鑰的名稱、密鑰開頭的若干字元(供你辨認)、密鑰機密的 SHA-256 雜湊值、建立時間和最後使用時間。機密只會顯示一次,不會被儲存;",
+          "- 登入會話:<code>randscan_session</code> cookie 中的隨機令牌(設有 HttpOnly 和 SameSite),其雜湊值保存在我們的資料庫中。會話自最後一次使用起有效 30 日,並會在你登出時刪除。",
+          "使用 API 密鑰發出的請求會計入該密鑰以進行速率限制,所用的一分鐘記憶體窗口與匿名流量相同。我們不會記錄密鑰呼叫了哪些端點,也不會記錄它請求了什麼。"
+        ]
+      },
+      {
+        "id": "email",
+        "title": "電郵",
+        "body": [
+          "我們只發送一種電郵:密碼重設連結,而且只在你提出要求時才發送。電郵透過 Resend (resend.com) 傳送,Resend 會處理你的電郵地址和郵件內容以完成傳送。重設連結在一小時後失效。我們不發送通訊或通知,也不會將你的地址用於其他任何用途。"
+        ]
+      },
+      {
+        "id": "hosting",
+        "title": "資料存放位置",
+        "body": [
+          "RandScan 運行於向 DigitalOcean 租用、位於新加坡的伺服器上。存放帳戶、已雜湊憑證和會話的資料庫位於該伺服器上。備份(如有)會為相同目的保存相同的資料。使用本服務即表示你接受你的資料在該處處理,不論你身處何地。"
+        ]
+      },
+      {
+        "id": "retention",
+        "title": "我們保留資料多久",
+        "body": [
+          "- 速率限制計數器:一分鐘,保存在記憶體中。",
+          "- 伺服器日誌:短時間,其後輪替清除。",
+          "- 會話:自最後一次使用起 30 日,或直至你登出。",
+          "- <code>lang</code> cookie(你從選單選擇的語言):一年,保存在你的瀏覽器中。",
+          "- 密碼重設令牌:一小時。",
+          "- 帳戶和 API 密鑰:直至你要求我們刪除。",
+          "- 公開鏈上資料:只要瀏覽器仍在運行就會保留,因為它就是帳本。"
+        ]
+      },
+      {
+        "id": "rights",
+        "title": "你的選擇和權利",
+        "body": [
+          "你可以在<a href=\"/dashboard\">儀表板</a>撤銷任何 API 密鑰,並登出任何會話。如要查看我們持有的關於你帳戶的資料、更正資料,或要求刪除帳戶及其密鑰,請從帳戶所用的電郵地址<a href=\"#contact\">聯絡我們</a>。我們會在 30 日內處理。目前尚未提供自助刪除按鈕,我們會加入該功能。",
+          "視乎你居住的地方,你可能根據 GDPR 或 CCPA 等法律享有其他權利,包括向監管機構投訴的權利。本文所述內容並不限制這些權利。"
+        ]
+      },
+      {
+        "id": "contact",
+        "title": "聯絡我們與變更",
+        "body": [
+          "有關本政策的疑問或關於你帳戶的要求,請透過瀏覽器的儲存庫聯絡 Rand Protocol 團隊:<a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>。",
+          "本政策變更時,新文本會連同新的生效日期在此刊載。降低你私隱保障的變更,會在生效前於瀏覽器上公告。本版本於 {effective} 生效。"
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "服務條款 — RandScan",
+    "metaDescription": "RandScan(Rand Protocol 瀏覽器)及其 API 和帳戶的提供條款。",
+    "title": "服務條款",
+    "effective": "2026 年 10 月 1 日",
+    "intro": "RandScan 是一個免費、開源、通往公開帳本的窗口。本條款說明本服務是什麼、不是什麼、其 API 和帳戶可如何使用,以及我們承諾的限度。",
+    "sections": [
+      {
+        "id": "agreement",
+        "title": "協議",
+        "body": [
+          "本條款規管你對 RandScan (randscan.org) 的使用,包括網站、位於 randscan.org/api 的 JSON API、WebSocket 推送,以及透過其提供的帳戶和 API 密鑰。RandScan 由 Rand Protocol 團隊(「我們」)營運。使用其中任何部分,即表示你接受本條款。如你不接受,請勿使用本服務。",
+          "<a href=\"/privacy\">私隱政策</a>說明本服務收集哪些資料,並屬本條款的一部分。"
+        ]
+      },
+      {
+        "id": "service",
+        "title": "RandScan 是什麼,不是什麼",
+        "body": [
+          "RandScan 是區塊瀏覽器。它從全節點讀取 Rand Protocol 網絡的公開帳本,為其建立索引並加以呈現。它是通往區塊鏈的窗口,而非區塊鏈的一部分。",
+          "- 它不是錢包。它不持有資金、不持有花費金鑰，亦不託管任何資產，也不能代表你建立、簽署或廣播交易。",
+          "- 它不是跨鏈橋。<a href=\"/bridge\">跨鏈橋</a>頁面描述的是記錄在 Rand 鏈上的跨鏈橋活動。跨鏈橋本身由其守護者按其自身條款營運；存款、批准及結算均在來源鏈上進行，應在當地核實。",
+          "- 它不是建議。RandScan 上的任何內容均不構成財務、投資、法律或稅務建議，亦不構成買賣任何資產的要約或招攬。"
+        ]
+      },
+      {
+        "id": "accuracy",
+        "title": "數據的準確性",
+        "body": [
+          "我們盡力如實呈現區塊鏈，而且瀏覽器的程式碼公開，任何人都可以查核。然而，你所看到的是由軟件製作的副本，可能有誤或有所延遲：",
+          "- 索引器可能落後於區塊鏈，或在其讀取的節點重新啟動期間停止運作；",
+          "- 若區塊鏈發生重組，瀏覽器曾顯示的區塊可能會被取代；",
+          "- 當網絡轉移到新的區塊鏈時，瀏覽器的歷史記錄會重設至新的創世區塊，而先前區塊鏈的數據將不再提供；",
+          "- 屏蔽鏈在設計上隱藏金額及各方身份，因此瀏覽器必然只能顯示賬本公開的內容，而代幣名稱等標籤來自瀏覽器自身的清單，並非來自區塊鏈；",
+          "- 節點及證明者的位置、版本和狀態均屬觀察所得，並非保證。",
+          "凡取決於區塊鏈狀態的決定，應與你自行運行或信任的節點核對。我們不保證 RandScan 上的任何數字準確或為最新。"
+        ]
+      },
+      {
+        "id": "viewing",
+        "title": "查看金鑰與票據開啟器",
+        "body": [
+          "<a href=\"/viewing\">歷史記錄</a>頁面以你貼上的金鑰開啟屏蔽票據。開啟過程在你的瀏覽器中運行，金鑰不會傳送給我們，一如私隱政策所述。你仍須對你處理的金鑰負責：只在你信任的裝置及瀏覽器上貼上金鑰，凡查看金鑰足以應付的情況，請優先使用查看金鑰而非花費金鑰，並請明白我們無法恢復金鑰，也無法撤銷取得金鑰者所能看到的內容。開啟器的結果是對區塊鏈盡力而為的解讀，與此處其他數字一樣附帶相同的但書。"
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "帳戶與 API 金鑰",
+        "body": [
+          "使用 RandScan 毋須帳戶。帳戶可發出請求配額較高的 API 金鑰。如你建立帳戶：",
+          "- 你必須提供由你掌控的電郵地址，並妥善保密你的密碼；",
+          "- API 金鑰屬於憑證。請勿將其放入客戶端程式碼或公開的程式碼庫，如金鑰外洩，請在你的<a href=\"/dashboard\">控制台</a>撤銷。凡使用你的金鑰所做的一切，均視為你所為；",
+          "- 你最多可持有 10 個有效金鑰，而每人或每個系統一個帳戶為慣例；",
+          "- 你不得為超出配額而共用、出售或合併金鑰，亦不得以自動化方式建立帳戶。",
+          "如帳戶違反本條款、被濫用，或長期未有使用，我們可暫停或刪除該帳戶，或撤銷其金鑰。你可隨時停止使用本服務，並要求我們刪除你的帳戶。"
+        ]
+      },
+      {
+        "id": "quotas",
+        "title": "配額與可接受的使用",
+        "body": [
+          "公開的讀取端點免費。匿名流量按 IP 地址限制，持金鑰的流量按金鑰限制；現行數字刊載於 <a href=\"https://github.com/randprotocol/randscan.org/blob/main/docs/api.md\">API 文件</a>，並可能更改。超出限額時，服務會以 HTTP 429 及 Retry-After 標頭回應，客戶端應遵從。",
+          "你同意不會：",
+          "- 規避速率限制，例如輪換地址或金鑰，或使用多個帳戶；",
+          "- 探測、掃描、使過載或以其他方式干擾本服務、其伺服器或其背後的節點；",
+          "- 利用本服務違法、侵犯任何人的權利，或騷擾他人或揭露他人身份；",
+          "- 在不註明出處的情況下將 RandScan 的數據當作你自己的數據，或暗示我們認可使用該等數據的產品。",
+          "在配額內大量讀取公開數據並無問題。如需更多，請自行運行節點及索引器；該軟件免費。"
+        ]
+      },
+      {
+        "id": "ip",
+        "title": "軟件、數據與標誌",
+        "body": [
+          "瀏覽器的原始碼按 MIT 授權條款發布，你可按該等條款使用。RandScan 上顯示的區塊鏈數據屬公開，不屬於任何人；請自由取用，並註明來源。RandScan 的名稱與標誌，以及 Rand Protocol 的名稱與標誌，用以識別本服務及網絡，不得用作暗示某事物屬於我們而實則不然。"
+        ]
+      },
+      {
+        "id": "third-parties",
+        "title": "第三方",
+        "body": [
+          "RandScan 連結至其他網站及區塊鏈，而地圖頁面會從 Esri 的 ArcGIS Online 載入底圖圖磚。該等服務有其自身條款。我們並不控制它們，亦不對它們的行為或所顯示的內容負責。"
+        ]
+      },
+      {
+        "id": "warranty",
+        "title": "不作保證",
+        "body": [
+          "RandScan 按「現狀」及「可用狀態」提供，不附帶任何明示或默示的保證，包括準確性、可用性、適合特定用途或不侵權的保證。本服務由小型團隊以盡力而為的方式營運；可能無法使用、可能更改，亦可能被撤回，不論有否事先通知。"
+        ]
+      },
+      {
+        "id": "liability",
+        "title": "責任限制",
+        "body": [
+          "在法律許可的最大範圍內，對於因你使用或無法使用 RandScan 或其上顯示的任何內容而引致的任何損失或損害，我們概不負責。這包括資金損失、利潤損失、數據損失，以及任何間接或相應而生的損失，不論成因為何，即使我們已獲告知有此可能。尤其是，對於依據瀏覽器數據作出的決定、任何區塊鏈上的交易，或第三方的行為，我們概不負責。在責任無法排除的情況下，責任以你就本服務向我們支付的金額為限，而該金額為零。",
+          "部分司法管轄區不容許某些免責條款。此處任何內容均不剝奪你根據法律享有而不可放棄的權利。"
+        ]
+      },
+      {
+        "id": "changes",
+        "title": "本條款的更改",
+        "body": [
+          "我們可更改本條款。現行文本一直載於 randscan.org/terms，並附有生效日期。如更改屬重大，我們會在其生效前於瀏覽器上說明。更改後繼續使用本服務，即表示你接受新條款。本版本於 {effective} 生效。"
+        ]
+      },
+      {
+        "id": "general",
+        "title": "一般條款",
+        "body": [
+          "如本條款任何部分被裁定不可強制執行，其餘部分仍然適用。我們未就違約採取行動，並不構成棄權。本條款及私隱政策構成你與我們之間就 RandScan 的完整協議。如有疑問，請透過 <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a> 聯絡 Rand Protocol 團隊。"
+        ]
+      }
+    ]
+  },
+  "home": {
+    "title": "Rand Protocol 瀏覽器",
+    "chain": "區塊鏈 {id}",
+    "connecting": "正在連接網絡…",
+    "blockHeight": "區塊高度",
+    "nodeSyncing": "節點同步中",
+    "inSync": "已同步",
+    "validators": "驗證者",
+    "activeStake": "活躍質押",
+    "transactions": "交易",
+    "programs": {
+      "other": "{n} 個程式"
+    },
+    "notes": "票據",
+    "spent": "已花費 {count} 個",
+    "avgBlockTime": "平均出塊時間",
+    "peers": "對等節點",
+    "mempool": "記憶池",
+    "epoch": "紀元",
+    "epochValue": {
+      "other": "{epoch}（{n} 個區塊）"
+    },
+    "currentLeader": "目前領導者",
+    "facts": {
+      "totalSupply": "總供應量 {amount}",
+      "supplyUnavailable": "供應量審計不可用",
+      "view": "視圖 {view}",
+      "treeRoot": "樹根",
+      "bundleGuest": "bundle guest",
+      "faucetOn": "水龍頭已啟用",
+      "faucetOff": "水龍頭已停用",
+      "confidentialOn": "保密調用已開啟",
+      "confidentialOff": "保密調用已關閉",
+      "decimals": {
+        "other": "{symbol} 有 {n} 位小數"
+      },
+      "genesis": "創世",
+      "node": "節點 {version}",
+      "nodeSha": "節點 {version}（{sha}）"
+    },
+    "limits": {
+      "programs": {
+        "other": "上限：程式 {n} 個字"
+      },
+      "proofs": "證明 {size}",
+      "blocks": "區塊 {size}",
+      "callEnvelopes": "調用封包 {size}",
+      "publicInput": {
+        "other": "公開輸入 {n} 個字"
+      },
+      "publicInputOff": "公開輸入已關閉",
+      "noteEnvelopesMemo": "便箋信封 {bytes} B(含備忘)",
+      "noteEnvelopesNoMemo": "便箋信封 {bytes} B(不含備忘)",
+      "v6On": "v0.6 規則已啟用",
+      "v6Off": "v0.6 規則已停用",
+      "authGuest": "驗證:訪客",
+      "none": "無",
+      "proofWindow": {
+        "other": "證明窗口 {n} 個區塊"
+      },
+      "bindingsGenesis": "綁定創世哈希",
+      "bindingsChainId": "綁定鏈 ID"
+    },
+    "network": {
+      "testnet": "網絡:testnet(創世標記)",
+      "mainnet": "網絡:mainnet",
+      "admission": "新驗證者經驗證者集投票接納(<a href=\"/validators\">已接納的密鑰</a>)",
+      "slashing": {
+        "other": "雙重簽署罰沒 {percent} 質押,監禁 {n} 個週期"
+      },
+      "slashingOff": "雙重簽署罰沒已停用"
+    },
+    "gas": {
+      "circuit": "Gas:本鏈自有區段,於電路內計量",
+      "policy": "Gas:本節點的策略,按證明標頭定價",
+      "perGas": "每 gas {amount}",
+      "perKiB": "每 KiB {amount}",
+      "ceilings": "上限 {gas} / gas、{byte} / KiB",
+      "ceilingsPaying": "上限 {gas} / gas、{byte} / KiB(只有付費位元組會推動位元組價格)",
+      "bundleLimit": "每個交易包聲明 {gas} gas",
+      "pricesMove": "價格按區塊滿載程度每個區塊浮動 {percent}%",
+      "pricesFixed": "價格固定",
+      "programState": "程式狀態已啟用:每創建一個儲存格收 {fee},每次調用最多 {reads} 次讀取、{writes} 次寫入及 {payouts} 次支付"
+    },
+    "latestBlocks": "最新區塊",
+    "latestTransactions": "最新交易",
+    "viewAll": "查看全部 →"
+  },
+  "blocks": {
+    "title": "區塊",
+    "error": "無法載入區塊。",
+    "indexed": {
+      "other": "已索引 {n} 個區塊"
+    },
+    "loading": "正在載入區塊…"
+  },
+  "transactions": {
+    "title": "交易",
+    "kind": "類型",
+    "allKinds": "所有類型",
+    "kinds": {
+      "transfer": "轉賬(隱私)",
+      "mint": "鑄造(水龍頭)",
+      "deploy": "部署",
+      "call": "調用(保密)",
+      "bond": "質押",
+      "unbond": "解除質押",
+      "withdraw": "提取",
+      "bridge_attest": "跨鏈轉入(證明)",
+      "bridge_burn": "跨鏈轉出(銷毀)",
+      "register_token": "代幣已註冊",
+      "token_mint": "代幣鑄造",
+      "set_authority": "代幣權限已變更",
+      "token_burn": "代幣銷毀",
+      "pause_mints": "跨鏈鑄造已暫停",
+      "unpause_mints": "跨鏈鑄造已恢復",
+      "register_bridged_token": "跨鏈代幣已上架",
+      "list_backing": "抵押儲備已上架",
+      "invoke": "調用(程式狀態)",
+      "admit_validator": "驗證者已接納(投票)",
+      "slash_equivocation": "雙重簽署已罰沒",
+      "rotate_pq_guardians": "PQ 守護者已輪換",
+      "rotate_pause_key": "暫停密鑰已輪換",
+      "rotate_pq_guardians_v2": "PQ 守護者輪換(延遲)",
+      "rotate_pause_key_v2": "暫停密鑰輪換(延遲)",
+      "cancel_rotation": "輪換已取消",
+      "other": "其他"
+    },
+    "error": "無法載入交易。",
+    "count": {
+      "other": "{n} 宗交易"
+    },
+    "countOfKind": {
+      "other": "{n} 宗類型為 {kind} 的交易"
+    },
+    "loading": "正在載入交易…",
+    "empty": "找不到交易",
+    "emptyOfKind": "找不到 {kind} 交易"
+  },
+  "notes": {
+    "title": "便箋",
+    "columns": {
+      "leaf": "葉節點",
+      "commitment": "承諾",
+      "height": "高度",
+      "createdBy": "創建者"
+    },
+    "genesis": "創世",
+    "deposit": "存入",
+    "error": "無法載入承諾樹。",
+    "leaves": {
+      "other": "承諾樹中有 {n} 個葉節點"
+    },
+    "loading": "正在載入便箋…",
+    "created": "已創建便箋",
+    "createdSub": "樹葉節點",
+    "spent": "已花費便箋",
+    "spentSub": "已公佈的作廢標記",
+    "treeRoot": "樹根",
+    "treeRootSub": "錢包據以證明的錨點",
+    "empty": "尚未索引任何葉節點",
+    "help": "每張便箋都是對隱藏擁有者和金額的承諾。若承諾曾在網絡上傳送,葉節點會顯示創建它的交易;創世、提取及跨鏈存入的便箋則不會關聯。作廢標記花費的是哪個葉節點,從不公開。"
+  },
+  "programs": {
+    "title": "程式",
+    "columns": {
+      "program": "程式",
+      "deployedAt": "部署於",
+      "words": "字數",
+      "calls": "調用次數",
+      "lastCalled": "最近調用"
+    },
+    "never": "從未",
+    "error": "無法載入程式。",
+    "deployed": {
+      "other": "已部署 {n} 個程式"
+    },
+    "loading": "正在載入程式…",
+    "empty": "尚未部署任何程式"
+  },
+  "tokens": {
+    "title": "代幣",
+    "authority": {
+      "none": "無(固定供應量)",
+      "key": "密鑰簽署",
+      "bridge": {
+        "other": "跨鏈橋({n} 項抵押儲備)"
+      },
+      "program": "程式"
+    },
+    "columns": {
+      "token": "代幣",
+      "index": "索引",
+      "decimals": "小數位數",
+      "authority": "權限",
+      "totalSupply": "總供應量",
+      "registeredAt": "註冊於",
+      "tokenId": "代幣 ID"
+    },
+    "error": "無法載入代幣登記冊。",
+    "standard": "RPL 代幣標準",
+    "disabled": "本鏈沒有代幣登記冊:尚未註冊任何 RPL 代幣,而且此版本的節點早於代幣 RPC。所有轉賬均為 RAND。",
+    "registered": {
+      "other": "已註冊 {n} 個 RPL 代幣"
+    },
+    "registeredWithFee": {
+      "other": "已註冊 {n} 個 RPL 代幣 · 註冊費 {fee} RAND"
+    },
+    "loading": "正在載入代幣登記冊…",
+    "empty": "尚未註冊任何 RPL 代幣",
+    "help": "代幣的註冊及鑄造在設計上是公開的(規格 §4)——此處的數量和代號均為準確數值。保密的是誰持有代幣的便箋,以及轉賬在哪些人之間進行:在公開頁面上,任何代幣的轉賬都與普通 RAND 付款無法區分,而代幣的登記冊索引也從不出現在轉賬的交易包上。"
+  },
+  "validators": {
+    "title": "驗證者",
+    "columns": {
+      "validator": "驗證者",
+      "epochSet": "週期驗證者集",
+      "stake": "質押",
+      "rewards": "獎勵",
+      "unbonding": "解除質押中",
+      "share": "佔比",
+      "blocksProposed": "已提議區塊",
+      "lastProposed": "最近提議"
+    },
+    "active": "活躍",
+    "inactive": "不活躍",
+    "never": "從未",
+    "error": "無法載入驗證者登記冊。",
+    "subtitle": "{active} 個活躍,共 {total} 個已登記 · {stake}",
+    "activeStake": "活躍質押",
+    "loading": "正在載入驗證者…",
+    "empty": "沒有驗證者的報告",
+    "admission": "新驗證者經驗證者集投票接納(審計 v6):登記新密鑰的質押須先有 <code>admit_validator</code>。",
+    "noneAdmitted": "沒有已獲接納並等待登記的密鑰。",
+    "admittedWaiting": {
+      "other": "{n} 個已接納,尚未登記:"
+    },
+    "help": "登記冊是本鏈唯一以明文儲存金額的地方。活躍驗證者是運行當前週期的驗證者集;視圖 v 的領導者是按地址順序排列的第 v mod n 個活躍條目。"
+  },
+  "provers": {
+    "title": "證明者",
+    "subtitle": "委託證明者:無法自行生成證明的錢包把交易包發送到哪裏,以及這些機器位於何處",
+    "error": "無法載入證明者。",
+    "columns": {
+      "host": "主機",
+      "prover": "證明者",
+      "location": "位置",
+      "network": "網絡"
+    },
+    "notLocated": "尚未定位",
+    "status": {
+      "answering": "回應中",
+      "notChecked": "尚未檢查",
+      "notAnswering": "沒有回應"
+    },
+    "panel": {
+      "endpoint": "端點",
+      "operator": "營運者",
+      "fingerprint": "指紋",
+      "endpointReports": "端點回報 {fingerprint}",
+      "endpointReportsOther": "端點回報另一把密鑰",
+      "capacity": "容量",
+      "capacityValue": {
+        "other": "{proving} 個證明中 · {depth} 個等候中 · {n} 個槽位"
+      },
+      "capacityNote": "(每個成員一次處理一個交易包)",
+      "fee": "費用",
+      "feeValue": "每個交易包 {amount}",
+      "free": "免費",
+      "proves": "證明內容",
+      "jobs": "{kinds} 工作",
+      "provesValue": "{jobs},使用 {backend} · 版本 {version}",
+      "unknownBuild": "未知",
+      "lastChecked": "最近檢查",
+      "lastAnswered": "最近回應 {time}",
+      "error": "錯誤",
+      "pairing": "配對"
+    },
+    "stats": {
+      "provers": "證明者",
+      "answering": "{count} 個回應中",
+      "hosts": "證明者主機",
+      "countries": "國家/地區",
+      "slots": "工作槽位",
+      "slotsSub": "空閒及忙碌,回應中的證明者"
+    },
+    "hosts": "證明者主機",
+    "empty": "此瀏覽器不知道任何證明者",
+    "hostsHelp": "一個池在單一地址回應,並把每項工作交給有空閒槽位的成員主機,因此主機在此處的位置來自瀏覽器自身的清單,而非在網絡上發現。位置取自各主機的公開 IP;地址本身不會顯示。",
+    "help": "委託證明者根據以其密鑰加密的工作,為錢包生成交易包證明。它會收到錢包的查看密鑰,而不會收到花費密鑰:運行它的人可以讀取該錢包的歷史記錄,但僅此而已。任何人都可以自行運行(<code>rand-prover</code>),並改為把錢包與其配對。"
+  },
+  "nodes": {
+    "title": "節點",
+    "subtitle": "運行 Rand Protocol 的完整節點,按對等節點地址定位",
+    "error": "無法從節點載入對等節點列表。",
+    "columns": {
+      "role": "角色",
+      "peerId": "對等節點 ID",
+      "address": "地址",
+      "location": "位置",
+      "network": "網絡",
+      "connected": "已連線"
+    },
+    "roles": {
+      "validator": "驗證者",
+      "observer": "觀察者",
+      "peer": "對等節點"
+    },
+    "thisNode": "本節點",
+    "unknownLocation": "位置不明",
+    "stats": {
+      "nodes": "節點",
+      "geolocated": "已地理定位",
+      "withoutLocation": "{count} 個沒有位置",
+      "countries": "國家/地區"
+    },
+    "peers": "對等節點",
+    "empty": "目前沒有已連線的對等節點"
+  },
+  "search": {
+    "title": "搜尋",
+    "subtitle": "尋找區塊、交易、程式、便箋及驗證者",
+    "help": "可按區塊高度搜尋;按 64 個字元的哈希搜尋,可以是區塊、交易、程式 ID、便箋承諾或作廢標記;或按 base58 驗證者地址搜尋。本鏈沒有帳戶。",
+    "searching": "正在搜尋「{query}」…",
+    "resultsFor": "「{query}」的結果",
+    "error": "搜尋請求失敗。",
+    "noResults": "沒有結果",
+    "nothingMatches": "鏈上沒有與「{query}」相符的內容。",
+    "resultsCount": {
+      "other": "「{query}」有 {n} 項結果"
+    },
+    "types": {
+      "block": "區塊",
+      "transaction": "交易",
+      "validator": "驗證者",
+      "program": "程式",
+      "note": "便箋",
+      "nullifier": "作廢標記"
+    }
+  },
+  "dashboard": {
+    "account": "帳戶",
+    "title": "API 密鑰",
+    "signOut": "登出",
+    "requestFailed": "請求失敗",
+    "newKey": {
+      "title": "新密鑰",
+      "copyNow": "請立即複製您的密鑰。基於安全理由,密鑰只會顯示一次;如果遺失,請撤銷並另行建立。"
+    },
+    "create": {
+      "title": "建立密鑰",
+      "name": "名稱",
+      "placeholder": "例如:交易所存款監察器",
+      "submit": "新密鑰",
+      "limits": "最多 10 個有效密鑰。使用密鑰的請求每分鐘可發出 600 次;匿名流量每個 IP 為 60 次。請參閱 <a href=\"https://github.com/randprotocol/randscan/blob/main/docs/api.md\">API 指南</a>。"
+    },
+    "activeKeys": "有效密鑰({count})",
+    "keysError": "無法載入您的密鑰。",
+    "noActiveKeys": "尚無有效密鑰。",
+    "activeKeyMeta": {
+      "other": "建立於 {created} · 最近使用 {lastUsed} · {n} 次請求"
+    },
+    "revoke": "撤銷",
+    "revokedKeys": "已撤銷密鑰({count})",
+    "revokedKeyMeta": {
+      "other": "撤銷於 {revoked} · {n} 次請求"
+    },
+    "changePassword": "更改密碼",
+    "email": "電郵",
+    "memberSince": "加入日期",
+    "lastSignIn": "最近登入"
+  }
+}

@@ -1,21 +1,22 @@
 // Translate src/i18n/messages/en.json into every other language with `claude -p`: ~1,200 words a
 // call, several calls in parallel, {placeholders}, tags, identifiers and the glossary kept intact,
 // plural messages given exactly the forms the language uses. Re-runnable: a key whose English has
-// not changed since it was translated (src/i18n/messages/.source-hashes.json) is kept.
+// not changed since it was translated (src/i18n/messages/.source/{code}.json) is kept. One file per
+// language, so several languages can run at once.
 //
 //   node scripts/i18n/translate.mjs              # every language, changed keys only
 //   node scripts/i18n/translate.mjs ru ja        # some languages
 //   FORCE=1 node scripts/i18n/translate.mjs ar   # everything again for Arabic
 //   MODEL=opus PARALLEL=4 node scripts/i18n/translate.mjs
-import { readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { LOCALES, localeInfo } from '../../src/i18n/locales.js';
-import { flat, unflat, marks, NEVER, isPlural, pluralCategories } from './dict.mjs';
+import { flat, unflat, marks, formMarks, NEVER, isPlural, pluralCategories } from './dict.mjs';
 
 const ROOT = new URL('../../', import.meta.url).pathname;
 const MSG = `${ROOT}src/i18n/messages/`;
-const STAMP = `${MSG}.source-hashes.json`;
+const STAMPS = `${MSG}.source/`;
 const GLOSSARY = readFileSync(new URL('./glossary.txt', import.meta.url), 'utf8').trim().split('\n').join(', ');
 const PARALLEL = Number(process.env.PARALLEL || 6);
 const MODEL = process.env.MODEL || 'sonnet';
@@ -41,6 +42,20 @@ const LANGUAGE = {
 
 const sha = (v) => createHash('sha1').update(JSON.stringify(v)).digest('hex');
 const words = (v) => (typeof v === 'string' ? v : Object.values(v).join(' ')).split(/\s+/).length;
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+/** claude -p, retried with backoff (a busy or rate-limited CLI exits 1 with nothing on stderr). */
+async function claudeRetry(prompt) {
+  for (let i = 0; ; i++) {
+    try {
+      return await claude(prompt);
+    } catch (e) {
+      if (i >= 4) throw e;
+      await sleep(15_000 * 2 ** i);
+    }
+  }
+}
 
 function claude(prompt) {
   return new Promise((resolve, reject) => {
@@ -79,7 +94,9 @@ function problem(code, source, value) {
     const need = pluralCategories(localeInfo(code).tag);
     const missing = need.filter((c) => typeof value[c] !== 'string' || value[c].trim() === '');
     if (missing.length) return `plural forms missing: ${missing.join(',')}`;
-    for (const c of need) if (marks(value[c]) !== marks(source.other)) return `plural form ${c} changed placeholders`;
+    const tag = localeInfo(code).tag;
+    for (const c of need)
+      if (formMarks(tag, c, value[c]) !== formMarks(tag, c, source.other)) return `plural form ${c} changed placeholders`;
     return null;
   }
   if (typeof value !== 'string' || value.trim() === '') return 'empty';
@@ -99,6 +116,7 @@ Rules:
 - A value starting with "- " is a bullet item: keep the leading "- ".
 - Keep these terms in English exactly as written: ${GLOSSARY}. Also keep untranslated every identifier, field name, RPC method (rand_*), CLI command or flag, file name, hex string, number, unit (KB, MB, MiB) and URL.
 - A value that is an object of plural forms (keys among zero/one/two/few/many/other) must come back as an object with exactly these keys for ${LANGUAGE[code]}: ${cats.join(', ')}. Each form is the full phrase for that count, using {n} where the English uses it.
+- The output must be valid JSON: escape any double quote inside a value as \\" (or use the language's own quotation marks).
 - Write as a careful native technical writer for a blockchain explorer would: concise, plain, consistent terminology across keys (the same English term always gets the same translation). UI labels stay short. Do not add explanations or change meaning. Use the language's own punctuation and quotation marks.
 - Legal text (keys under privacy.* and terms.*) must be translated faithfully and completely, sentence by sentence, without summarising.
 
@@ -106,14 +124,23 @@ Input JSON:
 ${JSON.stringify(Object.fromEntries(entries), null, 1)}`;
   let out = null;
   try {
-    const text = await claude(prompt);
+    const text = await claudeRetry(prompt);
     const m = text.match(/\{[\s\S]*\}/);
     out = JSON.parse(m ? m[0] : text);
   } catch (e) {
-    if (attempt >= 3) throw e;
+    console.warn(`  ${code}: ${entries.length} keys: ${String(e.message).slice(0, 120)}`);
+  }
+  // Unparseable output from a long chunk: halve it rather than resend the same thing.
+  if (!out && entries.length > 4 && attempt < 4) {
+    const mid = Math.ceil(entries.length / 2);
+    const [a, b] = await Promise.all([
+      translateChunk(code, entries.slice(0, mid), attempt + 1),
+      translateChunk(code, entries.slice(mid), attempt + 1),
+    ]);
+    return { ...a, ...b };
   }
   const bad = entries.filter(([k, v]) => !out || problem(code, v, out[k]) !== null);
-  if (bad.length && attempt < 3) {
+  if (bad.length && attempt < 4) {
     const reasons = bad.slice(0, 3).map(([k, v]) => `${k}: ${out ? problem(code, v, out[k]) : 'no JSON'}`).join('; ');
     console.warn(`  ${code}: ${bad.length}/${entries.length} keys failed checks (${reasons}); retry ${attempt + 1}`);
     const again = await translateChunk(code, bad, attempt + 1);
@@ -141,7 +168,6 @@ async function pool(items, n, fn) {
 }
 
 const en = flat(JSON.parse(readFileSync(`${MSG}en.json`, 'utf8')));
-const stamps = existsSync(STAMP) ? JSON.parse(readFileSync(STAMP, 'utf8')) : {};
 const args = process.argv.slice(2);
 const wanted = args.length ? args : LOCALES.map((l) => l.code).filter((c) => c !== 'en');
 
@@ -150,7 +176,8 @@ for (const code of wanted) {
   const started = Date.now();
   const file = `${MSG}${code}.json`;
   const existing = existsSync(file) ? flat(JSON.parse(readFileSync(file, 'utf8'))) : {};
-  const st = (stamps[code] ??= {});
+  const stampFile = `${STAMPS}${code}.json`;
+  const st = existsSync(stampFile) ? JSON.parse(readFileSync(stampFile, 'utf8')) : {};
   const translatable = ([k, v]) =>
     !NEVER.test(k) && (isPlural(v) || (typeof v === 'string' && /\p{L}/u.test(v)));
   const todo = Object.entries(en).filter(
@@ -172,7 +199,8 @@ for (const code of wanted) {
   for (const k of Object.keys(st)) if (!(k in en)) delete st[k];
   const ordered = Object.fromEntries(Object.keys(en).filter((k) => k in merged).map((k) => [k, merged[k]]));
   writeFileSync(file, JSON.stringify(unflat(ordered), null, 2) + '\n');
-  writeFileSync(STAMP, JSON.stringify(stamps, null, 1) + '\n');
+  mkdirSync(STAMPS, { recursive: true });
+  writeFileSync(stampFile, JSON.stringify(st, null, 1) + '\n');
   const missing = Object.keys(en).filter((k) => !(k in merged)).length;
   console.log(`${code}: written in ${Math.round((Date.now() - started) / 1000)} s${missing ? `, ${missing} keys still English` : ''}`);
 }

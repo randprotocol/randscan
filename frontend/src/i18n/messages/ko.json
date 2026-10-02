@@ -1,1 +1,1447 @@
-{}
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Rand Protocol 익스플로러",
+    "metaDescription": "Rand Protocol 네트워크의 블록, 트랜잭션, 계정, 검증자 및 기밀 프로그램을 살펴보세요.",
+    "language": "언어",
+    "englishGoverns": "이 번역은 편의를 위해 제공되며, 영어 원문이 우선합니다.",
+    "loading": "불러오는 중…",
+    "retry": "다시 시도",
+    "copy": "복사",
+    "copied": "복사됨",
+    "live": "실시간",
+    "offline": "오프라인",
+    "notFound": "찾을 수 없음",
+    "backToDashboard": "대시보드로 돌아가기",
+    "somethingWrong": "문제가 발생했습니다",
+    "apiUnreachable": "익스플로러 API에 연결할 수 없습니다. 다시 시도해 주세요.",
+    "previousPage": "이전 페이지",
+    "nextPage": "다음 페이지"
+  },
+  "fmt": {
+    "units": "단위",
+    "assetUnits": "자산 #{index}의 {units} 단위",
+    "bridged": "토큰 {tokens}개({units} 단위)",
+    "chain": "체인 {id}",
+    "unknownLocation": "알 수 없는 위치"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "대시보드",
+      "blocks": "블록",
+      "transactions": "트랜잭션",
+      "notes": "노트",
+      "history": "기록",
+      "validators": "검증자",
+      "provers": "증명자",
+      "programs": "프로그램",
+      "tokens": "토큰",
+      "bridge": "브리지",
+      "nodes": "노드"
+    },
+    "apiKeys": "API 키",
+    "signIn": "로그인",
+    "toggleNav": "탐색 메뉴 전환"
+  },
+  "footer": {
+    "blurb": "RandScan은 Rand Protocol의 익스플로러입니다.",
+    "privacy": "개인정보 처리방침",
+    "terms": "이용약관"
+  },
+  "bridge": {
+    "title": "브리지",
+    "subtitle": "Ethereum, BSC, Solana, Tron에서 잠긴 토큰이 이곳에서 실드 노트로 발행됩니다. 브리지된 가치는 노트이므로 잔액은 없고, 들어온 것과 나간 것만 있습니다.",
+    "loadError": "브리지 상태를 불러올 수 없습니다.",
+    "noSection": "체인 {chain}의 제네시스에는 브리지 섹션이 없습니다. 가디언, 자산 레지스트리, 브리지된 노트가 아직 없습니다. 아래의 소스 체인과 승인된 토큰은 브리지 섹션이 있는 체인이 실행되면 브리지가 받아들일 항목입니다.",
+    "byChain": "소스 체인별 브리지된 토큰",
+    "openOn": "{chain} 익스플로러에서 열기",
+    "openOnChain": "체인 익스플로러에서 열기",
+    "floorTitle": "제네시스에서 설정된 리플레이 하한선입니다. 이보다 낮은 시퀀스의 락은 이 체인의 기반이 된 체인에서 이미 발행되었거나 재배포된 컨트랙트에서 운영자 자신의 것이며, 여기서는 발행되지 않습니다.",
+    "stats": {
+      "in": "브리지 입금",
+      "inSub": "입금 증명됨",
+      "out": "브리지 출금",
+      "outSub": "소각 후 반환됨",
+      "assets": "확인된 자산",
+      "noActive": "활성 소스 체인 아직 없음",
+      "from": "{chains}에서",
+      "approved": "승인된 토큰",
+      "approvedSub": "네 개 체인의 USDT 및 USDC"
+    },
+    "activity": {
+      "token": "토큰",
+      "asset": "자산",
+      "in": "브리지 입금",
+      "out": "브리지 출금",
+      "fees": "소각 수수료",
+      "feesTitle": "v0.6.8 브리지 수수료는 이 코인의 소각분에서 zUSD 노트로 보관됩니다. '브리지 출금'은 반환되어 잠긴 잔액에서 빠져나간 금액만 집계합니다.",
+      "outstanding": "현재 Rand에 있는 양",
+      "locked": "잠김(레지스트리)",
+      "minted": "발행량 / 한도",
+      "inLast": "최근 {window}",
+      "today": "오늘",
+      "headroom": "발행 여유",
+      "headroomMissing": "v0.6.7 이후 노드에서 제공됩니다.",
+      "headroomTitle": "현재 한도가 이 코인에 허용하는 최대 입금액입니다. 이 코인 자체 한도에서 발행량을 뺀 값이며, 해당 기간에 모든 토큰이 합쳐서 남긴 양을 넘지 않습니다.",
+      "last": "마지막 활동",
+      "notApproved": "승인 목록에 없음",
+      "na": "해당 없음",
+      "naTitle": "입금은 잠긴 원본 코인이 아니라 발행된 토큰을 게시하므로, 여러 코인으로 구성된 토큰의 경우 특정 코인에 귀속시킬 수 없습니다.",
+      "transactions": {
+        "other": "트랜잭션 {n}건"
+      }
+    },
+    "source": {
+      "contract": "브리지 컨트랙트",
+      "noContract": "이 체인에 등록된 브리지 컨트랙트 없음",
+      "floor": "시퀀스 {sequence}부터의 락",
+      "inOut": "입금 {in}, 출금 {out}",
+      "out": "출금 {out}",
+      "empty": "{name}에서 브리지된 항목이 아직 없습니다 · 체인 ID {chain}"
+    },
+    "tokens": {
+      "title": "승인된 토큰",
+      "intro": "브리지는 이 토큰들만 받습니다. 토큰이 속한 체인의 브리지 컨트랙트로만 보내세요. 그 외 토큰의 입금은 컨트랙트가 거부하며, 승인된 토큰이라도 잘못된 체인에 입금하면 Rand에서는 다른 자산이 됩니다.",
+      "empty": "승인된 토큰 없음",
+      "noteOn": "{chain}의 {symbol}:",
+      "decimalsNote": "Rand의 금액은 토큰의 원래 소수 자릿수와 관계없이 항상 소수 8자리입니다. 브리지 컨트랙트가 입금과 출금 시 변환합니다. 레지스트리는 각 주소를 32바이트 워드로 저장합니다. Ethereum, BSC, Tron 주소는 왼쪽을 0으로 채우고, Solana 민트는 그대로 저장합니다.",
+      "token": "토큰",
+      "chain": "체인",
+      "address": "컨트랙트 주소",
+      "decimals": "소수 자릿수",
+      "onRand": "Rand에서 8",
+      "status": "상태",
+      "allowed": "허용됨",
+      "discontinued": "중단됨"
+    },
+    "registry": {
+      "title": "자산 레지스트리",
+      "empty": "등록된 브리지 자산 없음",
+      "note": "노드 자체의 레지스트리이며, 각 자산의 첫 입금 시 채워집니다. 인덱스는 브리지된 노트가 담는 자산 워드이며, 인덱스 0은 RAND로 레지스트리에 포함되지 않습니다.",
+      "index": "인덱스",
+      "sourceChain": "소스 체인",
+      "token": "토큰",
+      "unknown": "알 수 없음",
+      "tokenAddress": "토큰 주소(32바이트)",
+      "assetId": "자산 ID"
+    },
+    "state": {
+      "title": "브리지 상태",
+      "mintPause": "발행 일시 중지",
+      "paused": "일시 중지됨 — 전송 증명 거부(소각과 교체는 계속 가능)",
+      "notPaused": "일시 중지 아님",
+      "pauseNonce": "일시 중지 / 재개 논스",
+      "listNonce": "목록 논스",
+      "registrationFee": "등록 수수료",
+      "pqGuardians": "PQ 가디언({count})",
+      "pqGuardiansText": {
+        "other": "Dilithium2 키 {n}개이며, 아래 기존 가디언 세트와 인덱스가 정렬되어 있습니다. 모든 입금 증명과 정족수가 필요한 모든 거버넌스 작업은 이 세트가 함께 서명하며, 교체해도 이 세트는 바뀌지 않습니다."
+      },
+      "pauseKey": "일시 중지 키",
+      "outboundEmitter": "아웃바운드 발행자",
+      "guardianSet": "가디언 세트",
+      "guardians": "가디언({count})",
+      "messagesEmitted": "발행된 메시지",
+      "nextIndex": "다음 자산 인덱스",
+      "fees": "브리지 수수료",
+      "feeRates": "입금 {in} / 출금 {out}",
+      "feeBps": "({in} / {out} bps), 다음 수신자에게 zUSD 노트로 발행:",
+      "feesCollected": "지금까지 징수: 입금 <code>{deposits}</code>, 소각 <code>{burns}</code>. 입금은 총액을 잠그고 수령인의 노트와 수수료 노트를 발행하며, 소각은 소각액에서 수수료를 뺀 금액을 반환하고 수수료를 다시 발행하므로 공급량 = Σ 잠금 = 커스터디가 계속 유지됩니다. 수수료 노트에는 엔벨로프가 없습니다.",
+      "rotationRules": "교체 규칙",
+      "rotationDelay": "교체는 커밋 후 {delay} 뒤에 적용됩니다",
+      "rotationDelayPossession": "교체는 커밋 후 {delay} 뒤에 적용되며, 새 보유자 모두의 소유 증명을 포함해야 합니다",
+      "pendingPauseKey": "대기 중인 일시 중지 키 교체, 적용 시점 <code>{at}</code>",
+      "pendingPq": "대기 중인 PQ 가디언 교체, 적용 시점 <code>{at}</code>",
+      "noPending": "대기 중인 교체 없음",
+      "rotationNonce": "교체 논스",
+      "mintCapAll": "발행 한도, 전체 토큰",
+      "mintCapPer": "{window}당, 모든 토큰의 모든 담보를 합산",
+      "mintedInWindow": "이 기간 발행량 <code>{minted}</code>, 추가 발행 여유 <code>{room}</code>",
+      "trustedEmitters": "신뢰된 발행자({count})",
+      "asStored": "체인에 저장된 그대로",
+      "floorMinted": "시퀀스 {sequence}부터의 락 발행됨"
+    }
+  },
+  "auth": {
+    "login": {
+      "metaTitle": "로그인 — RandScan"
+    },
+    "signup": {
+      "metaTitle": "계정 만들기 — RandScan"
+    },
+    "form": {
+      "intro": "계정이 있으면 더 높은 요청 할당량의 API 키를 만들 수 있습니다.",
+      "email": "이메일",
+      "password": "비밀번호",
+      "minLength": "10자 이상이어야 합니다.",
+      "forgotLink": "비밀번호를 잊으셨나요?",
+      "pleaseWait": "잠시만 기다려 주세요…",
+      "requestFailed": "요청에 실패했습니다",
+      "login": {
+        "title": "로그인",
+        "button": "로그인",
+        "alt": "아직 계정이 없으신가요?",
+        "altLabel": "계정 만들기"
+      },
+      "signup": {
+        "title": "계정 만들기",
+        "button": "계정 만들기",
+        "alt": "이미 가입하셨나요?",
+        "altLabel": "로그인",
+        "terms": "계정을 만들면 <a href=\"/terms\">이용약관</a> 및 <a href=\"/privacy\">개인정보 처리방침</a>에 동의하는 것으로 간주됩니다."
+      }
+    },
+    "forgot": {
+      "metaTitle": "비밀번호 찾기 — RandScan",
+      "title": "비밀번호를 잊으셨나요?",
+      "intro": "계정 이메일을 입력하면 새 비밀번호를 설정할 수 있는 링크를 보내 드립니다. 링크는 1시간 동안 유효합니다.",
+      "sent": "<code>{email}</code> 계정이 있다면 재설정 링크가 발송되었습니다. 몇 분 내에 도착하지 않으면 스팸 폴더를 확인해 주세요.",
+      "backToSignIn": "로그인으로 돌아가기",
+      "button": "재설정 링크 보내기",
+      "remembered": "비밀번호가 기억나셨나요?",
+      "signIn": "로그인"
+    },
+    "reset": {
+      "metaTitle": "비밀번호 재설정 — RandScan",
+      "title": "비밀번호 재설정",
+      "missingToken": "이 링크에 토큰이 없습니다. 이메일의 링크를 열거나 새 링크를 요청하세요.",
+      "requestLink": "새 링크 요청",
+      "choose": "새 비밀번호 설정",
+      "signedOut": "다른 모든 기기에서 로그아웃됩니다.",
+      "newPassword": "새 비밀번호",
+      "confirm": "새 비밀번호 확인",
+      "mismatch": "두 비밀번호가 일치하지 않습니다.",
+      "button": "새 비밀번호 설정",
+      "expired": "링크가 만료되었나요?",
+      "requestNew": "새 링크 요청"
+    },
+    "change": {
+      "current": "현재 비밀번호",
+      "done": "비밀번호가 변경되었습니다. 다른 기기에서는 로그아웃되었습니다.",
+      "button": "비밀번호 변경"
+    }
+  },
+  "components": {
+    "dataTable": {
+      "empty": "표시할 데이터가 없습니다"
+    },
+    "tables": {
+      "blocks": {
+        "height": "높이",
+        "hash": "Hash",
+        "proposer": "제안자",
+        "txs": "트랜잭션",
+        "view": "보기",
+        "age": "경과 시간",
+        "empty": "아직 인덱싱된 블록이 없습니다"
+      },
+      "txs": {
+        "hash": "Tx hash",
+        "kind": "종류",
+        "height": "높이",
+        "action": "작업",
+        "fee": "수수료",
+        "age": "경과 시간",
+        "empty": "트랜잭션을 찾을 수 없습니다",
+        "hiddenTitle": "발신자, 수신자, 금액은 번들 안에 숨겨져 있습니다",
+        "shielded": "실드",
+        "noFeeTitle": "검증자 서명 작업: 번들 없음, 수수료 없음"
+      }
+    },
+    "search": {
+      "placeholder": "높이, 해시, 주소 또는 프로그램으로 검색",
+      "ariaLabel": "익스플로러 검색"
+    },
+    "theme": {
+      "toLight": "라이트 테마로 전환",
+      "toDark": "다크 테마로 전환",
+      "light": "라이트 테마",
+      "dark": "다크 테마"
+    },
+    "nodeMap": {
+      "thisNode": "{role} · 현재 노드",
+      "connected": "{time} 연결됨",
+      "copyPeerId": "피어 ID 복사"
+    },
+    "openedNotes": {
+      "received": "수신",
+      "sent": "발신",
+      "openedWithTxKey": "트랜잭션 키로 열람됨",
+      "unspent": "미사용",
+      "spentIn": "사용된 위치",
+      "leaf": "리프 #{n}",
+      "feeHint": "브리지 수수료 노트: 엔벨로프가 없어(아무에게도 봉인되지 않음) 수수료 수령인의 열람 키만 공개 필드로 재구성하여 찾을 수 있습니다",
+      "notIndexed": "엔벨로프가 아직 인덱싱되지 않았습니다",
+      "notOpened": "이 키로 열람되지 않음(또는 아무에게도 봉인되지 않은 더미 슬롯)",
+      "amount": "금액",
+      "owner": "소유자(pk)",
+      "createdBy": "생성자(pk)",
+      "noteTime": "노트 시간",
+      "commitment": "커밋먼트",
+      "verifiedRebuilt": "검증됨 ✓ (이 키의 pk와 공개 필드로 재구성했으며 리프와 일치)",
+      "verifiedRecomputed": "검증됨 ✓ (평문으로 재계산)",
+      "nullifier": "널리파이어",
+      "status": "상태",
+      "noTranscript": "이 호출은 입력 트랜스크립트를 게시하지 않았습니다.",
+      "transcriptNotOpened": "입력 트랜스크립트는 이 키로 열람되지 않습니다.",
+      "caller": "호출자",
+      "auditor": "감사자",
+      "openedWithCallKey": "호출 키로 열람됨",
+      "callInputs": "호출 입력",
+      "privateInputs": "비공개 입력",
+      "salt": "솔트",
+      "faithful": "H_IN과 일치 ✓",
+      "falseTranscript": "H_IN과 일치하지 않음: 호출자가 허위 트랜스크립트를 게시했습니다"
+    },
+    "txOpener": {
+      "noNotes": "이 트랜잭션은 봉투(envelope)가 있는 노트를 생성하지 않았습니다(키로 열 수 있는 것이 없습니다)."
+    },
+    "keyPanel": {
+      "title": "키로 열기",
+      "kinds": {
+        "viewing": "조회 키 (nk)",
+        "spend": "지출 키",
+        "tx": "트랜잭션 키",
+        "call": "호출 키"
+      },
+      "kindsLower": {
+        "viewing": "조회 키 (nk)",
+        "spend": "지출 키",
+        "tx": "트랜잭션 키",
+        "call": "호출 키"
+      },
+      "invalidWithFile": "키는 16진수 64자이거나 지갑 키 파일(wallet.key.json)의 내용이어야 합니다.",
+      "invalidKinds": "{kinds}는 16진수 64자입니다.",
+      "placeholderFile": "16진수 64자 또는 wallet.key.json 붙여넣기",
+      "placeholder": "16진수 64자",
+      "keyFileDetected": "키 파일 감지됨",
+      "opening": "여는 중…",
+      "open": "열기",
+      "remember": "이 탭에서 기억",
+      "preferViewing": "조회 키를 사용하는 것이 좋습니다. 지출 키는 자금을 이동할 수 있습니다. 이 페이지는 조회 키를 로컬에서 도출하며 메모리에는 조회 키만 보관합니다."
+    }
+  },
+  "kinds": {
+    "transfer": {
+      "label": "전송 (셸드)",
+      "short": "전송"
+    },
+    "mint": {
+      "label": "민트 (페이셋)",
+      "short": "민트"
+    },
+    "deploy": {
+      "label": "배포",
+      "short": "배포"
+    },
+    "call": {
+      "label": "호출 (기밀)",
+      "short": "호출"
+    },
+    "bond": {
+      "label": "본딩",
+      "short": "본딩"
+    },
+    "unbond": {
+      "label": "언본딩",
+      "short": "언본딩"
+    },
+    "withdraw": {
+      "label": "출금",
+      "short": "출금"
+    },
+    "bridge_attest": {
+      "label": "브리지 입금 (증명)",
+      "short": "브리지 입금"
+    },
+    "bridge_burn": {
+      "label": "브리지 출금 (소각)",
+      "short": "브리지 출금"
+    },
+    "register_token": {
+      "label": "토큰 등록됨",
+      "short": "토큰 등록"
+    },
+    "token_mint": {
+      "label": "토큰 민트",
+      "short": "토큰 민트"
+    },
+    "set_authority": {
+      "label": "토큰 권한 변경됨",
+      "short": "권한 설정"
+    },
+    "token_burn": {
+      "label": "토큰 소각",
+      "short": "토큰 소각"
+    },
+    "pause_mints": {
+      "label": "브리지 민트 일시 중지됨",
+      "short": "민트 일시 중지"
+    },
+    "unpause_mints": {
+      "label": "브리지 민트 재개됨",
+      "short": "민트 재개"
+    },
+    "register_bridged_token": {
+      "label": "브리지 토큰 목록 등재됨",
+      "short": "토큰 등재"
+    },
+    "list_backing": {
+      "label": "담보 등재됨",
+      "short": "담보 등재"
+    },
+    "invoke": {
+      "label": "인보크 (프로그램 상태)",
+      "short": "인보크"
+    },
+    "admit_validator": {
+      "label": "검증자 승인됨 (투표)",
+      "short": "승인"
+    },
+    "slash_equivocation": {
+      "label": "이중 서명 슬래싱됨",
+      "short": "슬래싱"
+    },
+    "rotate_pq_guardians": {
+      "label": "PQ 가디언 교체됨",
+      "short": "PQ 교체"
+    },
+    "rotate_pause_key": {
+      "label": "일시 중지 키 교체됨",
+      "short": "중지 키 교체"
+    },
+    "rotate_pq_guardians_v2": {
+      "label": "PQ 가디언 교체 (지연)",
+      "short": "PQ 교체"
+    },
+    "rotate_pause_key_v2": {
+      "label": "일시 중지 키 교체 (지연)",
+      "short": "중지 키 교체"
+    },
+    "cancel_rotation": {
+      "label": "교체 취소됨",
+      "short": "교체 취소"
+    },
+    "other": {
+      "label": "기타",
+      "short": "기타"
+    }
+  },
+  "roles": {
+    "validator": "검증자",
+    "observer": "옵저버",
+    "peer": "피어"
+  },
+  "block": {
+    "notFound": "블록을 찾을 수 없습니다",
+    "notFoundMessage": "\"{id}\"와 일치하는 블록이 없습니다. 블록은 높이 또는 64자 해시로 조회할 수 있습니다.",
+    "back": "블록으로 돌아가기",
+    "loadError": "이 블록을 불러오지 못했습니다.",
+    "title": "블록 #{height}",
+    "overview": "개요",
+    "height": "높이",
+    "hash": "Hash",
+    "parent": "부모",
+    "genesis": "제네시스 (부모 없음)",
+    "proposer": "제안자",
+    "timestamp": "타임스탬프",
+    "view": "뷰",
+    "justifyView": "정당화 뷰",
+    "transactions": "트랜잭션",
+    "txRoot": "트랜잭션 루트",
+    "stateRoot": "상태 루트",
+    "txHeading": "트랜잭션 ({count})",
+    "previous": "← 이전 블록",
+    "empty": "이 블록에는 트랜잭션이 없습니다"
+  },
+  "tx": {
+    "notFound": "트랜잭션을 찾을 수 없습니다",
+    "notFoundMessage": "\"{hash}\"와 일치하는 트랜잭션이 없습니다. 커밋된 트랜잭션만 색인됩니다.",
+    "back": "트랜잭션으로 돌아가기",
+    "loadError": "이 트랜잭션을 불러오지 못했습니다.",
+    "title": "트랜잭션",
+    "overview": "개요",
+    "hash": "Hash",
+    "kind": "종류",
+    "block": "블록",
+    "indexInBlock": "블록 내 인덱스",
+    "timestamp": "타임스탬프",
+    "fee": "수수료",
+    "noFee": "없음 (번들 없음)",
+    "bundle": "번들",
+    "bundleYes": "예: 발신자 본인의 노트에서 지불되며 STARK로 증명됨",
+    "bundleNo": "아니요: 검증자 또는 가디언 정족수가 서명함",
+    "chainId": "체인 ID",
+    "kindDetails": "{kind} 상세",
+    "program": "프로그램",
+    "callProofSize": "호출 증명 크기",
+    "inputTranscript": "입력 트랜스크립트",
+    "sealed": "{size} 봉인됨",
+    "amount": "금액",
+    "amountBurned": "소각된 금액",
+    "asset": "자산",
+    "assetIndex": "자산 #{index}",
+    "recipient": "수신자",
+    "noteTime": "노트 시간",
+    "token": "토큰",
+    "name": "이름",
+    "symbol": "Symbol",
+    "decimals": "소수 자릿수",
+    "authority": "권한",
+    "registryIndex": "레지스트리 인덱스",
+    "mintNonce": "민트 논스",
+    "nonce": "논스",
+    "none": "없음",
+    "sourceChain": "출발 체인",
+    "sourceToken": "출발 토큰",
+    "sourceDecimals": "출발 소수 자릿수",
+    "pqCoSigners": "PQ 가디언 공동 서명자",
+    "bridgeFee": "브리지 수수료",
+    "feeNoteLeaf": "수수료 수령인에게 가는 노트, 리프",
+    "cells": {
+      "key": "키",
+      "wrote": "기록함",
+      "read": "읽음",
+      "zerosDeleted": "0 — 셀이 삭제됨",
+      "zerosAbsent": "0 — 셀이 존재하지 않았음"
+    },
+    "payout": {
+      "nth": "지급 {n}",
+      "to": "수신",
+      "note": "노트"
+    },
+    "invoke": {
+      "nonePublished": "게시된 것 없음",
+      "intoVault": "볼트로",
+      "noRand": "RAND 없음",
+      "and": "및",
+      "destroyed": "— 소멸됨 (프로그램 자체 토큰)",
+      "deposited": "— 예치됨",
+      "cellsRead": "읽은 셀 ({count})",
+      "cellsWritten": "기록한 셀 ({count})",
+      "paidOut": "지급됨 ({count})",
+      "minted": "민트됨 ({count})",
+      "none": "없음",
+      "nothingLeft": "볼트에서 나간 것 없음",
+      "nothing": "없음",
+      "help": "증명이 정확히 이 상태 전환을 보증하는 호출이며, 원장이 이를 적용했습니다. 읽기는 표시된 값을 가져야 했고 그렇지 않으면 트랜잭션이 거부되었습니다. 모든 지급은 체인이 위의 값으로부터 계산한 노트이므로, 수신자는 민트를 찾는 것과 같은 방식으로 이를 찾습니다. 누가 입금했는지는 비공개이며, 무엇이 이동했는지는 공개입니다."
+    },
+    "bundlePanel": {
+      "anchor": "앵커",
+      "nullifierAsset": "널리파이어 {n} (자산)",
+      "nullifierRand": "널리파이어 {n} (RAND)",
+      "commitmentAsset": "커밋먼트 {n} (자산)",
+      "commitmentRand": "커밋먼트 {n} (RAND)",
+      "burned": "소각됨",
+      "nothingBurned": "소각된 것 없음",
+      "time": "시간 (목표 높이)",
+      "proofSize": "증명 크기",
+      "envelopeSizes": "봉투 크기",
+      "authCommit": "인증 커밋먼트",
+      "authProofSize": "인증 증명 크기",
+      "authorisation": "인증",
+      "authInside": "번들 증명 내부 (이 체인에는 별도의 인증 증명 없음)",
+      "help": "더미를 포함해 네 개의 슬롯이 있습니다. 슬롯 1–2는 비공개 자산(RAND 또는 임의의 RPL 토큰)을, 슬롯 3–4는 항상 RAND를 담습니다. 공개 자산 필드는 없으므로, RAND 전송과 임의의 RPL 토큰 전송은 필드 하나하나까지 같은 형태입니다. 증명과 봉투는 크기만 표시됩니다.",
+      "splitAuth": "분리 인증: 번들 증명은 조회 키로 만들어져 인증 커밋먼트를 게시하며, 지출 키에 대한 작고 별도의 증명이 이와 일치해야 하므로 위임된 증명자는 지출 키를 보유하지 않습니다."
+    },
+    "transfer": {
+      "help": "RAND 또는 임의의 RPL 토큰의 일반 셸드 전송입니다. 자산은 비공개이므로 이 페이지에서는 어느 것이 이동했는지 알 수 없습니다. 최대 두 개의 노트가 사용되고, 최대 두 개가 생성되며, 수수료가 붙습니다. 누가 누구에게 얼마를 어떤 자산으로 보냈는지는 두 당사자와, 이들이 조회 키 또는 트랜잭션 키를 건넨 사람만 알 수 있습니다."
+    },
+    "mint": {
+      "depositNote": "입금 노트",
+      "mintedBy": "민트한 주체",
+      "help": "testnet 페이셋 입금입니다. 금액은 이 트랜잭션에서만 공개되며, 생성된 노트는 이후 다른 모든 노트와 구별할 수 없습니다."
+    },
+    "deploy": {
+      "wordsLength": "워드 길이",
+      "words": {
+        "other": "워드 {n}개"
+      }
+    },
+    "call": {
+      "nonePublished": "게시된 것 없음 (호출자가 --no-envelope를 선택함)",
+      "help": "호출의 비공개 입력은 평문으로 지갑을 떠나지 않습니다. 트랜스크립트가 게시되면 호출자의 조회 키, 호출별 키 또는 호출자가 지정한 감사자만 열 수 있습니다."
+    },
+    "staking": {
+      "validator": "검증자",
+      "registration": "등록",
+      "newValidator": "새 검증자",
+      "existingValidator": "기존 검증자",
+      "registerNonce": "등록 논스",
+      "bondHelp": "값이 풀에서 검증자의 공개 스테이크로 이동했습니다(번들의 소각).",
+      "unbondHelp": "스테이크가 언본딩 대기열로 이동했으며, 검증자의 키로 서명되었습니다.",
+      "withdrawHelp": "해제된 스테이크와 보상이 검증자의 지급 주소에 공개 금액의 새 노트 하나로 만들어졌습니다."
+    },
+    "bridgeBurn": {
+      "released": "출발 체인에서 해제됨",
+      "relayerFee": "릴레이어 수수료",
+      "destChain": "도착 체인",
+      "destAddress": "도착 주소",
+      "coinRedeemed": "상환된 코인",
+      "help": "하나의 숨겨진 자산 번들이 소각 전체를 담습니다. 번들의 <code>burn_a</code>와 <code>burn_asset</code>은 이 동작의 자산과 금액이며, 번들의 수수료는 브리지 수수료를 RAND로 지불합니다."
+    },
+    "attest": {
+      "size": "증명서 크기",
+      "rotation": "가디언 세트 교체, 입금 없음",
+      "gross": "총액, 출발 체인에서 잠김",
+      "deposited": "수신자에게 입금됨",
+      "commitment": "입금 커밋먼트",
+      "rotationShort": "— (교체)",
+      "help": "브리지된 자산을 수신자를 위한 노트로 입금하는, 가디언이 서명한 메시지입니다. 금액은 여기에서만 공개됩니다.",
+      "feeHelp": "체인의 브리지 수수료에 따라 총액이 잠기고 두 개의 노트로 나뉩니다. 수신자의 노트와 수수료 수령인에게 가는 수수료 노트입니다. 수수료 노트에는 봉투가 없으므로 어떤 조회 키도 복호화로 이를 찾을 수 없으며, 소유자는 위의 필드로부터 이를 재구성합니다."
+    },
+    "registerToken": {
+      "initialMint": "초기 민트",
+      "amountTo": "{amount} 수신:",
+      "help": "토큰의 등록과 초기 민트는 브리지 입금과 마찬가지로 설계상 공개입니다(spec §4). 이후 토큰 노트의 전송만 셸드됩니다."
+    },
+    "tokenMint": {
+      "help": "민트된 노트의 모든 값이 여기에 있으므로(발신자는 체인의 고정 민트 태그입니다), 민터가 어떤 봉투를 게시했든 수신자는 복호화 없이 이를 재구성합니다."
+    },
+    "setAuthority": {
+      "newAuthority": "새 권한",
+      "renounced": "없음 (포기됨 — 이 토큰은 다시는 민트될 수 없음)"
+    },
+    "tokenBurn": {
+      "help": "보유자의 소각입니다. 토큰의 총 공급량을 감사할 수 있게 하므로 설계상 공개입니다. 같은 토큰의 전송은 일반 셸드 전송이며 자산은 비공개로 유지됩니다."
+    },
+    "pause": {
+      "pauseHelp": "일시 중지된 동안 모든 전송 증명서는 거부되며, 소각과 가디언 세트 교체는 계속 가능합니다. 제네시스 일시 중지 키만으로 서명됩니다.",
+      "unpauseHelp": "일시 중지를 해제하려면 PQ 가디언 정족수가 필요하며, 일시 중지 키 단독으로는 해제할 수 없습니다."
+    },
+    "governance": {
+      "help": "PQ 가디언 정족수가 승인하며, 제출자가 지불하는 RAND 수수료 번들로 처리됩니다."
+    },
+    "rotation": {
+      "nonce": "교체 논스",
+      "newSet": "새 PQ 가디언 세트",
+      "keys": {
+        "other": "Dilithium2 키 {n}개"
+      },
+      "newPauseKey": "새 일시 중지 키",
+      "possession": "소유 증명",
+      "cancelled": "취소됨",
+      "pendingPauseKey": "대기 중인 일시 중지 키 교체",
+      "pendingGuardians": "대기 중인 PQ 가디언 교체",
+      "cancelHelp": "서명되었으나 아직 적용되지 않은 교체가 지연 시간이 끝나기 전에 철회되었습니다(audit v6, BRG-14).",
+      "delayedHelp": "현재 PQ 가디언 정족수가 모든 새 보유자의 소유 증명과 함께 서명했으며, 취소되지 않는 한 제네시스 교체 지연 시간(브리지 페이지 참조) 이후에 적용됩니다.",
+      "help": "교체 이전 세트의 PQ 가디언 정족수가 서명했습니다(bridge rules v2)."
+    },
+    "admit": {
+      "candidate": "후보",
+      "voters": "투표자",
+      "validators": {
+        "other": "검증자 {n}명"
+      },
+      "votedBy": "투표한 주체",
+      "help": "이 키가 본드와 함께 등록할 수 있도록 하는 검증자 세트의 투표이며, 투표로 검증자를 승인하는 체인에서 사용됩니다(audit v6, STAKE-2). 번들과 수수료가 없습니다."
+    },
+    "slash": {
+      "offender": "위반자",
+      "view": "뷰",
+      "firstHeader": "첫 번째 헤더",
+      "secondHeader": "두 번째 헤더",
+      "help": "하나의 검증자 키가 같은 뷰에 서명한 두 헤더입니다. 리더 이중 서명의 증거이며, 제네시스 슬래싱 규칙(audit v6, STAKE-1)에 따라 슬래싱됩니다."
+    },
+    "receipt": {
+      "title": "영수증",
+      "none": "이 call 또는 invoke에 대해 색인된 영수증이 없습니다.",
+      "tier": "티어",
+      "position": "위치",
+      "index": "인덱스 {index}",
+      "hIn": "입력 커밋먼트 (H_IN)",
+      "hPub": "공개 입력 (H_PUB)",
+      "hPubEmpty": "비어 있음 — 프로그램이 공개 입력 없이 배포되었습니다",
+      "outputs": "출력",
+      "out": "출력 {index}",
+      "help": "공개 출력 워드 8개만 기록되며 그 외에는 아무것도 이동하지 않습니다. 가치는 해당 호출 비용을 낸 번들을 통해서만 이동합니다. H_IN은 비공개 입력의 솔트 다이제스트이며 그 자체로는 아무것도 드러내지 않습니다."
+    },
+    "unknownKind": {
+      "help": "이 트랜잭션 종류는 현재 익스플로러 빌드보다 새로운 것입니다. 해시, 번들, 수수료, 블록만 색인되었으며, 디코딩된 필드는 익스플로러가 업데이트된 후에 표시됩니다."
+    }
+  },
+  "note": {
+    "notFound": "노트를 찾을 수 없음",
+    "notFoundMessage": "“{id}”와(과) 일치하는 트리 리프가 없습니다. 노트는 커밋먼트(64자리 hex) 또는 리프 인덱스로 조회할 수 있습니다. 아주 최근 블록의 커밋먼트는 아직 로드되지 않았을 수 있습니다.",
+    "back": "노트로 돌아가기",
+    "loadError": "이 노트를 불러오지 못했습니다.",
+    "title": "노트 #{index}",
+    "leaf": "리프",
+    "leafIndex": "리프 인덱스",
+    "commitment": "커밋먼트",
+    "createdAt": "생성 높이",
+    "createdBy": "생성자",
+    "genesisDeposit": "제네시스 입금 노트",
+    "depositOffWire": "커밋먼트가 와이어에 없는 입금 (출금 또는 브리지 증명)",
+    "openWithKey": "수신자 또는 발신자의 뷰잉 키, 혹은 이 트랜잭션의 키를 가지고 있나요? <a href=\"{href}\">트랜잭션 페이지에서 키로 열어 보세요</a>.",
+    "sealed": "소유자와 금액은 봉인된 봉투 안에 있으며 수신자와 발신자의 뷰잉 키로만 열 수 있습니다. 이 노트가 사용되었는지 여부도 공개되지 않습니다. 널리파이어를 리프와 대응시킬 수 없기 때문입니다."
+  },
+  "program": {
+    "notFound": "프로그램을 찾을 수 없음",
+    "notFoundMessage": "“{id}”와(과) 일치하는 프로그램이 없습니다. 프로그램 id는 64자 해시입니다.",
+    "back": "프로그램으로 돌아가기",
+    "loadError": "이 프로그램을 불러오지 못했습니다.",
+    "title": "프로그램",
+    "calls": "호출",
+    "andInvokes": {
+      "other": "및 invoke {n}건"
+    },
+    "codeSize": "코드 크기",
+    "words": {
+      "other": "워드 {n}개"
+    },
+    "deployedAt": "배포 시점",
+    "lastCalled": "마지막 호출",
+    "callOrInvoke": "call 또는 invoke",
+    "details": "세부 정보",
+    "programId": "프로그램 id",
+    "deployTx": "배포 트랜잭션",
+    "deployedAtHeight": "배포 높이",
+    "basePc": "기준 PC",
+    "wordsLength": "워드 길이",
+    "codeHash": "코드 해시",
+    "publicInput": "공개 입력",
+    "noPublicInput": "없음 — 호출은 빈 입력에 대해 검사됩니다",
+    "publicDigest": "공개 다이제스트 (H_PUB)",
+    "callCount": "호출 횟수",
+    "never": "없음",
+    "vault": "볼트",
+    "vaultEmpty": "프로그램이 보유한 것이 없습니다. 가치는 invoke의 번들을 통해 볼트로 들어가고, invoke가 지급하는 노트로 볼트를 떠납니다.",
+    "asset": "자산 #{index}",
+    "stateCells": "상태 셀 ({count})",
+    "noCells": "셀 없음: 아무것도 기록되지 않았거나 모든 기록이 0이었습니다.",
+    "key": "키",
+    "value": "값",
+    "statePublic": "설계상 공개: 프로그램의 상태는 64자리 hex 키에서 64자리 hex 값(각 8워드)으로의 맵이며, 노드에서 키 순서대로 실시간으로 읽습니다.",
+    "moreCells": "셀이 더 있습니다. API는 <code>/api/v1/programs/{id}/cells?after=…</code>에서 페이지 단위로 제공합니다.",
+    "recentCallsInvokes": "최근 call 및 invoke",
+    "recentCalls": "최근 호출",
+    "empty": "이 프로그램은 아직 호출된 적이 없습니다"
+  },
+  "token": {
+    "initialMint": "최초 발행",
+    "mint": "발행",
+    "burn": "소각",
+    "height": "높이",
+    "event": "이벤트",
+    "transaction": "트랜잭션",
+    "change": "변동",
+    "notFound": "토큰을 찾을 수 없음",
+    "notFoundMessage": "“{id}”와(과) 일치하는 RPL 토큰이 없습니다. 레지스트리 인덱스, 64자리 hex id 또는 rpl1… 텍스트 형식을 사용하세요.",
+    "back": "토큰으로 돌아가기",
+    "loadError": "이 토큰을 불러오지 못했습니다.",
+    "totalSupply": "총 공급량",
+    "decimals": "소수 자릿수",
+    "registryIndex": "레지스트리 인덱스",
+    "authority": "권한",
+    "authorityKind": {
+      "none": "없음",
+      "key": "키",
+      "program": "프로그램",
+      "bridge": "브리지"
+    },
+    "backingCount": {
+      "other": "담보 {n}건"
+    },
+    "registration": "등록",
+    "deployTx": "배포 트랜잭션",
+    "notIndexed": "색인되지 않음 (이번 처리 이전에 등록됨)",
+    "registeredAt": "등록 시점",
+    "idHex": "토큰 id (hex)",
+    "idText": "토큰 id (rpl1…)",
+    "mintNonce": "발행 논스",
+    "mintAuthority": "발행 권한",
+    "signingKey": "서명 키",
+    "address": "주소",
+    "program": "프로그램",
+    "backings": "담보 ({count})",
+    "sourceChain": "원본 체인",
+    "sourceToken": "원본 토큰",
+    "sourceDecimals": "원본 소수 자릿수",
+    "locked": "잠김",
+    "mintedIn": "{window} 동안 발행 / 한도",
+    "mintedToday": "오늘 발행 / 한도",
+    "roomToMint": "발행 가능량",
+    "roomToMintHelp": "현재 한도 내에서 이 코인에 허용되는 최대 입금액입니다. 이 코인 자체의 한도에서 이미 발행한 양을 뺀 값이며, 해당 기간 동안 모든 토큰이 합쳐서 남은 한도를 넘지 않습니다.",
+    "supplyHistory": "공급량 내역",
+    "empty": "이 토큰에 대해 색인된 공개 발행 또는 소각 이벤트가 아직 없습니다",
+    "historyHelp": "이 토큰을 지정하는 모든 register_token(최초 발행), token_mint, token_burn을 오래된 순으로 표시합니다. 총 공급량을 감사할 수 있게 하므로 설계상 공개입니다. 이 토큰 노트의 전송은 일반 실드 전송이며 여기에는 나타나지 않습니다."
+  },
+  "validator": {
+    "releaseEpoch": "해제 에폭",
+    "amount": "금액",
+    "notFound": "검증자를 찾을 수 없음",
+    "notFoundMessage": "“{address}”은(는) 검증자 레지스터에 없습니다.",
+    "back": "검증자로 돌아가기",
+    "loadError": "이 검증자를 불러오지 못했습니다.",
+    "title": "검증자",
+    "active": "이번 에폭에 활성",
+    "inactive": "현재 집합에 없음",
+    "stake": "스테이크",
+    "rewards": "보상",
+    "unwithdrawnFees": "미출금 수수료",
+    "share": "활성 스테이크 비중",
+    "blocksProposed": "제안한 블록",
+    "lastAgo": "마지막 {ago}",
+    "registerEntry": "레지스터 항목",
+    "address": "주소",
+    "payout": "지급 주소",
+    "payoutUnknown": "이 노드에서 제공하지 않음",
+    "nonce": "레지스터 논스",
+    "sortIndex": "정렬 인덱스",
+    "lastProposed": "마지막으로 제안한 블록",
+    "never": "없음",
+    "unbonding": "언본딩 대기열",
+    "unbondingEmpty": "언본딩 중인 항목 없음",
+    "stakingTxs": "스테이킹 트랜잭션",
+    "stakingEmpty": "이 검증자를 지정한 본드, 언본드, 출금, 발행이 없습니다",
+    "recentBlocks": "최근 블록",
+    "blocksEmpty": "이 검증자는 아직 블록을 제안한 적이 없습니다"
+  },
+  "account": {
+    "title": "이 체인에는 계정이 없습니다",
+    "shielded": "RAND는 완전 실드 체인입니다. 잔액은 소유자의 뷰잉 키로만 열 수 있는 노트의 집합이며, 트랜잭션에는 발신자, 수신자, 금액이 없습니다. 커밋먼트, 널리파이어, 봉인된 봉투, 수수료, 증명만 있습니다.",
+    "nothingToShow": "따라서 익스플로러가 주소에 대해 보여 줄 수 있는 것은 없습니다. 공개되는 것은 검증자 레지스터(스테이크, 보상, 언본딩 대기열), 커밋먼트 트리와 널리파이어 집합, 프로그램 배포, 호출 영수증, 브리지 자체의 상태입니다.",
+    "isValidator": "이 주소는 검증자입니다. <a href=\"{href}\">레지스터 항목 보기 →</a>",
+    "validators": "검증자 →",
+    "notes": "노트 (커밋먼트 트리) →"
+  },
+  "viewing": {
+    "leaf": "리프",
+    "height": "높이",
+    "transaction": "트랜잭션",
+    "genesis": "제네시스",
+    "deposit": "입금",
+    "role": "역할",
+    "amount": "금액",
+    "counterparty": "상대방 (pk)",
+    "status": "상태",
+    "token": "토큰",
+    "assetIndex": "자산 #{index}",
+    "spendable": "사용 가능 잔액",
+    "unspentNotes": "미사용 노트",
+    "title": "내 내역",
+    "subtitle": "뷰잉 키로 커밋먼트 트리를 스캔합니다. 익스플로러는 키를 볼 수 없으며, 모든 봉투는 브라우저에서 열립니다.",
+    "scanTitle": "뷰잉 키로 스캔",
+    "scanned": {
+      "other": "리프 {n}개 중 {scanned}개 스캔함"
+    },
+    "spendableHelp": "수신한 미사용 노트, RAND. 토큰은 아래",
+    "notesReceived": "수신한 노트",
+    "unspentCount": "미사용 {count}개",
+    "notesSent": "발신한 노트",
+    "address": "주소",
+    "pk": "pk {pk}…",
+    "shieldedAddress": "실드 주소:",
+    "empty": "이 키로 열 수 있는 노트가 체인에 없습니다",
+    "footnote": "모든 행은 이 브라우저에서 복호화되었으며 평문으로부터 커밋먼트를 다시 계산했습니다. 거스름 노트는 수신으로 표시됩니다."
+  },
+  "legal": {
+    "label": "법적 고지",
+    "effective": "시행일 {date}",
+    "contents": "목차",
+    "seeAlso": "<a href=\"{href}\">{label}</a>도 참고하세요."
+  },
+  "privacy": {
+    "metaTitle": "개인정보 처리방침 — RandScan",
+    "metaDescription": "RandScan이 수집하는 것, 절대 볼 수 없는 것, 보유한 정보를 얼마나 오래 보관하는지 안내합니다.",
+    "title": "개인정보 처리방침",
+    "effective": "2026년 10월 2일",
+    "intro": "RandScan은 공개 원장을 보여 주며, 이를 보는 사람들에 대해서는 거의 아무것도 보관하지 않습니다. 이 페이지는 익스플로러가 무엇을 보고, 무엇을 저장하고, 무엇을 절대 보지 못하며, 얼마나 오래 보관하는지를 정확히 설명합니다.",
+    "sections": [
+      {
+        "id": "scope",
+        "title": "운영 주체와 적용 범위",
+        "body": [
+          "RandScan(randscan.org)은 Rand Protocol 팀(“당사”)이 운영하는 Rand Protocol의 블록 익스플로러입니다. Rand Protocol 네트워크의 공개 원장을 색인하여 웹 페이지, JSON API, WebSocket 피드로 보여 줍니다. 이 방침은 웹사이트, randscan.org/api의 API, API 키를 받기 위해 만들 수 있는 계정에 적용됩니다.",
+          "익스플로러의 소스 코드는 MIT 라이선스로 공개되어 있으므로, 여기에 설명된 모든 내용을 소프트웨어의 실제 동작과 대조하여 확인할 수 있습니다."
+        ]
+      },
+      {
+        "id": "no-tracking",
+        "title": "당사가 하지 않는 일",
+        "body": [
+          "RandScan은 분석 도구, 광고, 추적 스크립트를 일절 사용하지 않습니다. 글꼴은 당사 서버에서 제공합니다. 어떤 페이지에서도 제3자 JavaScript를 불러오지 않습니다. 동의할 대상이 없으므로 쿠키 배너도 없습니다. 쿠키는 메뉴에서 언어를 선택한 경우 그 언어, 그리고 아래에 설명하는 로그인 세션뿐이며, 로그인 세션은 로그인한 후에만 설정됩니다.",
+          "당사는 누구에게도 그들 자신의 목적을 위해 개인정보를 판매, 대여 또는 공유하지 않습니다."
+        ]
+      },
+      {
+        "id": "chain-data",
+        "title": "공개 블록체인 데이터",
+        "body": [
+          "RandScan이 보여 주는 거의 모든 것은 Rand Protocol 원장의 사본입니다. 블록, 트랜잭션, 노트, 검증자, 프로그램, 토큰, 브리지 활동이 이에 해당합니다. 이 원장은 설계상 공개이며 네트워크의 모든 노드가 복제합니다. 당사는 이를 귀하로부터 수집한 것이 아니고, 변경할 수 없으며, 항목을 삭제할 수도 없습니다.",
+          "Rand Protocol은 셸드(shielded) 체인입니다. 거래 금액, 보낸 사람, 받는 사람은 원장 자체에서 숨겨지며, 탐색기는 체인이 공개하는 정보만 보여 줍니다. 즉 각 거래의 커밋먼트, 널리파이어, 증명과 함께, 수수료나 브리지 민팅처럼 체인이 직접 계산하는 노트의 공개 오프닝을 표시합니다."
+        ]
+      },
+      {
+        "id": "viewing-keys",
+        "title": "뷰잉 키는 브라우저 안에만 보관됩니다",
+        "body": [
+          "<a href=\"/viewing\">내역</a> 페이지와 노트 열기 도구에서는 뷰잉 키, 거래 키 또는 지갑 키 파일을 붙여넣어 본인의 셸드 활동을 확인할 수 있습니다. 복호화는 탐색기 자체 코드로 컴파일된 WebAssembly 모듈을 통해 페이지 안에서 실행됩니다. 붙여넣은 키는 페이지의 메모리에만 보관됩니다. 이 키는 당사 서버로 보내는 어떤 요청에도 포함되지 않으며, 쿠키나 로컬 스토리지에 기록되지 않고, 페이지를 닫거나 새로고침하면 사라집니다.",
+          "다만 페이지는 필요한 암호화된 봉투를 당사 API에서 가져오며, 이는 다른 방문자와 같은 방식입니다. 따라서 당사는 브라우저가 어떤 거래를 요청했는지는 알 수 있지만, 그중 무엇이 열렸는지 또는 그 안에 무엇이 들어 있었는지는 알 수 없습니다."
+        ]
+      },
+      {
+        "id": "visitors",
+        "title": "모든 방문에서 처리되는 정보",
+        "body": [
+          "다른 웹 서버와 마찬가지로 당사 서버는 방문자의 IP 주소, 요청한 페이지 또는 엔드포인트, 브라우저가 보내는 헤더를 수신합니다. IP 주소는 두 가지 용도로 사용합니다.",
+          "- 요청 제한. 익명 트래픽은 IP 주소별로 제한됩니다. 카운터는 1분 단위 구간 동안 서버 메모리에만 보관되며 데이터베이스에 기록되지 않습니다.",
+          "- 서비스 운영. 문제를 진단하는 동안 서버 및 프로세스 로그에 요청이 기록될 수 있습니다. 로그는 서버에만 남으며 짧은 시간이 지나면 순환 삭제됩니다.",
+          "홈 페이지에 처음 방문할 때에 한해, 사이트가 열릴 언어를 정하기 위해 당사 서버에 보관된 DB-IP의 국가 데이터베이스 사본에서 방문자 주소의 국가를 조회합니다. 결과는 저장되지 않으며 누구에게도 전송되지 않습니다. 메뉴에서 선택한 언어는 <code>lang</code>이라는 쿠키에 1년간 저장되며, 이후에는 국가보다 우선합니다. IP Geolocation by <a href=\"https://db-ip.com\">DB-IP</a>, licensed under CC BY 4.0.",
+          "테마 선택(다크 또는 라이트)은 브라우저의 로컬 스토리지에 <code>randscan-theme</code> 키로 저장됩니다. 이 정보는 기기 밖으로 나가지 않습니다."
+        ]
+      },
+      {
+        "id": "map",
+        "title": "노드 및 프로버 페이지의 지도 타일",
+        "body": [
+          "<a href=\"/nodes\">노드</a> 및 <a href=\"/provers\">프로버</a> 페이지에는 세계 지도가 표시됩니다. 기본 지도 타일은 브라우저가 Esri의 ArcGIS Online 타일 서비스에서 직접 불러오므로, Esri는 다른 지도와 마찬가지로 방문자의 IP 주소와 타일 좌표를 수신합니다. 그 외의 페이지는 제3자로부터 아무것도 불러오지 않습니다.",
+          "이 지도의 마커는 네트워크 피어와 위임된 프로버 호스트의 위치를 나타냅니다. 이는 네트워크 자체가 공개하는 서버 주소이며 방문자가 아닙니다. 당사 인덱서는 ipwho.is 위치 조회 서비스를 통해 이 주소를 조회하고, 반환된 도시, 국가, 제공업체를 캐시에 저장합니다. 방문자의 주소는 위치 조회 서비스로 전송되지 않습니다."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "계정 및 API 키",
+        "body": [
+          "RandScan의 모든 기능은 계정 없이 이용할 수 있습니다. 계정은 더 높은 요청 한도를 가진 API 키를 발급하기 위해서만 존재합니다. 계정을 만들면 다음을 저장합니다.",
+          "- 이메일 주소와 계정 생성 시각;",
+          "- 비밀번호의 Argon2id 해시. 당사는 비밀번호 자체를 읽을 수 없으며 어디로도 전송하지 않습니다;",
+          "- 각 API 키의 이름, 키를 알아볼 수 있도록 하는 앞부분 몇 글자, 시크릿의 SHA-256 해시, 생성 시각, 마지막 사용 시각. 시크릿은 한 번만 표시되며 저장되지 않습니다;",
+          "- 로그인 세션: <code>randscan_session</code> 쿠키에 담긴 무작위 토큰(HttpOnly 및 SameSite)과, 당사 데이터베이스에 저장된 그 토큰의 해시. 세션은 마지막 사용 시점부터 30일간 유지되며 로그아웃하면 삭제됩니다.",
+          "API 키로 보낸 요청은 익명 트래픽과 동일한 1분 단위 메모리 구간에서 요청 제한을 위해 해당 키에 대해 집계됩니다. 키가 어떤 엔드포인트를 호출했는지, 무엇을 요청했는지는 기록하지 않습니다."
+        ]
+      },
+      {
+        "id": "email",
+        "title": "이메일",
+        "body": [
+          "당사가 보내는 이메일은 비밀번호 재설정 링크 한 종류뿐이며, 방문자가 요청한 경우에만 보냅니다. 이메일은 Resend(resend.com)를 통해 전달되며, Resend는 전달을 위해 이메일 주소와 메시지를 처리합니다. 재설정 링크는 한 시간 후 만료됩니다. 당사는 뉴스레터나 알림을 보내지 않으며, 이메일 주소를 다른 용도로 사용하지 않습니다."
+        ]
+      },
+      {
+        "id": "hosting",
+        "title": "데이터가 보관되는 곳",
+        "body": [
+          "RandScan은 싱가포르에 있는 DigitalOcean의 임대 서버에서 운영됩니다. 계정, 해시된 자격 증명, 세션을 담은 데이터베이스는 해당 서버에 있습니다. 백업을 만드는 경우 백업에는 동일한 데이터가 동일한 목적으로 보관됩니다. 서비스를 이용함으로써 방문자는 어느 곳에 있든 데이터가 그곳에서 처리된다는 점을 인정합니다."
+        ]
+      },
+      {
+        "id": "retention",
+        "title": "보관 기간",
+        "body": [
+          "- 요청 제한 카운터: 1분, 메모리에만 보관.",
+          "- 서버 로그: 짧은 기간 보관 후 순환 삭제.",
+          "- 세션: 마지막 사용 시점부터 30일, 또는 로그아웃할 때까지.",
+          "- <code>lang</code> 쿠키, 즉 메뉴에서 선택한 언어: 브라우저에 1년.",
+          "- 비밀번호 재설정 토큰: 한 시간.",
+          "- 계정 및 API 키: 삭제를 요청할 때까지.",
+          "- 공개 체인 데이터: 탐색기가 운영되는 동안. 이것이 곧 원장입니다."
+        ]
+      },
+      {
+        "id": "rights",
+        "title": "선택권과 권리",
+        "body": [
+          "<a href=\"/dashboard\">대시보드</a>에서 모든 API 키를 폐기하고 모든 세션에서 로그아웃할 수 있습니다. 계정에 대해 보관된 데이터를 확인하거나 정정하거나, 계정과 키를 삭제하려면 계정에 등록된 이메일 주소로 <a href=\"#contact\">문의</a>해 주세요. 당사는 30일 이내에 조치합니다. 아직 셀프 서비스 삭제 버튼은 없으며, 추가할 예정입니다.",
+          "거주 지역에 따라 GDPR 또는 CCPA 등의 법률에 따른 추가 권리가 있을 수 있으며, 감독 기관에 민원을 제기할 권리도 포함됩니다. 이 문서의 어떤 내용도 해당 권리를 제한하지 않습니다."
+        ]
+      },
+      {
+        "id": "contact",
+        "title": "문의 및 변경",
+        "body": [
+          "이 정책에 관한 질문이나 계정에 관한 요청은 탐색기 저장소 <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>를 통해 Rand Protocol 팀에 보내 주세요.",
+          "이 정책이 변경되면 새 텍스트가 새 시행일과 함께 이곳에 게시됩니다. 개인정보 보호를 줄이는 변경은 시행 전에 탐색기에서 공지합니다. 이 버전은 {effective}에 시행되었습니다."
+        ]
+      }
+    ]
+  },
+  "terms": {
+    "metaTitle": "서비스 약관 — RandScan",
+    "metaDescription": "Rand Protocol 탐색기인 RandScan과 그 API 및 계정이 제공되는 조건입니다.",
+    "title": "서비스 약관",
+    "effective": "2026년 10월 1일",
+    "intro": "RandScan은 공개 원장을 들여다보는 무료 오픈소스 창입니다. 이 약관은 서비스가 무엇이고 무엇이 아닌지, API와 계정을 어떻게 사용할 수 있는지, 그리고 당사가 약속하는 범위의 한계를 설명합니다.",
+    "sections": [
+      {
+        "id": "agreement",
+        "title": "약관의 성립",
+        "body": [
+          "이 약관은 RandScan(randscan.org)의 이용에 적용됩니다. 여기에는 웹사이트, randscan.org/api의 JSON API, WebSocket 피드, 그리고 이를 통해 제공되는 계정과 API 키가 포함됩니다. RandScan은 Rand Protocol 팀(이하 “당사”)이 운영합니다. 이 중 무엇이든 이용하면 이 약관에 동의한 것으로 봅니다. 동의하지 않는 경우 서비스를 이용하지 마세요.",
+          "<a href=\"/privacy\">개인정보 처리방침</a>은 서비스가 수집하는 정보를 설명하며 이 약관의 일부입니다."
+        ]
+      },
+      {
+        "id": "service",
+        "title": "RandScan이 무엇이고 무엇이 아닌지",
+        "body": [
+          "RandScan은 블록 탐색기입니다. 풀 노드에서 Rand Protocol 네트워크의 공개 원장을 읽어 색인하고 보여 줍니다. 체인을 들여다보는 창일 뿐, 체인의 일부가 아닙니다.",
+          "- 지갑이 아닙니다. 자금, 지출 키, 그 어떤 것에 대한 수탁도 하지 않으며, 사용자를 대신해 트랜잭션을 생성, 서명 또는 브로드캐스트할 수 없습니다.",
+          "- 브리지가 아닙니다. <a href=\"/bridge\">브리지</a> 페이지는 Rand 체인에 기록된 브리지 활동을 설명합니다. 브리지 자체는 수호자들이 자체 약관에 따라 운영하며, 입금, 승인 및 정산은 소스 체인에서 이루어지므로 해당 체인에서 확인해야 합니다.",
+          "- 조언이 아닙니다. RandScan의 어떤 내용도 금융, 투자, 법률 또는 세무 조언이 아니며, 어떤 자산의 매수 또는 매도에 대한 제안이나 권유도 아닙니다."
+        ]
+      },
+      {
+        "id": "accuracy",
+        "title": "데이터의 정확성",
+        "body": [
+          "저희는 체인을 충실하게 보여 드리려 노력하며, 탐색기의 코드는 누구나 확인할 수 있도록 공개되어 있습니다. 그래도 화면에 보이는 것은 소프트웨어가 만든 사본이므로 틀리거나 늦을 수 있습니다.",
+          "- 인덱서가 체인보다 뒤처지거나, 인덱서가 읽는 노드가 재시작되는 동안 멈출 수 있습니다.",
+          "- 체인이 재구성되면 탐색기에 표시된 블록이 다른 블록으로 대체될 수 있습니다.",
+          "- 네트워크가 새 체인으로 옮겨 가면 탐색기의 기록은 새 제네시스로 초기화되며, 이전 체인의 데이터는 더 이상 제공되지 않습니다.",
+          "- 실드 체인은 설계상 금액과 당사자를 숨기므로, 탐색기는 원장이 공개하는 내용만 보여 줄 수밖에 없으며, 토큰 이름 같은 라벨은 체인이 아닌 탐색기 자체의 목록에서 가져옵니다.",
+          "- 노드와 프로버의 위치, 버전, 상태는 관측값이며 보증이 아닙니다.",
+          "체인의 상태에 좌우되는 결정은 직접 운영하거나 신뢰하는 노드와 대조하여 확인해야 합니다. RandScan의 어떤 수치도 정확하거나 최신이라고 약속하지 않습니다."
+        ]
+      },
+      {
+        "id": "viewing",
+        "title": "뷰잉 키와 노트 오프너",
+        "body": [
+          "<a href=\"/viewing\">기록</a> 페이지는 사용자가 붙여넣은 키로 실드 노트를 엽니다. 열기 과정은 사용자의 브라우저에서 실행되며, 개인정보 처리방침에 설명된 대로 키는 저희에게 전송되지 않습니다. 사용자가 다루는 키에 대한 책임은 사용자에게 있습니다. 신뢰할 수 있는 기기와 브라우저에서만 붙여넣고, 가능하면 지출 키보다 뷰잉 키를 사용하며, 저희는 키를 복구할 수 없고 키를 입수한 사람이 볼 수 있는 내용을 되돌릴 수 없다는 점을 이해하시기 바랍니다. 오프너의 결과는 체인을 최선을 다해 해석한 것이며, 이곳의 다른 모든 수치와 같은 유의 사항이 적용됩니다."
+        ]
+      },
+      {
+        "id": "accounts",
+        "title": "계정과 API 키",
+        "body": [
+          "RandScan을 이용하는 데 계정은 필요하지 않습니다. 계정은 더 높은 요청 할당량을 가진 API 키를 발급합니다. 계정을 만드는 경우:",
+          "- 본인이 관리하는 이메일 주소를 제공해야 하며, 비밀번호를 비밀로 유지해야 합니다.",
+          "- API 키는 자격 증명입니다. 클라이언트 측 코드와 공개 저장소에 넣지 말고, 유출되면 <a href=\"/dashboard\">대시보드</a>에서 폐기하십시오. 키로 이루어진 모든 행위는 사용자가 한 것으로 간주됩니다.",
+          "- 활성 키는 최대 10개까지 보유할 수 있으며, 한 사람 또는 한 시스템당 계정 하나가 원칙입니다.",
+          "- 할당량을 초과하기 위해 키를 공유, 판매 또는 합산하거나 자동화된 수단으로 계정을 만들어서는 안 됩니다.",
+          "계정이 이 약관을 위반하거나, 남용되거나, 오랫동안 사용되지 않은 경우 저희는 계정을 정지 또는 삭제하거나 키를 폐기할 수 있습니다. 사용자는 언제든지 서비스 이용을 중단하고 계정 삭제를 요청할 수 있습니다."
+        ]
+      },
+      {
+        "id": "quotas",
+        "title": "할당량과 허용되는 사용",
+        "body": [
+          "공개 읽기 엔드포인트는 무료입니다. 익명 트래픽은 IP 주소별로, 키를 사용한 트래픽은 키별로 제한되며, 현재 수치는 <a href=\"https://github.com/randprotocol/randscan.org/blob/main/docs/api.md\">API 문서</a>에 게시되어 있고 변경될 수 있습니다. 서비스는 한도를 초과하면 HTTP 429와 Retry-After 헤더로 응답하며, 클라이언트는 이를 준수해야 합니다.",
+          "다음 행위를 하지 않는 데 동의합니다.",
+          "- 주소나 키를 바꿔 가며 쓰거나 여러 계정을 사용하는 등 속도 제한을 회피하는 행위",
+          "- 서비스, 서버 또는 그 뒤의 노드를 탐색, 스캔, 과부하시키거나 달리 방해하는 행위",
+          "- 서비스를 이용해 법을 위반하거나, 타인의 권리를 침해하거나, 사람들을 괴롭히거나 익명성을 해제하는 행위",
+          "- 출처 표시 없이 RandScan의 데이터를 자신의 것처럼 제시하거나, 이를 사용하는 제품을 저희가 보증한다고 암시하는 행위",
+          "공개 데이터를 대량으로 읽는 것은 할당량 안에서는 문제가 없습니다. 더 필요하다면 직접 노드와 인덱서를 운영하십시오. 소프트웨어는 무료입니다."
+        ]
+      },
+      {
+        "id": "ip",
+        "title": "소프트웨어, 데이터 및 표장",
+        "body": [
+          "탐색기의 소스 코드는 MIT 라이선스로 공개되어 있으며, 해당 조건에 따라 사용할 수 있습니다. RandScan에 표시되는 체인 데이터는 공개되어 있고 누구의 소유도 아니므로, 출처를 밝히고 가져가셔도 됩니다. RandScan 명칭과 표장, Rand Protocol 명칭과 표장은 이 서비스와 네트워크를 식별하는 것이며, 저희 것이 아닌 것을 저희 것인 양 암시하는 데 사용해서는 안 됩니다."
+        ]
+      },
+      {
+        "id": "third-parties",
+        "title": "제3자",
+        "body": [
+          "RandScan은 다른 사이트와 체인으로 연결되며, 지도 페이지는 Esri의 ArcGIS Online에서 기본 지도 타일을 불러옵니다. 이러한 서비스에는 자체 약관이 있습니다. 저희는 이를 통제하지 않으며 그들이 하거나 보여 주는 것에 책임지지 않습니다."
+        ]
+      },
+      {
+        "id": "warranty",
+        "title": "보증 없음",
+        "body": [
+          "RandScan은 정확성, 가용성, 특정 목적에의 적합성 또는 비침해에 대한 보증을 포함하여 명시적이든 묵시적이든 어떠한 종류의 보증도 없이 “있는 그대로” 및 “제공 가능한 상태로” 제공됩니다. 소규모 팀이 최선의 노력으로 운영하며, 이용할 수 없게 되거나, 변경되거나, 예고 여부와 관계없이 중단될 수 있습니다."
+        ]
+      },
+      {
+        "id": "liability",
+        "title": "책임의 제한",
+        "body": [
+          "법이 허용하는 최대 범위에서, 저희는 RandScan 또는 그 안에 표시된 어떤 것을 이용하거나 이용하지 못함으로써 발생하는 어떠한 손실이나 손해에도 책임지지 않습니다. 여기에는 자금 손실, 일실 이익, 데이터 손실 및 원인을 불문한 모든 간접 또는 결과적 손실이 포함되며, 그 가능성을 통지받았더라도 마찬가지입니다. 특히 저희는 탐색기 데이터를 근거로 내린 결정, 어떤 체인에서의 트랜잭션, 제3자의 행위에 대해 책임지지 않습니다. 책임을 배제할 수 없는 경우 책임은 사용자가 서비스에 대해 저희에게 지급한 금액으로 제한되며, 그 금액은 0입니다.",
+          "일부 관할권에서는 특정한 배제를 허용하지 않습니다. 이 약관의 어떤 내용도 법에 따라 포기할 수 없는 사용자의 권리를 박탈하지 않습니다."
+        ]
+      },
+      {
+        "id": "changes",
+        "title": "약관의 변경",
+        "body": [
+          "저희는 이 약관을 변경할 수 있습니다. 현재 본문은 항상 시행일과 함께 randscan.org/terms에 있습니다. 중요한 변경이 있는 경우 시행 전에 탐색기에 알립니다. 변경 후에도 서비스를 계속 이용하면 새 약관을 수락한 것으로 봅니다. 이 버전은 {effective}에 시행되었습니다."
+        ]
+      },
+      {
+        "id": "general",
+        "title": "일반 사항",
+        "body": [
+          "이 약관의 일부가 집행할 수 없는 것으로 판단되더라도 나머지는 계속 적용됩니다. 저희가 위반에 대해 조치하지 않았더라도 권리를 포기한 것이 아닙니다. 이 약관과 개인정보 처리방침은 RandScan에 관하여 사용자와 저희 사이의 전체 합의를 이룹니다. 문의는 <a href=\"https://github.com/randprotocol/randscan.org/issues\">github.com/randprotocol/randscan.org</a>를 통해 Rand Protocol 팀에 보내 주십시오."
+        ]
+      }
+    ]
+  },
+  "home": {
+    "title": "Rand Protocol 탐색기",
+    "chain": "체인 {id}",
+    "connecting": "네트워크에 연결하는 중…",
+    "blockHeight": "블록 높이",
+    "nodeSyncing": "노드 동기화 중",
+    "inSync": "동기화됨",
+    "validators": "검증자",
+    "activeStake": "활성 스테이크",
+    "transactions": "트랜잭션",
+    "programs": {
+      "other": "프로그램 {n}개"
+    },
+    "notes": "노트",
+    "spent": "{count}개 사용됨",
+    "avgBlockTime": "평균 블록 시간",
+    "peers": "피어",
+    "mempool": "멤풀",
+    "epoch": "에폭",
+    "epochValue": {
+      "other": "{epoch} (블록 {n}개)"
+    },
+    "currentLeader": "현재 리더",
+    "facts": {
+      "totalSupply": "총 공급량 {amount}",
+      "supplyUnavailable": "공급량 감사를 사용할 수 없음",
+      "view": "뷰 {view}",
+      "treeRoot": "트리 루트",
+      "bundleGuest": "번들 게스트",
+      "faucetOn": "파우셋 활성화됨",
+      "faucetOff": "파우셋 비활성화됨",
+      "confidentialOn": "기밀 호출 켜짐",
+      "confidentialOff": "기밀 호출 꺼짐",
+      "decimals": {
+        "other": "{symbol}의 소수 자릿수는 {n}자리"
+      },
+      "genesis": "제네시스",
+      "node": "노드 {version}",
+      "nodeSha": "노드 {version} ({sha})"
+    },
+    "limits": {
+      "programs": {
+        "other": "한도: 프로그램 {n}워드"
+      },
+      "proofs": "증명 {size}",
+      "blocks": "블록 {size}",
+      "callEnvelopes": "호출 엔벨로프 {size}",
+      "publicInput": {
+        "other": "공개 입력 {n}워드"
+      },
+      "publicInputOff": "공개 입력 꺼짐",
+      "noteEnvelopesMemo": "노트 봉투 {bytes} B (메모 포함)",
+      "noteEnvelopesNoMemo": "노트 봉투 {bytes} B (메모 없음)",
+      "v6On": "v0.6 규칙 켜짐",
+      "v6Off": "v0.6 규칙 꺼짐",
+      "authGuest": "인증 게스트",
+      "none": "없음",
+      "proofWindow": {
+        "other": "증명 창 {n}블록"
+      },
+      "bindingsGenesis": "제네시스 해시에 대한 바인딩",
+      "bindingsChainId": "체인 ID에 대한 바인딩"
+    },
+    "network": {
+      "testnet": "네트워크: testnet (제네시스 마커)",
+      "mainnet": "네트워크: 메인넷",
+      "admission": "검증자 집합의 투표로 새 검증자 승인 (<a href=\"/validators\">승인된 키</a>)",
+      "slashing": {
+        "other": "이중 서명 슬래싱 지분의 {percent}, {n}에포크 동안 수감"
+      },
+      "slashingOff": "이중 서명 슬래싱 꺼짐"
+    },
+    "gas": {
+      "circuit": "가스: 체인 자체 섹션, 회로 내에서 측정",
+      "policy": "가스: 이 노드의 정책, 증명 헤더 기준으로 가격 책정",
+      "perGas": "가스당 {amount}",
+      "perKiB": "KiB당 {amount}",
+      "ceilings": "상한 {gas} / 가스, {byte} / KiB",
+      "ceilingsPaying": "상한 {gas} / 가스, {byte} / KiB (유료 바이트만 바이트 가격을 움직임)",
+      "bundleLimit": "모든 번들이 {gas} 가스를 선언함",
+      "pricesMove": "가격은 혼잡도에 따라 블록당 {percent}% 변동",
+      "pricesFixed": "가격 고정",
+      "programState": "프로그램 상태 켜짐: 셀 생성당 {fee}, 호출당 최대 읽기 {reads}회, 쓰기 {writes}회, 지급 {payouts}회"
+    },
+    "latestBlocks": "최신 블록",
+    "latestTransactions": "최신 트랜잭션",
+    "viewAll": "모두 보기 →"
+  },
+  "blocks": {
+    "title": "블록",
+    "error": "블록을 불러오지 못했습니다.",
+    "indexed": {
+      "other": "블록 {n}개 인덱싱됨"
+    },
+    "loading": "블록 불러오는 중…"
+  },
+  "transactions": {
+    "title": "트랜잭션",
+    "kind": "종류",
+    "allKinds": "모든 종류",
+    "kinds": {
+      "transfer": "전송 (실드)",
+      "mint": "발행 (faucet)",
+      "deploy": "배포",
+      "call": "호출 (기밀)",
+      "bond": "본딩",
+      "unbond": "언본딩",
+      "withdraw": "출금",
+      "bridge_attest": "브리지 입금 (증명)",
+      "bridge_burn": "브리지 출금 (소각)",
+      "register_token": "토큰 등록됨",
+      "token_mint": "토큰 발행",
+      "set_authority": "토큰 권한 변경됨",
+      "token_burn": "토큰 소각",
+      "pause_mints": "브리지 발행 일시 중지됨",
+      "unpause_mints": "브리지 발행 재개됨",
+      "register_bridged_token": "브리지 토큰 등재됨",
+      "list_backing": "담보 등재됨",
+      "invoke": "호출 (프로그램 상태)",
+      "admit_validator": "검증자 승인됨 (투표)",
+      "slash_equivocation": "이중 서명 슬래싱됨",
+      "rotate_pq_guardians": "PQ 가디언 교체됨",
+      "rotate_pause_key": "일시 중지 키 교체됨",
+      "rotate_pq_guardians_v2": "PQ 가디언 교체 (지연)",
+      "rotate_pause_key_v2": "일시 중지 키 교체 (지연)",
+      "cancel_rotation": "교체 취소됨",
+      "other": "기타"
+    },
+    "error": "트랜잭션을 불러오지 못했습니다.",
+    "count": {
+      "other": "트랜잭션 {n}건"
+    },
+    "countOfKind": {
+      "other": "{kind} 종류 트랜잭션 {n}건"
+    },
+    "loading": "트랜잭션 불러오는 중…",
+    "empty": "트랜잭션이 없습니다",
+    "emptyOfKind": "{kind} 트랜잭션이 없습니다"
+  },
+  "notes": {
+    "title": "노트",
+    "columns": {
+      "leaf": "리프",
+      "commitment": "커밋먼트",
+      "height": "높이",
+      "createdBy": "생성자"
+    },
+    "genesis": "제네시스",
+    "deposit": "입금",
+    "error": "커밋먼트 트리를 불러오지 못했습니다.",
+    "leaves": {
+      "other": "커밋먼트 트리의 리프 {n}개"
+    },
+    "loading": "노트 불러오는 중…",
+    "created": "생성된 노트",
+    "createdSub": "트리 리프",
+    "spent": "사용된 노트",
+    "spentSub": "공개된 널리파이어",
+    "treeRoot": "트리 루트",
+    "treeRootSub": "지갑이 증명하는 기준점",
+    "empty": "아직 인덱싱된 리프가 없습니다",
+    "help": "모든 노트는 숨겨진 소유자와 금액에 대한 커밋먼트입니다. 커밋먼트가 네트워크에 전송된 경우 리프에 그 노트를 생성한 트랜잭션이 표시되며, 제네시스·출금·브리지 입금 노트는 연결되지 않습니다. 널리파이어가 어느 리프를 사용하는지는 공개되지 않습니다."
+  },
+  "programs": {
+    "title": "프로그램",
+    "columns": {
+      "program": "프로그램",
+      "deployedAt": "배포 시점",
+      "words": "워드",
+      "calls": "호출",
+      "lastCalled": "마지막 호출"
+    },
+    "never": "없음",
+    "error": "프로그램을 불러오지 못했습니다.",
+    "deployed": {
+      "other": "배포된 프로그램 {n}개"
+    },
+    "loading": "프로그램 불러오는 중…",
+    "empty": "아직 배포된 프로그램이 없습니다"
+  },
+  "tokens": {
+    "title": "토큰",
+    "authority": {
+      "none": "없음 (고정 공급량)",
+      "key": "키 서명",
+      "bridge": {
+        "other": "브리지 (담보 {n}개)"
+      },
+      "program": "프로그램"
+    },
+    "columns": {
+      "token": "토큰",
+      "index": "인덱스",
+      "decimals": "소수 자릿수",
+      "authority": "권한",
+      "totalSupply": "총 공급량",
+      "registeredAt": "등록 시점",
+      "tokenId": "토큰 ID"
+    },
+    "error": "토큰 레지스트리를 불러오지 못했습니다.",
+    "standard": "RPL 토큰 표준",
+    "disabled": "이 체인에는 토큰 레지스트리가 없습니다. 등록된 RPL 토큰이 없으며, 이 빌드의 노드는 토큰 RPC보다 이전 버전입니다. 모든 전송은 RAND입니다.",
+    "registered": {
+      "other": "등록된 RPL 토큰 {n}개"
+    },
+    "registeredWithFee": {
+      "other": "등록된 RPL 토큰 {n}개 · 등록 수수료 {fee} RAND"
+    },
+    "loading": "토큰 레지스트리 불러오는 중…",
+    "empty": "아직 등록된 RPL 토큰이 없습니다",
+    "help": "토큰의 등록과 발행은 설계상 공개됩니다(사양 §4). 여기 표시되는 금액과 심볼은 정확합니다. 비공개인 것은 토큰 노트를 누가 보유하는지, 전송이 누구 사이에서 이루어졌는지입니다. 어떤 토큰의 전송이든 공개 페이지에서는 일반 RAND 결제와 구별할 수 없으며, 토큰의 레지스트리 인덱스는 전송 번들에 나타나지 않습니다."
+  },
+  "validators": {
+    "title": "검증자",
+    "columns": {
+      "validator": "검증자",
+      "epochSet": "에포크 집합",
+      "stake": "스테이크",
+      "rewards": "보상",
+      "unbonding": "언본딩",
+      "share": "비중",
+      "blocksProposed": "제안한 블록",
+      "lastProposed": "마지막 제안"
+    },
+    "active": "활성",
+    "inactive": "비활성",
+    "never": "없음",
+    "error": "검증자 레지스터를 불러오지 못했습니다.",
+    "subtitle": "등록된 {total}명 중 {active}명 활성 · {stake}",
+    "activeStake": "활성 스테이크",
+    "loading": "검증자 불러오는 중…",
+    "empty": "보고된 검증자가 없습니다",
+    "admission": "새 검증자는 집합의 투표로 승인됩니다(audit v6). 새 키를 등록하는 본드에는 먼저 <code>admit_validator</code>가 필요합니다.",
+    "noneAdmitted": "승인되어 등록을 기다리는 키가 없습니다.",
+    "admittedWaiting": {
+      "other": "승인되었으나 아직 등록되지 않음: {n}개"
+    },
+    "help": "레지스터는 이 체인이 금액을 평문으로 저장하는 유일한 곳입니다. 활성 검증자는 현재 에포크를 실행하는 집합이며, 뷰 v의 리더는 주소 순서로 활성 항목 중 v mod n번째입니다."
+  },
+  "provers": {
+    "title": "프로버",
+    "subtitle": "위임 프로버: 직접 증명할 수 없는 지갑이 번들을 보내는 곳과 해당 머신의 위치",
+    "error": "프로버를 불러오지 못했습니다.",
+    "columns": {
+      "host": "호스트",
+      "prover": "프로버",
+      "location": "위치",
+      "network": "네트워크"
+    },
+    "notLocated": "아직 위치 미확인",
+    "status": {
+      "answering": "응답 중",
+      "notChecked": "아직 확인 안 됨",
+      "notAnswering": "응답 없음"
+    },
+    "panel": {
+      "endpoint": "엔드포인트",
+      "operator": "운영자",
+      "fingerprint": "지문",
+      "endpointReports": "엔드포인트가 {fingerprint}을(를) 보고함",
+      "endpointReportsOther": "엔드포인트가 다른 키를 보고함",
+      "capacity": "용량",
+      "capacityValue": {
+        "other": "증명 중 {proving} · 대기 {depth} · 슬롯 {n}개"
+      },
+      "capacityNote": "(멤버당 한 번에 번들 하나)",
+      "fee": "수수료",
+      "feeValue": "번들당 {amount}",
+      "free": "무료",
+      "proves": "증명 대상",
+      "jobs": "{kinds} 작업",
+      "provesValue": "{backend}에서 {jobs} · 빌드 {version}",
+      "unknownBuild": "알 수 없음",
+      "lastChecked": "마지막 확인",
+      "lastAnswered": "마지막 응답 {time}",
+      "error": "오류",
+      "pairing": "페어링"
+    },
+    "stats": {
+      "provers": "프로버",
+      "answering": "{count}개 응답 중",
+      "hosts": "프로버 호스트",
+      "countries": "국가",
+      "slots": "작업 슬롯",
+      "slotsSub": "응답 중인 프로버의 여유 및 사용 중 슬롯"
+    },
+    "hosts": "프로버 호스트",
+    "empty": "이 탐색기에 알려진 프로버가 없습니다",
+    "hostsHelp": "풀은 하나의 주소에서 응답하며 각 작업을 빈 슬롯이 있는 멤버 호스트에 넘깁니다. 따라서 호스트는 네트워크에서 발견된 것이 아니라 탐색기 자체 목록에 따라 여기에 배치됩니다. 위치는 각 호스트의 공개 IP에서 가져오며 주소 자체는 표시되지 않습니다.",
+    "help": "위임 프로버는 자신의 키로 봉인된 작업을 받아 지갑의 번들 증명을 만듭니다. 지갑의 조회 키는 전달되지만 지출 키는 전달되지 않습니다. 프로버를 운영하는 사람은 해당 지갑의 내역을 읽을 수 있을 뿐 그 이상은 할 수 없습니다. 누구나 직접 (<code>rand-prover</code>) 운영하고 지갑을 대신 페어링할 수 있습니다."
+  },
+  "nodes": {
+    "title": "노드",
+    "subtitle": "Rand Protocol을 실행하는 풀 노드, 피어 주소로 위치 확인",
+    "error": "노드에서 피어 목록을 불러오지 못했습니다.",
+    "columns": {
+      "role": "역할",
+      "peerId": "피어 ID",
+      "address": "주소",
+      "location": "위치",
+      "network": "네트워크",
+      "connected": "연결됨"
+    },
+    "roles": {
+      "validator": "검증자",
+      "observer": "옵서버",
+      "peer": "피어"
+    },
+    "thisNode": "이 노드",
+    "unknownLocation": "위치 알 수 없음",
+    "stats": {
+      "nodes": "노드",
+      "geolocated": "위치 확인됨",
+      "withoutLocation": "위치 없음 {count}개",
+      "countries": "국가"
+    },
+    "peers": "피어",
+    "empty": "현재 연결된 피어가 없습니다"
+  },
+  "search": {
+    "title": "검색",
+    "subtitle": "블록, 트랜잭션, 프로그램, 노트, 검증자 찾기",
+    "help": "블록 높이, 64자 해시(블록, 트랜잭션, 프로그램 ID, 노트 커밋먼트 또는 널리파이어일 수 있음), 또는 base58 검증자 주소로 검색하세요. 이 체인에는 계정이 없습니다.",
+    "searching": "“{query}” 검색 중…",
+    "resultsFor": "“{query}” 검색 결과",
+    "error": "검색 요청에 실패했습니다.",
+    "noResults": "결과 없음",
+    "nothingMatches": "“{query}”와(과) 일치하는 온체인 항목이 없습니다.",
+    "resultsCount": {
+      "other": "“{query}” 검색 결과 {n}건"
+    },
+    "types": {
+      "block": "블록",
+      "transaction": "트랜잭션",
+      "validator": "검증자",
+      "program": "프로그램",
+      "note": "노트",
+      "nullifier": "널리파이어"
+    }
+  },
+  "dashboard": {
+    "account": "계정",
+    "title": "API 키",
+    "signOut": "로그아웃",
+    "requestFailed": "요청에 실패했습니다",
+    "newKey": {
+      "title": "새 키",
+      "copyNow": "지금 키를 복사하세요. 보안을 위해 한 번만 표시되며, 잃어버리면 폐기하고 새로 만드세요."
+    },
+    "create": {
+      "title": "키 만들기",
+      "name": "이름",
+      "placeholder": "예: 거래소 입금 감시기",
+      "submit": "새 키",
+      "limits": "활성 키는 최대 10개입니다. 키를 사용한 요청은 분당 600건, 익명 트래픽은 IP당 60건까지 허용됩니다. <a href=\"https://github.com/randprotocol/randscan/blob/main/docs/api.md\">API 가이드</a>를 참조하세요."
+    },
+    "activeKeys": "활성 키 ({count})",
+    "keysError": "키를 불러오지 못했습니다.",
+    "noActiveKeys": "아직 활성 키가 없습니다.",
+    "activeKeyMeta": {
+      "other": "생성 {created} · 마지막 사용 {lastUsed} · 요청 {n}건"
+    },
+    "revoke": "폐기",
+    "revokedKeys": "폐기된 키 ({count})",
+    "revokedKeyMeta": {
+      "other": "폐기 {revoked} · 요청 {n}건"
+    },
+    "changePassword": "비밀번호 변경",
+    "email": "이메일",
+    "memberSince": "가입일",
+    "lastSignIn": "마지막 로그인"
+  }
+}
