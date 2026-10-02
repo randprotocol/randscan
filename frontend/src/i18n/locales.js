@@ -80,8 +80,9 @@ export const stripLocale = (pathname) => {
   return rest === '' || rest.startsWith('?') || rest.startsWith('#') ? `/${rest}` : rest;
 };
 
-/** Paths the app does not serve as pages; never prefixed. */
-export const UNPREFIXED = /^\/(api|ws|_next|viewing|rpc|cdn-cgi|\.well-known)(\/|$)/;
+/** Paths the app does not serve as pages; never prefixed. (The viewing wasm under /viewing/ is
+ *  skipped by its file extension: /viewing itself is the History page.) */
+export const UNPREFIXED = /^\/(api|ws|_next|rpc|cdn-cgi|\.well-known)(\/|$)/;
 
 /**
  * A root-relative page path in a locale: "/blocks" -> "/ru/blocks". Absolute URLs, anchors,
@@ -94,7 +95,8 @@ export const localizePath = (locale, path) => {
   if (/\.[a-z0-9]{2,5}(\?|#|$)/i.test(path)) return path;
   const bare = stripLocale(path);
   if (locale === DEFAULT_LOCALE) return bare;
+  // A language's home is "/ru", not "/ru/": Next answers the trailing slash with a 308.
   return bare === '/' || bare.startsWith('/?') || bare.startsWith('/#')
-    ? `/${locale}/${bare.slice(1)}`
+    ? `/${locale}${bare.slice(1)}`
     : `/${locale}${bare}`;
 };

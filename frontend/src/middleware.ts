@@ -2,7 +2,7 @@
 // hreflang Link header on every page. The rules are src/i18n/routing.js (tested); this file only
 // talks to Next. Node runtime so the country database can be read from disk.
 import { NextResponse, type NextRequest } from 'next/server';
-import { decide, alternatesHeader, clientIp } from '@/i18n/routing';
+import { decide, alternatesHeader, clientIp, needsCountry } from '@/i18n/routing';
 import { countryDb } from '@/i18n/geoip';
 import { stripLocale } from '@/i18n/locales';
 
@@ -23,7 +23,7 @@ export function middleware(req: NextRequest) {
 
   const cookie = req.cookies.get('lang')?.value ?? null;
   const country =
-    pathname === '/' && !cookie
+    needsCountry(pathname, cookie)
       ? (countryDb()?.country(clientIp(req.headers.get('x-forwarded-for')) ?? '') ?? null)
       : null;
 

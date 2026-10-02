@@ -93,7 +93,7 @@ const sections: LegalSection[] = [
           Like any web server, ours receives your IP address, the page or endpoint you asked for and
           the headers your browser sends. We use the IP address for two things:
         </p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>
             Rate limiting. Anonymous traffic is limited per IP address. The counter is held in the
             server&rsquo;s memory for a window of one minute and is not written to a database.
@@ -141,7 +141,7 @@ const sections: LegalSection[] = [
           You can use everything on RandScan without an account. An account exists only to issue API
           keys with a higher request quota. If you create one, we store:
         </p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>your email address and the time the account was created;</li>
           <li>
             an Argon2id hash of your password. We cannot read the password itself, and we never
@@ -200,7 +200,7 @@ const sections: LegalSection[] = [
     title: 'How long we keep things',
     body: (
       <>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>Rate-limit counters: one minute, in memory.</li>
           <li>Server logs: a short period, then rotated away.</li>
           <li>Sessions: 30 days from last use, or until you sign out.</li>

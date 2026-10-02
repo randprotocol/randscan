@@ -38,7 +38,7 @@ export function LegalPage({ title, effective, intro, sections, related }: LegalP
             {sections.map((section, index) => (
               <li key={section.id}>
                 <a href={`#${section.id}`} className="link">
-                  <span className="mr-2 font-mono text-xs text-mute">{index + 1}</span>
+                  <span className="me-2 font-mono text-xs text-mute">{index + 1}</span>
                   {section.title}
                 </a>
               </li>
@@ -49,7 +49,7 @@ export function LegalPage({ title, effective, intro, sections, related }: LegalP
         {sections.map((section, index) => (
           <section key={section.id} id={section.id} className="mt-10 scroll-mt-6">
             <h2 className="text-xl font-semibold tracking-tight text-strong">
-              <span className="mr-3 font-mono text-sm text-mute">{index + 1}</span>
+              <span className="me-3 font-mono text-sm text-mute">{index + 1}</span>
               {section.title}
             </h2>
             <div className="mt-3 space-y-3 text-[0.9375rem] leading-relaxed text-soft">

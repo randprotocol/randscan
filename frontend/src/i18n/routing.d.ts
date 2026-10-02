@@ -10,3 +10,4 @@ export function decide(req: {
 }): Decision;
 export function alternatesHeader(origin: string, barePath: string): string;
 export function clientIp(xff: string | null | undefined): string | null;
+export function needsCountry(pathname: string, cookie: string | null | undefined): boolean;

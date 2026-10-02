@@ -37,13 +37,15 @@ test('stripLocale and localizePath round-trip', () => {
   assert.equal(localizePath('en', '/blocks'), '/blocks');
   assert.equal(localizePath('en', '/ru/blocks'), '/blocks');
   assert.equal(localizePath('ru', '/blocks'), '/ru/blocks');
-  assert.equal(localizePath('ru', '/'), '/ru/');
+  assert.equal(localizePath('ru', '/'), '/ru');
   assert.equal(localizePath('ru', '/zh/blocks'), '/ru/blocks');
   assert.equal(localizePath('ru', '/api/v1/stats'), '/api/v1/stats');
   assert.equal(localizePath('ru', '/viewing/randscan_viewing.js'), '/viewing/randscan_viewing.js');
+  assert.equal(localizePath('ru', '/viewing'), '/ru/viewing');
+  assert.equal(localizePath('ru', '/viewing?key=1'), '/ru/viewing?key=1');
   assert.equal(localizePath('ru', 'https://randprotocol.org'), 'https://randprotocol.org');
   assert.equal(localizePath('ru', '/search?q=5'), '/ru/search?q=5');
-  assert.equal(localizePath('ru', '/?q=5'), '/ru/?q=5');
+  assert.equal(localizePath('ru', '/?q=5'), '/ru?q=5');
   assert.equal(localizePath('ru', '#top'), '#top');
   assert.equal(localizePath('ru', '/icon.png'), '/icon.png');
 });

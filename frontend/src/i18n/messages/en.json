@@ -24,5 +24,28 @@
     "bridged": "{tokens} tokens ({units} units)",
     "chain": "chain {id}",
     "unknownLocation": "Unknown location"
+  },
+  "header": {
+    "nav": {
+      "dashboard": "Dashboard",
+      "blocks": "Blocks",
+      "transactions": "Transactions",
+      "notes": "Notes",
+      "history": "History",
+      "validators": "Validators",
+      "provers": "Provers",
+      "programs": "Programs",
+      "tokens": "Tokens",
+      "bridge": "Bridge",
+      "nodes": "Nodes"
+    },
+    "apiKeys": "API keys",
+    "signIn": "Sign in",
+    "toggleNav": "Toggle navigation"
+  },
+  "footer": {
+    "blurb": "RandScan is the explorer for Rand Protocol.",
+    "privacy": "Privacy",
+    "terms": "Terms"
   }
 }

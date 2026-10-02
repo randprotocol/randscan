@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { SearchBar } from './SearchBar';
@@ -8,19 +7,22 @@ import { ThemeToggle } from './ThemeToggle';
 import { Brand } from './Brand';
 import { cn } from '@/lib/utils';
 import { useMe } from '@/hooks/useApi';
+import { L, useT } from '@/i18n/client';
+import { stripLocale } from '@/i18n/locales';
+import { LanguageMenu } from './LanguageMenu';
 
 const navLinks = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/blocks', label: 'Blocks' },
-  { href: '/transactions', label: 'Transactions' },
-  { href: '/notes', label: 'Notes' },
-  { href: '/viewing', label: 'History' },
-  { href: '/validators', label: 'Validators' },
-  { href: '/provers', label: 'Provers' },
-  { href: '/programs', label: 'Programs' },
-  { href: '/tokens', label: 'Tokens' },
-  { href: '/bridge', label: 'Bridge' },
-  { href: '/nodes', label: 'Nodes' },
+  { href: '/', key: 'dashboard' },
+  { href: '/blocks', key: 'blocks' },
+  { href: '/transactions', key: 'transactions' },
+  { href: '/notes', key: 'notes' },
+  { href: '/viewing', key: 'history' },
+  { href: '/validators', key: 'validators' },
+  { href: '/provers', key: 'provers' },
+  { href: '/programs', key: 'programs' },
+  { href: '/tokens', key: 'tokens' },
+  { href: '/bridge', key: 'bridge' },
+  { href: '/nodes', key: 'nodes' },
 ];
 
 function AccountLink({
@@ -32,15 +34,17 @@ function AccountLink({
   className?: string;
   onClick?: () => void;
 }) {
+  const { t } = useT();
   return (
-    <Link href={signedIn ? '/dashboard' : '/login'} className={className} onClick={onClick}>
-      {signedIn ? 'API keys' : 'Sign in'}
-    </Link>
+    <L href={signedIn ? '/dashboard' : '/login'} className={className} onClick={onClick}>
+      {signedIn ? t('header.apiKeys') : t('header.signIn')}
+    </L>
   );
 }
 
 export function Header() {
-  const pathname = usePathname();
+  const pathname = stripLocale(usePathname() ?? '/');
+  const { t } = useT();
   const [mobileOpen, setMobileOpen] = useState(false);
   const { data: me } = useMe();
 
@@ -51,15 +55,15 @@ export function Header() {
     <header className="border-b border-border-soft bg-bg">
       <div className="mx-auto max-w-6xl px-6 lg:px-8">
         <div className="flex h-14 items-center justify-between gap-5">
-          <Link href="/" className="flex flex-shrink-0 items-center rounded-md">
+          <L href="/" className="flex flex-shrink-0 items-center rounded-md">
             <Brand />
-          </Link>
+          </L>
 
           <nav className="hidden items-center gap-4 lg:flex">
             {navLinks.map((link) => {
               const active = isActive(link.href);
               return (
-                <Link
+                <L
                   key={link.href}
                   href={link.href}
                   className={cn(
@@ -67,16 +71,16 @@ export function Header() {
                     active ? 'text-strong' : 'text-soft'
                   )}
                 >
-                  {link.label}
+                  {t(`header.nav.${link.key}`)}
                   {active && (
-                    <span className="absolute -bottom-px left-0 h-0.5 w-full rounded-full bg-accent" />
+                    <span className="absolute -bottom-px start-0 h-0.5 w-full rounded-full bg-accent" />
                   )}
-                </Link>
+                </L>
               );
             })}
           </nav>
 
-          <div className="ml-auto hidden items-center gap-2.5 lg:flex">
+          <div className="ms-auto hidden items-center gap-2.5 lg:flex">
             <div className="w-44">
               <SearchBar />
             </div>
@@ -93,10 +97,11 @@ export function Header() {
               </svg>
               <span className="sr-only">GitHub</span>
             </a>
+            <LanguageMenu />
             <ThemeToggle />
           </div>
 
-          <div className="ml-auto flex items-center gap-2 lg:hidden">
+          <div className="ms-auto flex items-center gap-2 lg:hidden">
             <ThemeToggle />
             <button
               type="button"
@@ -104,7 +109,7 @@ export function Header() {
               aria-expanded={mobileOpen}
               className="btn-icon"
             >
-              <span className="sr-only">Toggle navigation</span>
+              <span className="sr-only">{t('header.toggleNav')}</span>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.6} stroke="currentColor">
                 <path
                   strokeLinecap="round"
@@ -119,7 +124,7 @@ export function Header() {
         {mobileOpen && (
           <nav className="flex flex-col border-t border-border-soft py-2 lg:hidden">
             {navLinks.map((link) => (
-              <Link
+              <L
                 key={link.href}
                 href={link.href}
                 onClick={() => setMobileOpen(false)}
@@ -128,14 +133,15 @@ export function Header() {
                   isActive(link.href) ? 'text-strong' : 'text-soft'
                 )}
               >
-                {link.label}
-              </Link>
+                {t(`header.nav.${link.key}`)}
+              </L>
             ))}
             <AccountLink
               signedIn={!!me}
               className="px-1 py-2 text-sm text-soft transition-colors hover:text-strong"
               onClick={() => setMobileOpen(false)}
             />
+            <LanguageMenu inline className="mt-2 border-t border-border-soft pt-2" />
           </nav>
         )}
 

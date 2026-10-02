@@ -620,7 +620,7 @@ export default function BridgePage() {
                 <ul className="space-y-1.5">
                   {bridge.guardians.map((g, i) => (
                     <li key={g} className="flex items-center gap-2">
-                      <span className="w-6 flex-shrink-0 text-right font-mono text-xs text-mute">
+                      <span className="w-6 flex-shrink-0 text-end font-mono text-xs text-mute">
                         {i}
                       </span>
                       <Hash value={g} full />

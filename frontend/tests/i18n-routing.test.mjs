@@ -22,19 +22,20 @@ test('an unprefixed page is rewritten into the English tree', () => {
 });
 
 test('the root: country decides only without a valid cookie', () => {
-  assert.deepEqual(d('/', { country: 'ID' }), { kind: 'redirect', to: '/id/', status: 302 });
+  assert.deepEqual(d('/', { country: 'ID' }), { kind: 'redirect', to: '/id', status: 302 });
   assert.deepEqual(d('/', { country: 'US' }), { kind: 'rewrite', to: '/en' });
   assert.deepEqual(d('/', { country: null }), { kind: 'rewrite', to: '/en' });
   assert.deepEqual(d('/', { country: 'ID', cookie: 'en' }), { kind: 'rewrite', to: '/en' });
-  assert.deepEqual(d('/', { country: 'US', cookie: 'ja' }), { kind: 'redirect', to: '/ja/', status: 302 });
-  assert.deepEqual(d('/', { country: 'ID', cookie: 'xx' }), { kind: 'redirect', to: '/id/', status: 302 });
-  assert.deepEqual(d('/', { country: 'ID', search: '?utm=1' }), { kind: 'redirect', to: '/id/?utm=1', status: 302 });
+  assert.deepEqual(d('/', { country: 'US', cookie: 'ja' }), { kind: 'redirect', to: '/ja', status: 302 });
+  assert.deepEqual(d('/', { country: 'ID', cookie: 'xx' }), { kind: 'redirect', to: '/id', status: 302 });
+  assert.deepEqual(d('/', { country: 'ID', search: '?utm=1' }), { kind: 'redirect', to: '/id?utm=1', status: 302 });
   assert.deepEqual(d('/blocks', { country: 'ID' }), { kind: 'rewrite', to: '/en/blocks' });
 });
 
 test('non-page paths are left alone', () => {
   assert.deepEqual(d('/api/v1/stats'), { kind: 'next' });
   assert.deepEqual(d('/viewing/randscan_viewing_bg.wasm'), { kind: 'next' });
+  assert.deepEqual(d('/viewing'), { kind: 'rewrite', to: '/en/viewing' });
   assert.deepEqual(d('/icon.png'), { kind: 'next' });
 });
 
@@ -44,7 +45,7 @@ test('the alternates header lists sixteen languages and x-default', () => {
   assert.match(h, /<https:\/\/randscan\.org\/zh-hk\/blocks>; rel="alternate"; hreflang="zh-Hant-HK"/);
   assert.match(h, /<https:\/\/randscan\.org\/blocks>; rel="alternate"; hreflang="x-default"/);
   assert.equal(h.split(', ').length, 17);
-  assert.match(alternatesHeader('https://randscan.org', '/'), /<https:\/\/randscan\.org\/ru\/>; rel="alternate"; hreflang="ru"/);
+  assert.match(alternatesHeader('https://randscan.org', '/'), /<https:\/\/randscan\.org\/ru>; rel="alternate"; hreflang="ru"/);
 });
 
 test('clientIp takes the first forwarded address', () => {
@@ -52,4 +53,13 @@ test('clientIp takes the first forwarded address', () => {
   assert.equal(clientIp(' 2001:db8::1 '), '2001:db8::1');
   assert.equal(clientIp(null), null);
   assert.equal(clientIp(''), null);
+});
+
+test('the country is looked up whenever the cookie is not a valid language', async () => {
+  const { needsCountry } = await import('../src/i18n/routing.js');
+  assert.equal(needsCountry('/', null), true);
+  assert.equal(needsCountry('/', 'xx'), true);
+  assert.equal(needsCountry('/', 'en'), false);
+  assert.equal(needsCountry('/', 'ja'), false);
+  assert.equal(needsCountry('/blocks', null), false);
 });

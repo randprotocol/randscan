@@ -31,7 +31,7 @@ export function SearchBar({
   return (
     <form onSubmit={handleSubmit} className={cn('relative', className)}>
       <svg
-        className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-mute"
+        className="pointer-events-none absolute start-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-mute"
         fill="none"
         viewBox="0 0 24 24"
         stroke="currentColor"
@@ -48,7 +48,7 @@ export function SearchBar({
         autoFocus={autoFocus}
         spellCheck={false}
         aria-label="Search the explorer"
-        className="input rounded-sm py-1.5 pl-8 pr-3"
+        className="input rounded-sm py-1.5 ps-8 pe-3"
       />
     </form>
   );

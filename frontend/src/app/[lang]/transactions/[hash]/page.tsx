@@ -561,7 +561,7 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
           ) : (
             <span className="text-base font-semibold text-strong">
               {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
-              {tx.fee_note ? <span className="ml-2 text-xs font-normal text-mute">gross, locked on the source chain</span> : null}
+              {tx.fee_note ? <span className="ms-2 text-xs font-normal text-mute">gross, locked on the source chain</span> : null}
             </span>
           )}
         </DetailRow>

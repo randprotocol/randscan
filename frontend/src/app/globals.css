@@ -460,3 +460,57 @@
   background: var(--color-surface-2);
   color: var(--color-text-strong);
 }
+
+/* ---------------------------------------------------------------------------------------------
+   Languages (docs/superpowers/specs/2026-10-02-explorer-i18n-design.md)
+   Hashes, keys, amounts and code read left to right inside a right-to-left page. Scripts Inter
+   lacks fall back to the system's own faces; no fonts are downloaded for them. Tracking is
+   reset where the site's slight negative letter-spacing would break Arabic joining or crowd CJK.
+   --------------------------------------------------------------------------------------------- */
+.font-mono,
+code,
+kbd,
+pre,
+input[type='text'].font-mono {
+  direction: ltr;
+  unicode-bidi: isolate;
+}
+
+html[lang^='zh-Hans'] body {
+  font-family: var(--font-sans), 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', 'Noto Sans CJK SC', sans-serif;
+}
+html[lang^='zh-Hant'] body {
+  font-family: var(--font-sans), 'PingFang HK', 'PingFang TC', 'Microsoft JhengHei', 'Noto Sans CJK TC', sans-serif;
+}
+html[lang='ja'] body {
+  font-family: var(--font-sans), 'Hiragino Sans', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', Meiryo, 'Noto Sans CJK JP', sans-serif;
+}
+html[lang='ko'] body {
+  font-family: var(--font-sans), 'Apple SD Gothic Neo', 'Malgun Gothic', 'Noto Sans CJK KR', sans-serif;
+}
+html[lang='ar'] body,
+html[lang='fa'] body {
+  font-family: var(--font-sans), 'Segoe UI', 'Geeza Pro', 'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, sans-serif;
+}
+html[lang='ar'] body,
+html[lang='ar'] h1,
+html[lang='ar'] h2,
+html[lang='ar'] h3,
+html[lang='fa'] body,
+html[lang='fa'] h1,
+html[lang='fa'] h2,
+html[lang='fa'] h3,
+html[lang^='zh'] body,
+html[lang^='zh'] h1,
+html[lang^='zh'] h2,
+html[lang^='zh'] h3,
+html[lang='ja'] body,
+html[lang='ja'] h1,
+html[lang='ja'] h2,
+html[lang='ja'] h3,
+html[lang='ko'] body,
+html[lang='ko'] h1,
+html[lang='ko'] h2,
+html[lang='ko'] h3 {
+  letter-spacing: normal;
+}

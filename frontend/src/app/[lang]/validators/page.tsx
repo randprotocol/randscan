@@ -55,7 +55,7 @@ const columns: Column<Validator>[] = [
       ) : (
         <span className="text-soft">
           {formatStake(pendingTotal(validator))}
-          <span className="ml-1 text-mute">({validator.pending.length})</span>
+          <span className="ms-1 text-mute">({validator.pending.length})</span>
         </span>
       ),
   },
@@ -93,7 +93,7 @@ const columns: Column<Validator>[] = [
             #{formatNumber(validator.last_proposed_height)}
           </Link>
           {validator.last_proposed_timestamp_ms !== null && (
-            <span className="ml-2 text-mute">
+            <span className="ms-2 text-mute">
               {formatTimestamp(validator.last_proposed_timestamp_ms)}
             </span>
           )}

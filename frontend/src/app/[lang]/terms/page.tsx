@@ -37,7 +37,7 @@ const sections: LegalSection[] = [
           RandScan is a block explorer. It reads the public ledger of the Rand Protocol network from a
           full node, indexes it, and presents it. It is a window onto the chain, not part of it.
         </p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>
             It is not a wallet. It holds no funds, no spending keys and no custody of anything, and
             it cannot create, sign or broadcast transactions on your behalf.
@@ -65,7 +65,7 @@ const sections: LegalSection[] = [
           We try to show the chain faithfully, and the explorer&rsquo;s code is open for anyone to
           check. Still, what you see is a copy made by software, and it can be wrong or late:
         </p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>the indexer can lag behind the chain, or stop while the node it reads is restarted;</li>
           <li>a block the explorer showed can be replaced if the chain reorganises;</li>
           <li>
@@ -112,7 +112,7 @@ const sections: LegalSection[] = [
           You do not need an account to use RandScan. An account issues API keys with a higher
           request quota. If you create one:
         </p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>you must give an email address you control, and keep your password secret;</li>
           <li>
             an API key is a credential. Keep it out of client-side code and public repositories, and
@@ -153,7 +153,7 @@ const sections: LegalSection[] = [
           and clients are expected to honour it.
         </p>
         <p>You agree not to:</p>
-        <ul className="list-disc space-y-1 pl-5">
+        <ul className="list-disc space-y-1 ps-5">
           <li>
             evade rate limits, for instance by rotating addresses or keys, or by many accounts;
           </li>

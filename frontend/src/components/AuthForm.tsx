@@ -89,7 +89,7 @@ export function AuthForm({ mode }: AuthFormProps) {
           />
           {mode === 'signup' && <p className="mt-1.5 text-xs text-mute">At least 10 characters.</p>}
           {mode === 'login' && (
-            <p className="mt-1.5 text-right text-xs">
+            <p className="mt-1.5 text-end text-xs">
               <Link href="/forgot" className="link">
                 Forgot your password?
               </Link>

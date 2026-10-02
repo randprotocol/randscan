@@ -34,6 +34,11 @@ export function decide({ pathname, search, cookie, country }) {
   return { kind: 'rewrite', to: `/${DEFAULT_LOCALE}${pathname === '/' ? '' : pathname}${q}` };
 }
 
+/** Whether a request needs the visitor's country: only the root, and only without a valid choice. */
+export function needsCountry(pathname, cookie) {
+  return pathname === '/' && !isLocale(cookie);
+}
+
 /** The `Link` header: every language's URL for one unprefixed path, then x-default. */
 export function alternatesHeader(origin, barePath) {
   const entries = LOCALES.map(

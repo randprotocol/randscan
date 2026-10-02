@@ -167,7 +167,7 @@ export default function DashboardPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="text-sm">
                 <span className="font-mono text-strong">rsk_{k.prefix}…</span>
-                <span className="ml-3 text-mute">
+                <span className="ms-3 text-mute">
                   created {when(k.created_at)} · last used {when(k.last_used_at)} ·{' '}
                   {formatNumber(k.request_count)} requests
                 </span>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
           {revoked.map((k) => (
             <DetailRow key={k.id} label={k.name}>
               <span className="font-mono text-mute">rsk_{k.prefix}…</span>
-              <span className="ml-3 text-sm text-mute">
+              <span className="ms-3 text-sm text-mute">
                 revoked {when(k.revoked_at)} · {formatNumber(k.request_count)} requests
               </span>
             </DetailRow>
