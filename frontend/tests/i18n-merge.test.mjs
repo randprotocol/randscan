@@ -13,3 +13,11 @@ test('translation over English, gaps filled from English', () => {
   assert.equal(merge(en, { nest: 'flat' }).nest.b, 'B');
   assert.equal(merge(en, { extra: 'x' }).extra, undefined);
 });
+
+test('a plural object keeps the translation\'s own forms (few, many) that English lacks', () => {
+  const en = { n: { one: '{n} block', other: '{n} blocks' } };
+  const ru = { n: { one: '{n} блок', few: '{n} блока', many: '{n} блоков', other: '{n} блока' } };
+  assert.deepEqual(merge(en, ru).n, ru.n);
+  assert.deepEqual(merge(en, { n: { few: 'x' } }).n, { one: '{n} block', other: '{n} blocks', few: 'x' });
+  assert.deepEqual(merge(en, { n: { bogus: 'x' } }).n, en.n);
+});

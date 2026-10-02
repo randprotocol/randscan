@@ -12,7 +12,7 @@ import {
 } from 'react';
 import type { Messages } from './messages';
 import { localeInfo, localizePath } from './locales';
-import { fill } from './rich';
+import { fill, plural } from './rich';
 import { makeFormat, type Format } from './format';
 import { Rich } from './RichText';
 import type { TokenInfo } from '@/types';
@@ -63,7 +63,7 @@ const lookup = (m: unknown, key: string): unknown =>
     );
 
 export function useT() {
-  const { messages, locale } = useCtx();
+  const { messages, locale, tag } = useCtx();
   const t = useCallback(
     (key: string, vars?: Record<string, string | number>) => {
       const v = lookup(messages, key);
@@ -82,7 +82,19 @@ export function useT() {
     ),
     [t, locale],
   );
-  return { t, get, rich, locale };
+  /** A plural message ({ one, other, few… }) for the count `n`; `{n}` gets the formatted number. */
+  const tp = useCallback(
+    (key: string, n: number, vars?: Record<string, string | number>) => {
+      const forms = lookup(messages, key);
+      if (!forms || typeof forms !== 'object') return key;
+      return plural(tag, forms as Record<string, string>, n, {
+        n: new Intl.NumberFormat(`${tag}-u-nu-latn`).format(n),
+        ...vars,
+      });
+    },
+    [messages, tag],
+  );
+  return { t, tp, get, rich, locale };
 }
 
 export function useLocalizePath() {

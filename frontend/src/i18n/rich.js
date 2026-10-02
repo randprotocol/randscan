@@ -36,3 +36,20 @@ export function tokenize(s) {
   text(s.slice(last));
   return root.children;
 }
+
+/**
+ * A plural message in a locale: the CLDR form for `n` ("one", "few", "many"…), else `other`.
+ * `{n}` is filled with `vars.n` when given (a formatted number), else with `n` itself.
+ * @param {string} tag @param {Record<string, string>} forms @param {number} n
+ * @param {Record<string, string | number>} [vars]
+ */
+export function plural(tag, forms, n, vars = {}) {
+  let rule = 'other';
+  try {
+    rule = new Intl.PluralRules(tag).select(n);
+  } catch {
+    rule = 'other';
+  }
+  const s = forms?.[rule] ?? forms?.other ?? '';
+  return fill(s, { n, ...vars });
+}
