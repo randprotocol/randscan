@@ -75,8 +75,8 @@ or later, with `rand` beside it or `RAND_CLI` set).
 
 ### Languages
 
-The site is served in sixteen languages: English at `/…`, and `ru zh zh-hk ko id ms ja ar fa es pt de
-fr it pl` at `/{code}/…` with the same path (design: `docs/superpowers/specs/2026-10-02-explorer-i18n-design.md`).
+The site is served in twenty languages: English at `/…`, and `ru zh zh-hk ko id ms ja ar fa es pt de
+fr it pl hi ur ps ta` at `/{code}/…` with the same path (Arabic, Persian, Urdu and Pashto right to left) (design: `docs/superpowers/specs/2026-10-02-explorer-i18n-design.md`).
 A first visit to `/` goes to the language of the visitor's country, looked up in process in the
 offline database `GEOIP_DB`; a language chosen from the globe menu is kept in the `lang` cookie
 and wins from then on. Strings live in `frontend/src/i18n/messages/{code}.json`, English being

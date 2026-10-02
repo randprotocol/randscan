@@ -24,6 +24,10 @@ export const LOCALES = [
   { code: 'fr', tag: 'fr', name: 'Français', dir: 'ltr' },
   { code: 'it', tag: 'it', name: 'Italiano', dir: 'ltr' },
   { code: 'pl', tag: 'pl', name: 'Polski', dir: 'ltr' },
+  { code: 'hi', tag: 'hi', name: 'हिन्दी', dir: 'ltr' },
+  { code: 'ur', tag: 'ur', name: 'اردو', dir: 'rtl' },
+  { code: 'ps', tag: 'ps', name: 'پښتو', dir: 'rtl' },
+  { code: 'ta', tag: 'ta', name: 'தமிழ்', dir: 'ltr' },
 ];
 
 export const LOCALE_CODES = LOCALES.map((l) => l.code);
@@ -45,13 +49,17 @@ const COUNTRIES = {
   ko: 'KR',
   ja: 'JP',
   ar: 'SA AE EG QA KW BH OM JO IQ LB MA DZ TN LY SD YE SY PS MR',
-  fa: 'IR AF',
+  fa: 'IR',
   es: 'ES MX AR CO CL PE VE EC GT CU BO DO HN PY SV NI CR PA UY PR',
   pt: 'BR PT AO MZ',
   de: 'DE AT CH LI',
   fr: 'FR MC',
   it: 'IT SM',
   pl: 'PL',
+  hi: 'IN',
+  ur: 'PK',
+  ps: 'AF',
+  ta: 'LK',
 };
 
 /** @type {Record<string, string>} ISO 3166-1 alpha-2 (upper case) -> locale code */

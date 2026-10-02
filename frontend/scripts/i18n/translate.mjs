@@ -38,6 +38,10 @@ const LANGUAGE = {
   fr: 'French',
   it: 'Italian',
   pl: 'Polish',
+  hi: 'Hindi (standard Hindi in Devanagari script)',
+  ur: 'Urdu (standard Urdu in Nastaliq/Perso-Arabic script, Pakistan)',
+  ps: 'Pashto (standard Pashto in Perso-Arabic script, Afghanistan)',
+  ta: 'Tamil (standard written Tamil in Tamil script)',
 };
 
 const sha = (v) => createHash('sha1').update(JSON.stringify(v)).digest('hex');

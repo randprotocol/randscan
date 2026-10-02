@@ -5,14 +5,21 @@ import {
   localeFromPath, stripLocale, localizePath, localeForCountry,
 } from '../src/i18n/locales.js';
 
-test('sixteen locales in the agreed order', () => {
-  assert.deepEqual(LOCALE_CODES, ['en','ru','zh','zh-hk','ko','id','ms','ja','ar','fa','es','pt','de','fr','it','pl']);
+test('twenty locales in the agreed order', () => {
+  assert.deepEqual(LOCALE_CODES, ['en','ru','zh','zh-hk','ko','id','ms','ja','ar','fa','es','pt','de','fr','it','pl','hi','ur','ps','ta']);
   assert.equal(DEFAULT_LOCALE, 'en');
   assert.equal(localeInfo('zh-hk').tag, 'zh-Hant-HK');
   assert.equal(localeInfo('ar').dir, 'rtl');
   assert.equal(localeInfo('fa').dir, 'rtl');
-  assert.equal(localeInfo('nope').code, 'en');
-  assert.equal(LOCALES.filter((l) => l.dir === 'rtl').length, 2);
+  assert.equal(localeInfo('ur').dir, 'rtl');
+  assert.equal(localeInfo('ps').dir, 'rtl');
+  assert.equal(localeInfo('hi').dir, 'ltr');
+  assert.equal(localeInfo('ta').dir, 'ltr');
+  assert.equal(localeInfo('hi').name, 'हिन्दी');
+  assert.equal(localeInfo('ur').name, 'اردو');
+  assert.equal(localeInfo('ps').name, 'پښتو');
+  assert.equal(localeInfo('ta').name, 'தமிழ்');  assert.equal(localeInfo('nope').code, 'en');
+  assert.equal(LOCALES.filter((l) => l.dir === 'rtl').length, 4);
 });
 
 test('localeFromPath reads only a whole first segment', () => {
@@ -58,6 +65,11 @@ test('country table', () => {
   assert.equal(localeForCountry('BR'), 'pt');
   assert.equal(localeForCountry('CH'), 'de');
   assert.equal(localeForCountry('SG'), 'en');
+  assert.equal(localeForCountry('IN'), 'hi');
+  assert.equal(localeForCountry('PK'), 'ur');
+  assert.equal(localeForCountry('AF'), 'ps');
+  assert.equal(localeForCountry('LK'), 'ta');
+  assert.equal(localeForCountry('IR'), 'fa');
   assert.equal(localeForCountry('XX'), 'en');
   assert.equal(localeForCountry(null), 'en');
   assert.equal(localeForCountry('id'), 'id');

@@ -465,7 +465,8 @@
    Languages (docs/superpowers/specs/2026-10-02-explorer-i18n-design.md)
    Hashes, keys, amounts and code read left to right inside a right-to-left page. Scripts Inter
    lacks fall back to the system's own faces; no fonts are downloaded for them. Tracking is
-   reset where the site's slight negative letter-spacing would break Arabic joining or crowd CJK.
+   reset where the site's slight negative letter-spacing would break Arabic joining, crowd CJK or
+   split Indic conjuncts.
    --------------------------------------------------------------------------------------------- */
 .font-mono,
 code,
@@ -492,6 +493,18 @@ html[lang='ar'] body,
 html[lang='fa'] body {
   font-family: var(--font-sans), 'Segoe UI', 'Geeza Pro', 'Noto Naskh Arabic', 'Noto Sans Arabic', Tahoma, sans-serif;
 }
+/* Urdu and Pashto letters (ٹ ڈ ڑ ں ے, ښ ځ څ ړ ږ ګ ڼ ې ۍ) are outside basic Arabic: faces that carry
+   them first. Naskh rather than Nastaliq, whose tall lines do not fit table rows. */
+html[lang='ur'] body,
+html[lang='ps'] body {
+  font-family: var(--font-sans), 'Segoe UI', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Noto Sans Arabic UI', 'Geeza Pro', Tahoma, sans-serif;
+}
+html[lang='hi'] body {
+  font-family: var(--font-sans), 'Kohinoor Devanagari', 'Devanagari Sangam MN', 'Nirmala UI', 'Noto Sans Devanagari', Mangal, sans-serif;
+}
+html[lang='ta'] body {
+  font-family: var(--font-sans), 'Tamil Sangam MN', 'Nirmala UI', 'Noto Sans Tamil', Latha, sans-serif;
+}
 html[lang='ar'] body,
 html[lang='ar'] h1,
 html[lang='ar'] h2,
@@ -500,6 +513,22 @@ html[lang='fa'] body,
 html[lang='fa'] h1,
 html[lang='fa'] h2,
 html[lang='fa'] h3,
+html[lang='ur'] body,
+html[lang='ur'] h1,
+html[lang='ur'] h2,
+html[lang='ur'] h3,
+html[lang='ps'] body,
+html[lang='ps'] h1,
+html[lang='ps'] h2,
+html[lang='ps'] h3,
+html[lang='hi'] body,
+html[lang='hi'] h1,
+html[lang='hi'] h2,
+html[lang='hi'] h3,
+html[lang='ta'] body,
+html[lang='ta'] h1,
+html[lang='ta'] h2,
+html[lang='ta'] h3,
 html[lang^='zh'] body,
 html[lang^='zh'] h1,
 html[lang^='zh'] h2,

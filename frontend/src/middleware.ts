@@ -1,4 +1,4 @@
-// English unprefixed, fifteen languages prefixed, the root by cookie then country, and an
+// English unprefixed, nineteen languages prefixed, the root by cookie then country, and an
 // hreflang Link header on every page. The rules are src/i18n/routing.js (tested); this file only
 // talks to Next. Node runtime so the country database can be read from disk.
 import { NextResponse, type NextRequest } from 'next/server';

@@ -39,12 +39,13 @@ test('non-page paths are left alone', () => {
   assert.deepEqual(d('/icon.png'), { kind: 'next' });
 });
 
-test('the alternates header lists sixteen languages and x-default', () => {
+test('the alternates header lists twenty languages and x-default', () => {
   const h = alternatesHeader('https://randscan.org', '/blocks');
   assert.match(h, /<https:\/\/randscan\.org\/blocks>; rel="alternate"; hreflang="en"/);
   assert.match(h, /<https:\/\/randscan\.org\/zh-hk\/blocks>; rel="alternate"; hreflang="zh-Hant-HK"/);
   assert.match(h, /<https:\/\/randscan\.org\/blocks>; rel="alternate"; hreflang="x-default"/);
-  assert.equal(h.split(', ').length, 17);
+  assert.equal(h.split(', ').length, 21);
+  assert.match(h, /<https:\/\/randscan\.org\/ur\/blocks>; rel="alternate"; hreflang="ur"/);
   assert.match(alternatesHeader('https://randscan.org', '/'), /<https:\/\/randscan\.org\/ru>; rel="alternate"; hreflang="ru"/);
 });
 

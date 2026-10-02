@@ -16,13 +16,17 @@ import de from './messages/de.json';
 import fr from './messages/fr.json';
 import it from './messages/it.json';
 import pl from './messages/pl.json';
+import hi from './messages/hi.json';
+import ur from './messages/ur.json';
+import ps from './messages/ps.json';
+import ta from './messages/ta.json';
 import { merge } from './merge';
 import { DEFAULT_LOCALE } from './locales';
 
 export type Messages = typeof en;
 
 const FILES: Record<string, unknown> = {
-  ru, zh, 'zh-hk': zhHk, ko, id, ms, ja, ar, fa, es, pt, de, fr, it, pl,
+  ru, zh, 'zh-hk': zhHk, ko, id, ms, ja, ar, fa, es, pt, de, fr, it, pl, hi, ur, ps, ta,
 };
 
 const cache = new Map<string, Messages>();

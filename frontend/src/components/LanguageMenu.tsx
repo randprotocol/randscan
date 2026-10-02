@@ -7,7 +7,7 @@ import { useLocale, useT } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 /**
- * The sixteen languages. Choosing one remembers it in the `lang` cookie (which wins over the
+ * The twenty languages. Choosing one remembers it in the `lang` cookie (which wins over the
  * visitor's country from then on, src/middleware.ts) and opens the same page in that language.
  * `inline` renders the plain list for the mobile drawer; otherwise a globe icon opens it.
  */
