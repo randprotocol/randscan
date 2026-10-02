@@ -71,6 +71,19 @@ or later, with `rand` beside it or `RAND_CLI` set).
 | `ANON_RATE_LIMIT_RPM` | `60` | requests per minute per IP for anonymous traffic |
 | `KEY_RATE_LIMIT_RPM` | `600` | requests per minute per API key |
 | `AUTH_RATE_LIMIT_RPM` | `10` | sign-in/sign-up attempts per minute per IP |
+| `GEOIP_DB` (frontend) | unset | DB-IP Country Lite `.mmdb` for the first-visit language redirect; unset means English |
+
+### Languages
+
+The site is served in sixteen languages: English at `/…`, and `ru zh zh-hk ko id ms ja ar fa es pt de
+fr it pl` at `/{code}/…` with the same path (design: `docs/superpowers/specs/2026-10-02-explorer-i18n-design.md`).
+A first visit to `/` goes to the language of the visitor's country, looked up in process in the
+offline database `GEOIP_DB`; a language chosen from the globe menu is kept in the `lang` cookie
+and wins from then on. Strings live in `frontend/src/i18n/messages/{code}.json`, English being
+the source. After changing English text, run `cd frontend && node scripts/i18n/translate.mjs`
+(it re-translates only what changed, with `claude -p`) and `npm test` (the parity test).
+`npm run lint` fails on hard-coded English in `src/app` and `src/components`.
+`frontend/scripts/i18n/fetch-geoip.sh` fetches the database for local runs.
 
 ## API
 
