@@ -16,6 +16,6 @@ REBUILD="(cd crates/randscan-viewing && wasm-pack build --release --target web -
 newer=$(find crates/randscan-viewing/src crates/randscan-viewing/Cargo.toml -newer "$WASM" -print -quit)
 [ -z "$newer" ] || { echo "$WASM is older than $newer; rebuild it: $REBUILD" >&2; exit 1; }
 rsync -az --delete -e "ssh $SSH_OPTS" \
-    --exclude target --exclude .git --exclude frontend/node_modules --exclude frontend/.next \
+    --exclude target --exclude .git --exclude frontend/node_modules --exclude frontend/.next --exclude frontend/geoip \
     ./ root@$IP:/root/randscan/
 ssh $SSH_OPTS root@$IP "bash /root/randscan/deploy/vps-setup.sh $DOMAIN"

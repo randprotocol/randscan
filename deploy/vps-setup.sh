@@ -79,6 +79,15 @@ grep -E "^\s+Finished" /tmp/randscan-build.log || true
 test -x target/release/randscan-api
 install -m 755 target/release/randscan-api /usr/local/bin/randscan-api
 
+# --- country database for the language redirect (DB-IP Country Lite, CC BY 4.0) ---------------
+# Read in process by the frontend's middleware on a first visit to / (privacy page, "IP address");
+# refreshed when older than 35 days, kept as it is when the download fails.
+GEO=$ENV_DIR/geoip/dbip-country-lite.mmdb
+if [ ! -s "$GEO" ] || [ -n "$(find "$GEO" -mtime +35 2>/dev/null)" ]; then
+    bash $SRC/frontend/scripts/i18n/fetch-geoip.sh "$GEO" || echo "geoip: download failed; keeping what is there"
+fi
+chmod 644 "$GEO" 2>/dev/null || true
+
 echo "building frontend..."
 cd $SRC/frontend
 npm ci --no-audit --no-fund >/dev/null
