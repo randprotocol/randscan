@@ -1,7 +1,7 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { L, useT } from '@/i18n/client';
 import { cn, copyToClipboard, shortenHash } from '@/lib/utils';
 
 interface CopyButtonProps {
@@ -10,7 +10,9 @@ interface CopyButtonProps {
   label?: string;
 }
 
-export function CopyButton({ value, className, label = 'Copy' }: CopyButtonProps) {
+export function CopyButton({ value, className, label: labelProp }: CopyButtonProps) {
+  const { t } = useT();
+  const label = labelProp ?? t('common.copy');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -33,8 +35,8 @@ export function CopyButton({ value, className, label = 'Copy' }: CopyButtonProps
     <button
       type="button"
       onClick={onCopy}
-      title={copied ? 'Copied' : label}
-      aria-label={copied ? 'Copied' : label}
+      title={copied ? t('common.copied') : label}
+      aria-label={copied ? t('common.copied') : label}
       className={cn(
         'inline-flex flex-shrink-0 items-center text-mute transition-colors hover:text-accent',
         className
@@ -84,9 +86,9 @@ export function Hash({
   const text = full ? value : shortenHash(value, start, end);
 
   const body = href ? (
-    <Link href={href} title={value} className={cn('link font-mono', full && 'break-all')}>
+    <L href={href} title={value} className={cn('link font-mono', full && 'break-all')}>
       {text}
-    </Link>
+    </L>
   ) : (
     <span title={value} className={cn('font-mono text-soft', full && 'break-all')}>
       {text}

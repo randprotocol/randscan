@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { Column, DataTable } from "@/components/DataTable";
 import { CopyButton, Hash } from "@/components/Hash";
 import { DetailSkeleton } from "@/components/Loading";
@@ -12,17 +11,8 @@ import {
   useBridgeTokens,
   useStats,
 } from "@/hooks/useApi";
-import {
-  BRIDGE_SOURCE_CHAINS,
-  bridgeChainName,
-  cn,
-  formatAmount,
-  formatBridgeChain,
-  bridgeTokenTotals,
-  formatBridgeUnits,
-  formatMintWindow,
-  formatNumber,
-} from "@/lib/utils";
+import { BRIDGE_SOURCE_CHAINS, cn, bridgeTokenTotals, knownBridgeChainName } from "@/lib/utils";
+import { L, useFmt, useT, type Fmt } from "@/i18n/client";
 import type {
   ApprovedToken,
   BridgeAsset,
@@ -34,9 +24,9 @@ import type {
 // A source chain's bridge contract
 // ---------------------------------------------------------------------------
 
-const FLOOR_TITLE =
-  "The replay floor set at genesis. A lock with a lower sequence was already minted on the chain this one was cut from, or is the operator's own on a redeployed contract, and is never minted here.";
+type T = ReturnType<typeof useT>;
 
+/** A bridge chain's own name when it is one we know, so fmt.bridgeChain can say "chain 9" otherwise. */
 /**
  * The contract (or program) a source chain's locks must come from, as that chain's own explorer
  * prints it. Falls back to the node's 32-byte word when the API did not derive an address.
@@ -50,6 +40,7 @@ function EndpointAddress({
   emitter: string;
   className?: string;
 }) {
+  const { t } = useT();
   if (!endpoint?.address) return <Hash value={emitter} full className={className} />;
   return (
     <span className={cn("inline-flex min-w-0 items-center gap-1.5", className)}>
@@ -59,7 +50,11 @@ function EndpointAddress({
           target="_blank"
           rel="noopener noreferrer"
           className="break-all font-mono text-text hover:text-strong hover:underline"
-          title={`Open on the ${endpoint.chain_name ?? "chain"} explorer`}
+          title={
+            endpoint.chain_name
+              ? t("bridge.openOn", { chain: endpoint.chain_name })
+              : t("bridge.openOnChain")
+          }
         >
           {endpoint.address}
         </a>
@@ -76,6 +71,7 @@ function EndpointAddress({
 // ---------------------------------------------------------------------------
 
 function TokenCell({ asset }: { asset: BridgeAssetActivity }) {
+  const { t } = useT();
   if (asset.symbol) {
     return (
       <span className="flex flex-col">
@@ -87,7 +83,7 @@ function TokenCell({ asset }: { asset: BridgeAssetActivity }) {
   return (
     <span className="flex flex-col">
       <Hash value={asset.token} start={10} end={8} />
-      <span className="text-xs text-mute">not on the approved list</span>
+      <span className="text-xs text-mute">{t("bridge.activity.notApproved")}</span>
     </span>
   );
 }
@@ -101,24 +97,24 @@ function FlowCell({
   units: string | null;
   symbol: string | null;
 }) {
+  const { t, tp } = useT();
+  const fmt = useFmt();
   // A deposit names the token it minted, not the source coin locked for it, so a token with
   // several backings has no per-coin deposit figure; "On Rand now" is the per-coin truth.
   if (count === null || units === null)
     return (
       <span
         className="text-mute"
-        title="A deposit publishes the token it minted, not which source coin was locked, so it cannot be attributed to one coin of a multi-coin token."
+        title={t("bridge.activity.naTitle")}
       >
-        n/a
+        {t("bridge.activity.na")}
       </span>
     );
   if (count === 0) return <span className="text-mute">—</span>;
   return (
     <span className="flex flex-col">
-      <span className="font-mono">{formatBridgeUnits(units, symbol)}</span>
-      <span className="text-xs text-mute">
-        {formatNumber(count)} {count === 1 ? "transaction" : "transactions"}
-      </span>
+      <span className="font-mono">{fmt.bridgeUnits(units, symbol)}</span>
+      <span className="text-xs text-mute">{tp("bridge.activity.transactions", count)}</span>
     </span>
   );
 }
@@ -126,111 +122,111 @@ function FlowCell({
 /** A registry index is a token; its backings share it, so a row's key is the backing. */
 const backingKey = (a: BridgeAsset) => `${a.index}-${a.chain}-${a.token}`;
 
-const activityColumns: Column<BridgeAssetActivity>[] = [
-  { key: "token", header: "Token", render: (a) => <TokenCell asset={a} /> },
+const activityColumns = ({ t }: T, fmt: Fmt): Column<BridgeAssetActivity>[] => [
+  { key: "token", header: t("bridge.activity.token"), render: (a) => <TokenCell asset={a} /> },
   {
     key: "index",
-    header: "Asset",
-    render: (a) => <span className="font-mono">#{formatNumber(a.index)}</span>,
+    header: t("bridge.activity.asset"),
+    render: (a) => <span className="font-mono">#{fmt.number(a.index)}</span>,
   },
   {
     key: "in",
-    header: "Bridged in",
+    header: t("bridge.activity.in"),
     render: (a) => (
       <FlowCell count={a.deposits} units={a.deposited} symbol={a.symbol} />
     ),
   },
   {
     key: "out",
-    header: "Bridged out",
+    header: t("bridge.activity.out"),
     render: (a) => (
       <FlowCell count={a.burns} units={a.burned} symbol={a.symbol} />
     ),
   },
   {
     key: "fees",
-    header: "Fees on burns",
+    header: t("bridge.activity.fees"),
     render: (a) =>
       a.burn_fees == null || a.burn_fees === "0" ? (
         <span className="text-mute">—</span>
       ) : (
         <span
           className="font-mono"
-          title="v0.6.8 bridge fees kept as zUSD notes out of this coin's burns; 'Bridged out' counts only what was released and left the locked balance."
+          title={t("bridge.activity.feesTitle")}
         >
-          {formatBridgeUnits(a.burn_fees, a.symbol)}
+          {fmt.bridgeUnits(a.burn_fees, a.symbol)}
         </span>
       ),
   },
   {
     key: "outstanding",
-    header: "On Rand now",
+    header: t("bridge.activity.outstanding"),
     render: (a) => (
       <span className="font-mono text-strong">
-        {formatBridgeUnits(a.outstanding, a.symbol)}
+        {fmt.bridgeUnits(a.outstanding, a.symbol)}
       </span>
     ),
   },
   {
     key: "locked",
-    header: "Locked (registry)",
+    header: t("bridge.activity.locked"),
     render: (a) =>
       a.locked === null ? (
         <span className="text-mute">—</span>
       ) : (
-        <span className="font-mono">{formatBridgeUnits(a.locked, a.symbol)}</span>
+        <span className="font-mono">{fmt.bridgeUnits(a.locked, a.symbol)}</span>
       ),
   },
   {
     key: "minted_today",
-    header: "Minted / cap",
+    header: t("bridge.activity.minted"),
     render: (a) =>
       a.minted_today === null && a.mint_cap_per_day === null ? (
         <span className="text-mute">—</span>
       ) : (
         <span className="flex flex-col">
           <span className="font-mono">
-            {formatBridgeUnits(a.minted_today, a.symbol)}
+            {fmt.bridgeUnits(a.minted_today, a.symbol)}
             {a.mint_cap_per_day !== null && (
-              <span className="text-mute"> / {formatBridgeUnits(a.mint_cap_per_day, a.symbol)}</span>
+              <span className="text-mute"> / {fmt.bridgeUnits(a.mint_cap_per_day, a.symbol)}</span>
             )}
           </span>
           <span className="text-xs text-mute">
             {typeof a.mint_window_secs === "number"
-              ? `in the last ${formatMintWindow(a.mint_window_secs)}`
-              : "today"}
+              ? t("bridge.activity.inLast", { window: fmt.mintWindow(a.mint_window_secs) })
+              : t("bridge.activity.today")}
           </span>
         </span>
       ),
   },
   {
     key: "headroom",
-    header: "Room to mint",
+    header: t("bridge.activity.headroom"),
     render: (a) =>
       a.mint_headroom == null ? (
-        <span className="text-mute" title="Served by nodes after v0.6.7.">—</span>
+        <span className="text-mute" title={t("bridge.activity.headroomMissing")}>—</span>
       ) : (
         <span
           className="font-mono"
-          title="The largest deposit the caps admit to this coin right now: its own cap less what it minted, and no more than every token together has left in the window."
+          title={t("bridge.activity.headroomTitle")}
         >
-          {formatBridgeUnits(a.mint_headroom, a.symbol)}
+          {fmt.bridgeUnits(a.mint_headroom, a.symbol)}
         </span>
       ),
   },
   {
     key: "last",
-    header: "Last activity",
+    header: t("bridge.activity.last"),
     render: (a) =>
       a.last_height === null ? (
         <span className="text-mute">—</span>
       ) : (
-        <Link
+        <L
           href={`/blocks/${a.last_height}`}
           className="font-mono text-soft hover:text-strong"
         >
-          #{formatNumber(a.last_height)}
-        </Link>
+          #{fmt.number(a.last_height)}
+        </L>
       ),
   },
 ];
@@ -248,6 +244,9 @@ function SourceChainPanel({
   endpoint: BridgeEndpoint | undefined;
   assets: BridgeAssetActivity[];
 }) {
+  const tr = useT();
+  const { t } = tr;
+  const fmt = useFmt();
   // Burns name their coin, so they add up per source chain. Deposits do only when every row here
   // is its token's one backing; otherwise this chain's share of them is not public.
   const deposits = assets.every((a) => a.deposits !== null)
@@ -261,31 +260,33 @@ function SourceChainPanel({
         <p className="text-xs text-mute">
           {emitter ? (
             <>
-              bridge contract{" "}
+              {t("bridge.source.contract")}{" "}
               <EndpointAddress endpoint={endpoint} emitter={emitter} className="text-xs" />
             </>
           ) : (
-            "no bridge contract registered for this chain"
+            t("bridge.source.noContract")
           )}
           {typeof endpoint?.min_inbound_sequence === "number" && (
-            <span title={FLOOR_TITLE}>
-              {" · "}locks from sequence {formatNumber(endpoint.min_inbound_sequence)}
+            <span title={t("bridge.floorTitle")}>
+              {" · "}
+              {t("bridge.source.floor", { sequence: fmt.number(endpoint.min_inbound_sequence) })}
             </span>
           )}
           {assets.length > 0 && (
             <>
               {" · "}
-              {deposits !== null && <>{formatNumber(deposits)} in, </>}
-              {formatNumber(burns)} out
+              {deposits !== null
+                ? t("bridge.source.inOut", { in: fmt.number(deposits), out: fmt.number(burns) })
+                : t("bridge.source.out", { out: fmt.number(burns) })}
             </>
           )}
         </p>
       </div>
       <DataTable
-        columns={activityColumns}
+        columns={activityColumns(tr, fmt)}
         data={assets}
         keyExtractor={backingKey}
-        emptyMessage={`Nothing has been bridged from ${name} yet · chain id ${chain}`}
+        emptyMessage={t("bridge.source.empty", { name, chain })}
       />
     </section>
   );
@@ -296,6 +297,7 @@ function SourceChainPanel({
 // ---------------------------------------------------------------------------
 
 function StatusBadge({ status }: { status: ApprovedToken["status"] }) {
+  const { t } = useT();
   return (
     <span
       className={cn(
@@ -303,103 +305,95 @@ function StatusBadge({ status }: { status: ApprovedToken["status"] }) {
         status === "allowed" ? "badge-bridge" : "badge-neutral line-through",
       )}
     >
-      {status === "allowed" ? "allowed" : "discontinued"}
+      {status === "allowed" ? t("bridge.tokens.allowed") : t("bridge.tokens.discontinued")}
     </span>
   );
 }
 
-const tokenColumns: Column<ApprovedToken>[] = [
+const tokenColumns = ({ t }: T): Column<ApprovedToken>[] => [
   {
     key: "token",
-    header: "Token",
-    render: (t) => (
+    header: t("bridge.tokens.token"),
+    render: (tk) => (
       <span className="flex flex-col">
-        <span className="font-medium text-strong">{t.symbol}</span>
-        <span className="text-xs text-mute">{t.name}</span>
+        <span className="font-medium text-strong">{tk.symbol}</span>
+        <span className="text-xs text-mute">{tk.name}</span>
       </span>
     ),
   },
   {
     key: "chain",
-    header: "Chain",
-    render: (t) => (
+    header: t("bridge.tokens.chain"),
+    render: (tk) => (
       <span className="flex flex-col">
-        <span>{t.chain_name}</span>
-        <span className="text-xs text-mute">{t.standard}</span>
+        <span>{tk.chain_name}</span>
+        <span className="text-xs text-mute">{tk.standard}</span>
       </span>
     ),
   },
   {
     key: "address",
-    header: "Contract address",
+    header: t("bridge.tokens.address"),
     className: "min-w-[22rem]",
-    render: (t) => (
+    render: (tk) => (
       <span className="inline-flex items-center gap-1.5">
         <a
-          href={t.explorer_url}
+          href={tk.explorer_url}
           target="_blank"
           rel="noopener noreferrer"
           className="break-all font-mono text-sm text-text hover:text-strong hover:underline"
-          title={`Open on the ${t.chain_name} explorer`}
+          title={t("bridge.openOn", { chain: tk.chain_name })}
         >
-          {t.address}
+          {tk.address}
         </a>
-        <CopyButton value={t.address} />
+        <CopyButton value={tk.address} />
       </span>
     ),
   },
   {
     key: "decimals",
-    header: "Decimals",
-    render: (t) => (
+    header: t("bridge.tokens.decimals"),
+    render: (tk) => (
       <span className="flex flex-col font-mono">
-        <span>{t.decimals}</span>
-        <span className="text-xs text-mute">8 on Rand</span>
+        <span>{tk.decimals}</span>
+        <span className="text-xs text-mute">{t("bridge.tokens.onRand")}</span>
       </span>
     ),
   },
   {
     key: "status",
-    header: "Status",
-    render: (t) => <StatusBadge status={t.status} />,
+    header: t("bridge.tokens.status"),
+    render: (tk) => <StatusBadge status={tk.status} />,
   },
 ];
 
 function ApprovedTokens({ tokens }: { tokens: ApprovedToken[] }) {
-  const notes = tokens.filter((t) => t.note);
+  const tr = useT();
+  const { t } = tr;
+  const notes = tokens.filter((tk) => tk.note);
   return (
     <section className="space-y-4">
-      <h2 className="chip">Approved tokens</h2>
-      <p className="text-sm text-soft">
-        The bridge accepts these tokens and nothing else. Send only to the
-        bridge contract on the token&apos;s own chain; a deposit of any other
-        token is refused by the contract, and a deposit of an approved token on
-        the wrong chain is a different asset on Rand.
-      </p>
+      <h2 className="chip">{t("bridge.tokens.title")}</h2>
+      <p className="text-sm text-soft">{t("bridge.tokens.intro")}</p>
       <DataTable
-        columns={tokenColumns}
+        columns={tokenColumns(tr)}
         data={tokens}
-        keyExtractor={(t) => `${t.chain}-${t.symbol}`}
-        emptyMessage="No approved tokens"
+        keyExtractor={(tk) => `${tk.chain}-${tk.symbol}`}
+        emptyMessage={t("bridge.tokens.empty")}
       />
       {notes.length > 0 && (
         <ul className="space-y-1 text-xs text-mute">
-          {notes.map((t) => (
-            <li key={`${t.chain}-${t.symbol}`}>
+          {notes.map((tk) => (
+            <li key={`${tk.chain}-${tk.symbol}`}>
               <span className="text-soft">
-                {t.symbol} on {t.chain_name}:
+                {t("bridge.tokens.noteOn", { symbol: tk.symbol, chain: tk.chain_name })}
               </span>{" "}
-              {t.note}
+              {tk.note}
             </li>
           ))}
         </ul>
       )}
-      <p className="text-xs text-mute">
-        Amounts on Rand always carry 8 decimals, whatever the token has at home;
-        the bridge contract converts on the way in and out. The registry stores
-        each address as a 32-byte word: an Ethereum, BSC or Tron address
-        left-padded with zeros, a Solana mint as is.
-      </p>
+      <p className="text-xs text-mute">{t("bridge.tokens.decimalsNote")}</p>
     </section>
   );
 }
@@ -408,35 +402,38 @@ function ApprovedTokens({ tokens }: { tokens: ApprovedToken[] }) {
 // Registry (the node's raw view)
 // ---------------------------------------------------------------------------
 
-const registryColumns: Column<BridgeAssetActivity | BridgeAsset>[] = [
+const registryColumns = (
+  { t }: T,
+  fmt: Fmt,
+): Column<BridgeAssetActivity | BridgeAsset>[] => [
   {
     key: "index",
-    header: "Index",
-    render: (a) => <span className="font-mono">#{formatNumber(a.index)}</span>,
+    header: t("bridge.registry.index"),
+    render: (a) => <span className="font-mono">#{fmt.number(a.index)}</span>,
   },
   {
     key: "chain",
-    header: "Source chain",
-    render: (a) => <span>{formatBridgeChain(a.chain)}</span>,
+    header: t("bridge.registry.sourceChain"),
+    render: (a) => <span>{fmt.bridgeChain(a.chain, knownBridgeChainName(a.chain))}</span>,
   },
   {
     key: "symbol",
-    header: "Token",
+    header: t("bridge.registry.token"),
     render: (a) =>
       "symbol" in a && a.symbol ? (
         <span>{a.symbol}</span>
       ) : (
-        <span className="text-mute">unknown</span>
+        <span className="text-mute">{t("bridge.registry.unknown")}</span>
       ),
   },
   {
     key: "token",
-    header: "Token address (32 bytes)",
+    header: t("bridge.registry.tokenAddress"),
     render: (a) => <Hash value={a.token} start={10} end={8} />,
   },
   {
     key: "asset_id",
-    header: "Asset id",
+    header: t("bridge.registry.assetId"),
     render: (a) => <Hash value={a.asset_id} start={10} end={8} />,
   },
 ];
@@ -450,6 +447,9 @@ export default function BridgePage() {
   const { data: activity } = useBridgeAssets();
   const { data: tokens } = useBridgeTokens();
   const { data: stats } = useStats();
+  const tr = useT();
+  const { t, rich } = tr;
+  const fmt = useFmt();
 
   if (isLoading && !bridge) {
     return <DetailSkeleton />;
@@ -458,9 +458,9 @@ export default function BridgePage() {
   if (error || !bridge) {
     return (
       <>
-        <PageHeader title="Bridge" />
+        <PageHeader title={t("bridge.title")} />
         <ErrorState
-          message="Could not load the bridge state."
+          message={t("bridge.loadError")}
           onRetry={() => void mutate()}
         />
       </>
@@ -490,50 +490,47 @@ export default function BridgePage() {
   return (
     <div className="space-y-10">
       <PageHeader
-        title="Bridge"
-        subtitle="Tokens locked on Ethereum, BSC, Solana and Tron and minted here as shielded notes. Bridged value is notes, so there are no balances: only what came in and what went out."
+        title={t("bridge.title")}
+        subtitle={t("bridge.subtitle")}
       />
 
       {!bridge.enabled && (
         <Panel>
           <p className="py-4 text-sm text-mute">
-            Chain {stats?.chain_id ?? ""} has no bridge section in its genesis:
-            no guardians, no asset registry and no bridged notes yet. The source
-            chains and the approved tokens below are what the bridge will accept
-            once a chain with a bridge section is running.
+            {t("bridge.noSection", { chain: stats?.chain_id ?? "" })}
           </p>
         </Panel>
       )}
 
       <StatsRow columns={4}>
         <StatsCard
-          title="Bridged in"
-          value={formatNumber(deposits)}
-          subtitle="deposits attested"
+          title={t("bridge.stats.in")}
+          value={fmt.number(deposits)}
+          subtitle={t("bridge.stats.inSub")}
         />
         <StatsCard
-          title="Bridged out"
-          value={formatNumber(burns)}
-          subtitle="burns released"
+          title={t("bridge.stats.out")}
+          value={fmt.number(burns)}
+          subtitle={t("bridge.stats.outSub")}
         />
         <StatsCard
-          title="Assets seen"
-          value={formatNumber(assets.length)}
+          title={t("bridge.stats.assets")}
+          value={fmt.number(assets.length)}
           subtitle={
             activeChains.length === 0
-              ? "no source chain active yet"
-              : `from ${activeChains.map((c) => c.name).join(", ")}`
+              ? t("bridge.stats.noActive")
+              : t("bridge.stats.from", { chains: activeChains.map((c) => c.name).join(", ") })
           }
         />
         <StatsCard
-          title="Approved tokens"
-          value={allowed === undefined ? "—" : formatNumber(allowed)}
-          subtitle="USDT and USDC on four chains"
+          title={t("bridge.stats.approved")}
+          value={allowed === undefined ? "—" : fmt.number(allowed)}
+          subtitle={t("bridge.stats.approvedSub")}
         />
       </StatsRow>
 
       <section className="space-y-6">
-        <h2 className="chip">Bridged tokens by source chain</h2>
+        <h2 className="chip">{t("bridge.byChain")}</h2>
         {BRIDGE_SOURCE_CHAINS.map((c) => (
           <SourceChainPanel
             key={c.id}
@@ -548,7 +545,7 @@ export default function BridgePage() {
           <SourceChainPanel
             key={id}
             chain={id}
-            name={bridgeChainName(id)}
+            name={knownBridgeChainName(id) ?? fmt.bridgeChain(id, null)}
             emitter={bridge.emitters[String(id)]}
             endpoint={endpointOf(id)}
             assets={byChain.get(id) ?? []}
@@ -560,60 +557,58 @@ export default function BridgePage() {
 
       {bridge.enabled && (
         <>
-          <Panel title="Bridge state">
-            <DetailRow label="Mint pause">
+          <Panel title={t("bridge.state.title")}>
+            <DetailRow label={t("bridge.state.mintPause")}>
               {bridge.mint_paused ? (
                 <span className="badge badge-neutral">
-                  Paused — transfer attests refused (burns and rotations stay open)
+                  {t("bridge.state.paused")}
                 </span>
               ) : (
-                <span className="badge badge-bridge">Not paused</span>
+                <span className="badge badge-bridge">{t("bridge.state.notPaused")}</span>
               )}
             </DetailRow>
-            <DetailRow label="Pause / unpause nonce">
+            <DetailRow label={t("bridge.state.pauseNonce")}>
               <span className="font-mono">
-                {bridge.pause_nonce === null ? "—" : formatNumber(bridge.pause_nonce)}
+                {bridge.pause_nonce === null ? "—" : fmt.number(bridge.pause_nonce)}
               </span>
             </DetailRow>
-            <DetailRow label="List nonce">
+            <DetailRow label={t("bridge.state.listNonce")}>
               <span className="font-mono">
-                {bridge.list_nonce === null ? "—" : formatNumber(bridge.list_nonce)}
+                {bridge.list_nonce === null ? "—" : fmt.number(bridge.list_nonce)}
               </span>
             </DetailRow>
-            <DetailRow label="Registration fee">
+            <DetailRow label={t("bridge.state.registrationFee")}>
               <span className="font-mono">
-                {bridge.registration_fee === null ? "—" : formatAmount(bridge.registration_fee)}
+                {bridge.registration_fee === null ? "—" : fmt.amount(bridge.registration_fee)}
               </span>
             </DetailRow>
-            <DetailRow label={`PQ guardians (${bridge.pq_guardians.length})`}>
+            <DetailRow label={t("bridge.state.pqGuardians", { count: fmt.number(bridge.pq_guardians.length) })}>
               {bridge.pq_guardians.length === 0 ? (
                 <span className="text-mute">—</span>
               ) : (
                 <span className="text-soft">
-                  {bridge.pq_guardians.length} Dilithium2 keys, index-aligned with the classical
-                  guardian set below. Every deposit attest and every governance action needing a
-                  quorum is co-signed by this set; a rotation never moves it.
+                  {tr.tp("bridge.state.pqGuardiansText", bridge.pq_guardians.length)}
                 </span>
               )}
             </DetailRow>
-            <DetailRow label="Pause key">
+            <DetailRow label={t("bridge.state.pauseKey")}>
               {bridge.pause_key ? (
                 <Hash value={bridge.pause_key} start={10} end={8} />
               ) : (
                 <span className="text-mute">—</span>
               )}
             </DetailRow>
-            <DetailRow label="Outbound emitter">
+            <DetailRow label={t("bridge.state.outboundEmitter")}>
               <Hash value={bridge.emitter} full />
             </DetailRow>
-            <DetailRow label="Guardian set">
+            <DetailRow label={t("bridge.state.guardianSet")}>
               <span className="font-mono">
                 {bridge.guardian_set_index === null
                   ? "—"
-                  : `#${formatNumber(bridge.guardian_set_index)}`}
+                  : `#${fmt.number(bridge.guardian_set_index)}`}
               </span>
             </DetailRow>
-            <DetailRow label={`Guardians (${bridge.guardians.length})`}>
+            <DetailRow label={t("bridge.state.guardians", { count: fmt.number(bridge.guardians.length) })}>
               {bridge.guardians.length === 0 ? (
                 <span className="text-mute">—</span>
               ) : (
@@ -629,27 +624,33 @@ export default function BridgePage() {
                 </ul>
               )}
             </DetailRow>
-            <DetailRow label="Messages emitted">
+            <DetailRow label={t("bridge.state.messagesEmitted")}>
               <span className="font-mono">
                 {bridge.burn_sequence === null
                   ? "—"
-                  : formatNumber(bridge.burn_sequence)}
+                  : fmt.number(bridge.burn_sequence)}
               </span>
             </DetailRow>
-            <DetailRow label="Next asset index">
+            <DetailRow label={t("bridge.state.nextIndex")}>
               <span className="font-mono">
                 {bridge.next_index === null
                   ? "—"
-                  : formatNumber(bridge.next_index)}
+                  : fmt.number(bridge.next_index)}
               </span>
             </DetailRow>
             {bridge.fees && (
-              <DetailRow label="Bridge fees">
+              <DetailRow label={t("bridge.state.fees")}>
                 <span className="font-mono">
-                  {(bridge.fees.mint_bps / 100).toFixed(2)}% in / {(bridge.fees.burn_bps / 100).toFixed(2)}% out
+                  {t("bridge.state.feeRates", {
+                    in: fmt.percentage(bridge.fees.mint_bps / 100, 2),
+                    out: fmt.percentage(bridge.fees.burn_bps / 100, 2),
+                  })}
                 </span>{" "}
                 <span className="text-soft">
-                  ({formatNumber(bridge.fees.mint_bps)} / {formatNumber(bridge.fees.burn_bps)} bps), minted as a zUSD note to
+                  {t("bridge.state.feeBps", {
+                    in: fmt.number(bridge.fees.mint_bps),
+                    out: fmt.number(bridge.fees.burn_bps),
+                  })}
                 </span>{" "}
                 <Hash value={bridge.fees.recipient} start={12} end={8} />
                 {(() => {
@@ -664,66 +665,70 @@ export default function BridgePage() {
                   }
                   return (
                     <div className="text-xs text-mute">
-                      collected so far: <span className="font-mono">{formatBridgeUnits(dep.toString())}</span> on deposits,{" "}
-                      <span className="font-mono">{formatBridgeUnits(out.toString())}</span> on burns. A deposit locks its
-                      gross and mints the recipient&apos;s note plus the fee note; a burn releases the burn less the fee and
-                      mints the fee back, so supply = Σ locked = custody still holds. Fee notes have no envelope.
+                      {rich("bridge.state.feesCollected", {
+                        deposits: fmt.bridgeUnits(dep.toString()),
+                        burns: fmt.bridgeUnits(out.toString()),
+                      })}
                     </div>
                   );
                 })()}
               </DetailRow>
             )}
             {bridge.rotation_rules && (
-              <DetailRow label="Rotation rules">
+              <DetailRow label={t("bridge.state.rotationRules")}>
                 <span className="text-soft">
-                  a rotation takes effect {formatMintWindow(bridge.rotation_rules.delay_secs)} after it commits
-                  {bridge.rotation_rules.needs_possession ? ", and must carry every new holder’s proof of possession" : ""}
+                  {t(
+                    bridge.rotation_rules.needs_possession
+                      ? "bridge.state.rotationDelayPossession"
+                      : "bridge.state.rotationDelay",
+                    { delay: fmt.mintWindow(bridge.rotation_rules.delay_secs) },
+                  )}
                 </span>
                 {bridge.pending_rotations && bridge.pending_rotations.length > 0 ? (
                   <ul className="mt-1 space-y-0.5 text-xs">
                     {bridge.pending_rotations.map((r, i) => (
                       <li key={i}>
-                        pending {r.kind === "pause_key" ? "pause-key" : "PQ guardian"} rotation, effective{" "}
-                        <span className="font-mono">{new Date(r.effective_at_secs * 1000).toISOString()}</span>
+                        {rich(
+                          r.kind === "pause_key"
+                            ? "bridge.state.pendingPauseKey"
+                            : "bridge.state.pendingPq",
+                          { at: new Date(r.effective_at_secs * 1000).toISOString() },
+                        )}
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <div className="text-xs text-mute">no rotation pending</div>
+                  <div className="text-xs text-mute">{t("bridge.state.noPending")}</div>
                 )}
               </DetailRow>
             )}
             {bridge.rotation_nonce != null && (
-              <DetailRow label="Rotation nonce">
-                <span className="font-mono">{formatNumber(bridge.rotation_nonce)}</span>
+              <DetailRow label={t("bridge.state.rotationNonce")}>
+                <span className="font-mono">{fmt.number(bridge.rotation_nonce)}</span>
               </DetailRow>
             )}
             {bridge.rules_v2 && (
-              <DetailRow label="Mint cap, all tokens">
+              <DetailRow label={t("bridge.state.mintCapAll")}>
                 <span className="font-mono">
-                  {formatBridgeUnits(bridge.rules_v2.global_mint_cap_per_window)}
+                  {fmt.bridgeUnits(bridge.rules_v2.global_mint_cap_per_window)}
                 </span>{" "}
                 <span className="text-soft">
-                  per {formatMintWindow(bridge.rules_v2.cap_window_secs)}, over every backing of
-                  every token together
+                  {t("bridge.state.mintCapPer", {
+                    window: fmt.mintWindow(bridge.rules_v2.cap_window_secs),
+                  })}
                 </span>
                 {bridge.rules_v2.global_minted_in_window != null &&
                   bridge.rules_v2.global_mint_headroom != null && (
                     <div className="text-xs text-mute">
-                      minted in this window{" "}
-                      <span className="font-mono">
-                        {formatBridgeUnits(bridge.rules_v2.global_minted_in_window)}
-                      </span>
-                      , room for{" "}
-                      <span className="font-mono">
-                        {formatBridgeUnits(bridge.rules_v2.global_mint_headroom)}
-                      </span>{" "}
-                      more
+                      {rich("bridge.state.mintedInWindow", {
+                        minted: fmt.bridgeUnits(bridge.rules_v2.global_minted_in_window),
+                        room: fmt.bridgeUnits(bridge.rules_v2.global_mint_headroom),
+                      })}
                     </div>
                   )}
               </DetailRow>
             )}
-            <DetailRow label={`Trusted emitters (${emitters.length})`}>
+            <DetailRow label={t("bridge.state.trustedEmitters", { count: fmt.number(emitters.length) })}>
               {emitters.length === 0 ? (
                 <span className="text-mute">—</span>
               ) : (
@@ -735,7 +740,7 @@ export default function BridgePage() {
                       <li key={chain} className="space-y-0.5">
                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                           <span className="text-soft">
-                            {formatBridgeChain(Number(chain))}
+                            {fmt.bridgeChain(Number(chain), knownBridgeChainName(Number(chain)))}
                           </span>
                           <EndpointAddress endpoint={endpoint} emitter={word} />
                         </div>
@@ -743,13 +748,13 @@ export default function BridgePage() {
                           <div className="flex flex-wrap items-center gap-x-4 text-xs text-mute">
                             {endpoint?.address && (
                               <span className="inline-flex items-center gap-x-2">
-                                as the chain stores it
+                                {t("bridge.state.asStored")}
                                 <Hash value={word} start={26} end={8} className="text-xs" />
                               </span>
                             )}
                             {typeof floor === "number" && (
-                              <span title={FLOOR_TITLE}>
-                                locks minted from sequence {formatNumber(floor)}
+                              <span title={t("bridge.floorTitle")}>
+                                {t("bridge.state.floorMinted", { sequence: fmt.number(floor) })}
                               </span>
                             )}
                           </div>
@@ -763,18 +768,14 @@ export default function BridgePage() {
           </Panel>
 
           <section className="space-y-4">
-            <h2 className="chip">Asset registry</h2>
+            <h2 className="chip">{t("bridge.registry.title")}</h2>
             <DataTable
-              columns={registryColumns}
+              columns={registryColumns(tr, fmt)}
               data={activity ?? bridge.assets}
               keyExtractor={backingKey}
-              emptyMessage="No bridged asset registered yet"
+              emptyMessage={t("bridge.registry.empty")}
             />
-            <p className="text-xs text-mute">
-              The node&apos;s own registry, filled on the first deposit of each
-              asset. The index is the asset word a bridged note carries; index 0
-              is RAND and is never in the registry.
-            </p>
+            <p className="text-xs text-mute">{t("bridge.registry.note")}</p>
           </section>
         </>
       )}

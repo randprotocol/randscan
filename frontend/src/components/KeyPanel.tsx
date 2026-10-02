@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { Panel } from '@/components/States';
+import { useLocale, useT } from '@/i18n/client';
 import { detectKeyKind, forgetKey, looksLikeKey, recallKey, rememberKey, type KeyKind } from '@/lib/viewing';
 
 export interface SubmittedKey {
@@ -19,13 +20,6 @@ interface KeyPanelProps {
   title?: string;
 }
 
-const LABELS: Record<Exclude<KeyKind, 'file'>, string> = {
-  viewing: 'Viewing key (nk)',
-  spend: 'Spend key',
-  tx: 'Transaction key',
-  call: 'Call key',
-};
-
 /**
  * A key pasted here is handed to WebAssembly in this page and nowhere else: no request carries
  * it, and a spend key is reduced to its viewing key locally before anything is opened. The
@@ -36,8 +30,10 @@ export function KeyPanel({
   onOpen,
   busy,
   children,
-  title = 'Open with a key',
+  title,
 }: KeyPanelProps) {
+  const { t } = useT();
+  const { tag } = useLocale();
   const [input, setInput] = useState('');
   const [chosen, setChosen] = useState<Exclude<KeyKind, 'file'>>(kinds[0]);
   const [remember, setRemember] = useState(false);
@@ -64,8 +60,12 @@ export function KeyPanel({
     if (!looksLikeKey(key, acceptsFile)) {
       setError(
         acceptsFile
-          ? 'A key is 64 hex characters, or the contents of a wallet key file (wallet.key.json).'
-          : `A ${kinds.map((k) => LABELS[k].toLowerCase()).join(' or ')} is 64 hex characters.`
+          ? t('components.keyPanel.invalidWithFile')
+          : t('components.keyPanel.invalidKinds', {
+              kinds: new Intl.ListFormat(tag, { type: 'disjunction' }).format(
+                kinds.map((k) => t(`components.keyPanel.kindsLower.${k}`))
+              ),
+            })
       );
       return;
     }
@@ -76,7 +76,7 @@ export function KeyPanel({
   };
 
   return (
-    <Panel title={title}>
+    <Panel title={title ?? t('components.keyPanel.title')}>
       <form onSubmit={submit} className="space-y-3 py-3">
         <textarea
           value={input}
@@ -84,7 +84,7 @@ export function KeyPanel({
           rows={3}
           spellCheck={false}
           autoComplete="off"
-          placeholder={acceptsFile ? '64 hex characters, or paste wallet.key.json' : '64 hex characters'}
+          placeholder={acceptsFile ? t('components.keyPanel.placeholderFile') : t('components.keyPanel.placeholder')}
           className="w-full rounded border border-border bg-surface px-3 py-2 font-mono text-xs text-strong focus:border-accent focus:outline-none"
         />
         {(kinds.length > 1 || kind === 'file') && (
@@ -99,25 +99,24 @@ export function KeyPanel({
                   disabled={kind === 'file'}
                   onChange={() => setChosen(k)}
                 />
-                {LABELS[k]}
+                {t(`components.keyPanel.kinds.${k}`)}
               </label>
             ))}
-            {kind === 'file' && <span className="text-mute">key file detected</span>}
+            {kind === 'file' && <span className="text-mute">{t('components.keyPanel.keyFileDetected')}</span>}
           </div>
         )}
         <div className="flex flex-wrap items-center gap-4">
           <button type="submit" disabled={busy || input.trim() === ''} className="btn-primary">
-            {busy ? 'Opening…' : 'Open'}
+            {busy ? t('components.keyPanel.opening') : t('components.keyPanel.open')}
           </button>
           <label className="inline-flex items-center gap-1.5 text-sm text-mute">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
-            remember for this tab
+            {t('components.keyPanel.remember')}
           </label>
         </div>
         {secret && (
           <p className="text-xs text-negative">
-            Prefer a viewing key: a spend key can move funds. This page derives the viewing key
-            locally and keeps only that in memory.
+            {t('components.keyPanel.preferViewing')}
           </p>
         )}
         {error && <p className="text-xs text-negative">{error}</p>}

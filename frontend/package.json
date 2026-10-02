@@ -6,8 +6,10 @@
     "dev": "next dev --port 3001",
     "build": "next build",
     "start": "next start --port 3001",
-    "lint": "next lint",
-    "test": "node --test tests/"
+    "lint": "next lint && node scripts/i18n/untranslated.mjs",
+    "test": "node --test tests/",
+    "i18n:check": "node scripts/i18n/untranslated.mjs",
+    "i18n:translate": "node scripts/i18n/translate.mjs"
   },
   "dependencies": {
     "clsx": "^2.1.1",

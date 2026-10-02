@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 export interface Column<T> {
@@ -25,9 +26,10 @@ export function DataTable<T>({
   keyExtractor,
   onRowClick,
   isLoading,
-  emptyMessage = 'No data available',
+  emptyMessage,
   className,
 }: DataTableProps<T>) {
+  const { t } = useT();
   if (isLoading) {
     return <DataTableSkeleton columns={columns.length} rows={5} />;
   }
@@ -36,7 +38,7 @@ export function DataTable<T>({
     return (
       <div className={cn('card', className)}>
         <div className="flex h-40 items-center justify-center">
-          <p className="text-sm text-mute">{emptyMessage}</p>
+          <p className="text-sm text-mute">{emptyMessage ?? t('components.dataTable.empty')}</p>
         </div>
       </div>
     );

@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Suspense, useEffect } from 'react';
 import { SearchBar } from '@/components/SearchBar';
@@ -8,6 +7,7 @@ import { PageLoading } from '@/components/Loading';
 import { ErrorState, NotFoundState, PageHeader } from '@/components/States';
 import { useSearch } from '@/hooks/useApi';
 import type { SearchResult } from '@/types';
+import { L, useLocalizePath, useT } from '@/i18n/client';
 
 export default function SearchPage() {
   return (
@@ -21,26 +21,26 @@ function SearchResults() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const query = (searchParams.get('q') ?? '').trim();
+  const { t, tp } = useT();
+  const localize = useLocalizePath();
 
   const { data: results, error, isLoading, mutate } = useSearch(query || null);
 
   // A single unambiguous hit goes straight to its page.
   useEffect(() => {
     if (results && results.length === 1) {
-      router.replace(results[0].url);
+      router.replace(localize(results[0].url));
     }
-  }, [results, router]);
+  }, [results, router, localize]);
 
   if (!query) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Search" subtitle="Find blocks, transactions, programs, notes and validators" />
+        <PageHeader title={t('search.title')} subtitle={t('search.subtitle')} />
         <div className="card-padded">
           <SearchBar autoFocus />
           <p className="mt-4 text-sm text-mute">
-            Search by block height; by a 64-character hash, which may be a block, a transaction,
-            a program id, a note commitment or a nullifier; or by a base58 validator address.
-            There are no accounts on this chain.
+            {t('search.help')}
           </p>
         </div>
       </div>
@@ -50,7 +50,7 @@ function SearchResults() {
   if (isLoading && !results) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Search" subtitle={`Searching for “${query}”…`} />
+        <PageHeader title={t('search.title')} subtitle={t('search.searching', { query })} />
         <PageLoading />
       </div>
     );
@@ -59,8 +59,8 @@ function SearchResults() {
   if (error) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Search" subtitle={`Results for “${query}”`} />
-        <ErrorState message="The search request failed." onRetry={() => void mutate()} />
+        <PageHeader title={t('search.title')} subtitle={t('search.resultsFor', { query })} />
+        <ErrorState message={t('search.error')} onRetry={() => void mutate()} />
       </div>
     );
   }
@@ -68,12 +68,12 @@ function SearchResults() {
   if (!results || results.length === 0) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Search" subtitle={`Results for “${query}”`} />
+        <PageHeader title={t('search.title')} subtitle={t('search.resultsFor', { query })} />
         <NotFoundState
-          title="No results"
-          message={`Nothing on chain matches “${query}”.`}
+          title={t('search.noResults')}
+          message={t('search.nothingMatches', { query })}
           backHref="/"
-          backLabel="Back to dashboard"
+          backLabel={t('common.backToDashboard')}
         />
       </div>
     );
@@ -82,14 +82,14 @@ function SearchResults() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Search"
-        subtitle={`${results.length} result${results.length === 1 ? '' : 's'} for “${query}”`}
+        title={t('search.title')}
+        subtitle={tp('search.resultsCount', results.length, { query })}
       />
 
       <ul className="card divide-y divide-border-soft">
         {results.map((result, index) => (
           <li key={`${result.type}-${result.id}-${index}`}>
-            <Link
+            <L
               href={result.url}
               className="flex items-center gap-4 px-6 py-4 transition-colors hover:bg-bg-soft"
             >
@@ -101,8 +101,8 @@ function SearchResults() {
                 )}
                 <p className="mt-0.5 truncate font-mono text-xs text-mute">{result.id}</p>
               </div>
-              <span className="badge badge-neutral flex-shrink-0 capitalize">{result.type}</span>
-            </Link>
+              <span className="badge badge-neutral flex-shrink-0">{t(`search.types.${result.type}`)}</span>
+            </L>
           </li>
         ))}
       </ul>

@@ -1,4 +1,6 @@
-import Link from 'next/link';
+'use client';
+
+import { L, useT } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 /** Accent section label with the short leading rule, as on randprotocol.org. */
@@ -58,18 +60,19 @@ interface NotFoundStateProps {
 }
 
 export function NotFoundState({
-  title = 'Not found',
+  title,
   message,
   backHref = '/',
-  backLabel = 'Back to dashboard',
+  backLabel,
 }: NotFoundStateProps) {
+  const { t } = useT();
   return (
     <div className="card-padded py-16 text-center">
-      <h2 className="text-2xl font-semibold tracking-tight text-strong">{title}</h2>
+      <h2 className="text-2xl font-semibold tracking-tight text-strong">{title ?? t('common.notFound')}</h2>
       <p className="mx-auto mt-3 max-w-md break-all text-sm text-soft">{message}</p>
-      <Link href={backHref} className="btn-secondary mt-7">
-        {backLabel}
-      </Link>
+      <L href={backHref} className="btn-secondary mt-7">
+        {backLabel ?? t('common.backToDashboard')}
+      </L>
     </div>
   );
 }
@@ -81,17 +84,18 @@ interface ErrorStateProps {
 }
 
 export function ErrorState({
-  title = 'Something went wrong',
-  message = 'The explorer API could not be reached. Please try again.',
+  title,
+  message,
   onRetry,
 }: ErrorStateProps) {
+  const { t } = useT();
   return (
     <div className="card-padded py-16 text-center">
-      <h2 className="text-2xl font-semibold tracking-tight text-negative">{title}</h2>
-      <p className="mx-auto mt-3 max-w-md text-sm text-soft">{message}</p>
+      <h2 className="text-2xl font-semibold tracking-tight text-negative">{title ?? t('common.somethingWrong')}</h2>
+      <p className="mx-auto mt-3 max-w-md text-sm text-soft">{message ?? t('common.apiUnreachable')}</p>
       {onRetry && (
         <button type="button" onClick={onRetry} className="btn-primary mt-7">
-          Retry
+          {t('common.retry')}
         </button>
       )}
     </div>
@@ -136,10 +140,11 @@ export function Panel({ title, children, actions, className }: PanelProps) {
 
 /** Muted green/grey dot reflecting the WebSocket connection. */
 export function LiveIndicator({ isConnected }: { isConnected: boolean }) {
+  const { t } = useT();
   return (
     <span className="inline-flex items-center gap-2 text-xs text-mute">
       <span className={cn('status-dot', isConnected ? 'status-dot-live' : 'status-dot-off')} />
-      {isConnected ? 'Live' : 'Offline'}
+      {isConnected ? t('common.live') : t('common.offline')}
     </span>
   );
 }

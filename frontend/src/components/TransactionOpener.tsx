@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { KeyPanel, type SubmittedKey } from '@/components/KeyPanel';
 import { OpenedCallBlock, OpenedNoteBlock, type OpenedNoteRow, type SpentState } from '@/components/OpenedNotes';
 import { useTokens } from '@/hooks/useApi';
+import { useT } from '@/i18n/client';
 import * as api from '@/lib/api';
 import { openCall, openNote, rebuildNote, type OpenedCall, type OpenedNote } from '@/lib/viewing';
 import type { TransactionKind } from '@/types';
@@ -29,6 +30,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
   // index to its symbol and decimals ("12.50 zUSD") — the browser never sends which token it is
   // asking about, since the whole registry is what a wallet reads through too.
   const { data: tokenList } = useTokens();
+  const { t } = useT();
 
   const run = async ({ kind: keyKind, key }: SubmittedKey) => {
     setBusy(true);
@@ -78,7 +80,7 @@ export function TransactionOpener({ hash, kind }: { hash: string; kind: Transact
       {error && <p className="border-t border-border-soft py-3 text-sm text-negative">{error}</p>}
       {rows && rows.length === 0 && (
         <p className="border-t border-border-soft py-3 text-sm text-mute">
-          This transaction created no notes with an envelope (nothing a key could open).
+          {t('components.txOpener.noNotes')}
         </p>
       )}
       {rows?.map((row) => (

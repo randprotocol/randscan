@@ -1,14 +1,13 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { DetailSkeleton } from '@/components/Loading';
 import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { TransactionsTable } from '@/components/Tables';
 import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/components/States';
 import { isNotFound, useProgram, useTokens } from '@/hooks/useApi';
-import { formatNumber, formatTokenAmount } from '@/lib/utils';
+import { L, useFmt, useT } from '@/i18n/client';
 
 export default function ProgramDetailPage() {
   const params = useParams<{ id: string }>();
@@ -16,6 +15,8 @@ export default function ProgramDetailPage() {
   const { data: program, error, isLoading, mutate } = useProgram(id);
   const { data: tokenList } = useTokens();
   const tokens = tokenList?.tokens ?? [];
+  const { t, tp, rich } = useT();
+  const fmt = useFmt();
 
   if (isLoading && !program) {
     return <DetailSkeleton />;
@@ -24,103 +25,102 @@ export default function ProgramDetailPage() {
   if (error && isNotFound(error)) {
     return (
       <NotFoundState
-        title="Program not found"
-        message={`No program matches "${id}". Program ids are 64-character hashes.`}
+        title={t('program.notFound')}
+        message={t('program.notFoundMessage', { id })}
         backHref="/programs"
-        backLabel="Back to programs"
+        backLabel={t('program.back')}
       />
     );
   }
 
   if (error || !program) {
-    return <ErrorState message="Could not load this program." onRetry={() => void mutate()} />;
+    return <ErrorState message={t('program.loadError')} onRetry={() => void mutate()} />;
   }
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Program" subtitle={<Hash value={program.id} full copyable />} />
+      <PageHeader title={t('program.title')} subtitle={<Hash value={program.id} full copyable />} />
 
       <StatsRow columns={4}>
         <StatsCard
-          title="Calls"
-          value={formatNumber(program.call_count)}
+          title={t('program.calls')}
+          value={fmt.number(program.call_count)}
           subtitle={
-            program.invoke_count ? `and ${formatNumber(program.invoke_count)} invokes` : undefined
+            program.invoke_count ? tp('program.andInvokes', program.invoke_count) : undefined
           }
         />
-        <StatsCard title="Code size" value={`${formatNumber(program.words_len)} words`} />
-        <StatsCard title="Deployed at" value={`#${formatNumber(program.deployed_at_height)}`} />
+        <StatsCard title={t('program.codeSize')} value={tp('program.words', program.words_len)} />
+        <StatsCard title={t('program.deployedAt')} value={`#${fmt.number(program.deployed_at_height)}`} />
         <StatsCard
-          title="Last called"
+          title={t('program.lastCalled')}
           value={
             lastActivity(program.last_called_height, program.last_invoked_height ?? null) === null
               ? '—'
-              : `#${formatNumber(lastActivity(program.last_called_height, program.last_invoked_height ?? null))}`
+              : `#${fmt.number(lastActivity(program.last_called_height, program.last_invoked_height ?? null))}`
           }
-          subtitle={program.invoke_count ? 'call or invoke' : undefined}
+          subtitle={program.invoke_count ? t('program.callOrInvoke') : undefined}
         />
       </StatsRow>
 
-      <Panel title="Details">
-        <DetailRow label="Program id">
+      <Panel title={t('program.details')}>
+        <DetailRow label={t('program.programId')}>
           <Hash value={program.id} full />
         </DetailRow>
-        <DetailRow label="Deploy transaction">
+        <DetailRow label={t('program.deployTx')}>
           <Hash value={program.deploy_tx} href={`/transactions/${program.deploy_tx}`} full />
         </DetailRow>
-        <DetailRow label="Deployed at height">
-          <Link href={`/blocks/${program.deployed_at_height}`} className="link font-mono">
-            #{formatNumber(program.deployed_at_height)}
-          </Link>
+        <DetailRow label={t('program.deployedAtHeight')}>
+          <L href={`/blocks/${program.deployed_at_height}`} className="link font-mono">
+            #{fmt.number(program.deployed_at_height)}
+          </L>
         </DetailRow>
-        <DetailRow label="Base PC">
-          <span className="font-mono">{formatNumber(program.base_pc)}</span>
+        <DetailRow label={t('program.basePc')}>
+          <span className="font-mono">{fmt.number(program.base_pc)}</span>
         </DetailRow>
-        <DetailRow label="Words length">
-          <span className="font-mono">{formatNumber(program.words_len)} words</span>
+        <DetailRow label={t('program.wordsLength')}>
+          <span className="font-mono">{tp('program.words', program.words_len)}</span>
         </DetailRow>
-        <DetailRow label="Code hash">
+        <DetailRow label={t('program.codeHash')}>
           <Hash value={program.code_hash} full />
         </DetailRow>
-        <DetailRow label="Public input">
+        <DetailRow label={t('program.publicInput')}>
           {program.public_words_len > 0 ? (
-            <span className="font-mono">{formatNumber(program.public_words_len)} words</span>
+            <span className="font-mono">{tp('program.words', program.public_words_len)}</span>
           ) : (
-            <span className="text-mute">None — calls are checked against the empty input</span>
+            <span className="text-mute">{t('program.noPublicInput')}</span>
           )}
         </DetailRow>
         {program.public_digest && (
-          <DetailRow label="Public digest (H_PUB)">
+          <DetailRow label={t('program.publicDigest')}>
             <Hash value={program.public_digest} full />
           </DetailRow>
         )}
-        <DetailRow label="Call count">
-          <span className="font-mono">{formatNumber(program.call_count)}</span>
+        <DetailRow label={t('program.callCount')}>
+          <span className="font-mono">{fmt.number(program.call_count)}</span>
         </DetailRow>
-        <DetailRow label="Last called">
+        <DetailRow label={t('program.lastCalled')}>
           {program.last_called_height === null ? (
-            <span className="text-mute">Never</span>
+            <span className="text-mute">{t('program.never')}</span>
           ) : (
-            <Link href={`/blocks/${program.last_called_height}`} className="link font-mono">
-              #{formatNumber(program.last_called_height)}
-            </Link>
+            <L href={`/blocks/${program.last_called_height}`} className="link font-mono">
+              #{fmt.number(program.last_called_height)}
+            </L>
           )}
         </DetailRow>
       </Panel>
 
       {program.program_state && (
         <>
-          <Panel title="Vault">
+          <Panel title={t('program.vault')}>
             {program.program_state.vault.length === 0 ? (
               <p className="py-3 text-sm text-mute">
-                The program holds nothing. Value enters its vault through an invoke&apos;s bundle
-                and leaves it as the notes the invoke pays out.
+                {t('program.vaultEmpty')}
               </p>
             ) : (
               program.program_state.vault.map((row) => (
-                <DetailRow key={row.asset} label={row.asset === 0 ? 'RAND' : `Asset #${row.asset}`}>
+                <DetailRow key={row.asset} label={row.asset === 0 ? 'RAND' : t('program.asset', { index: row.asset })}>
                   <span className="font-mono text-strong">
-                    {formatTokenAmount(row.amount, row.asset, tokens)}
+                    {fmt.tokenAmount(row.amount, row.asset, tokens)}
                   </span>
                 </DetailRow>
               ))
@@ -128,19 +128,23 @@ export default function ProgramDetailPage() {
           </Panel>
 
           <section className="space-y-4">
-            <h2 className="chip">State cells ({formatNumber(program.program_state.cells.length)}{program.program_state.cells_next ? '+' : ''})</h2>
+            <h2 className="chip">
+              {t('program.stateCells', {
+                count: `${fmt.number(program.program_state.cells.length)}${program.program_state.cells_next ? '+' : ''}`,
+              })}
+            </h2>
             {program.program_state.cells.length === 0 ? (
-              <p className="text-sm text-mute">No cell: nothing has been written, or every write was zeros.</p>
+              <p className="text-sm text-mute">{t('program.noCells')}</p>
             ) : (
               <ul className="card divide-y divide-border-soft">
                 {program.program_state.cells.map((c) => (
                   <li key={c.key} className="flex flex-col gap-1 px-6 py-3 text-xs md:flex-row md:items-center md:gap-6">
                     <span className="inline-flex items-center gap-2">
-                      <span className="w-10 text-mute">key</span>
+                      <span className="w-10 text-mute">{t('program.key')}</span>
                       <Hash value={c.key} start={14} end={10} className="text-xs" />
                     </span>
                     <span className="inline-flex items-center gap-2">
-                      <span className="w-10 text-mute">value</span>
+                      <span className="w-10 text-mute">{t('program.value')}</span>
                       <Hash value={c.value} start={14} end={10} className="text-xs" />
                     </span>
                   </li>
@@ -148,10 +152,9 @@ export default function ProgramDetailPage() {
               </ul>
             )}
             <p className="text-xs text-mute">
-              Public by design: a program&apos;s state is a map of 64-hex keys to 64-hex values
-              (eight words each), read live from the node in key order.
+              {t('program.statePublic')}
               {program.program_state.cells_next && (
-                <> More cells follow; the API pages them at <code>/api/v1/programs/{program.id}/cells?after=…</code>.</>
+                <> {rich('program.moreCells', { id: program.id })}</>
               )}
             </p>
           </section>
@@ -159,11 +162,11 @@ export default function ProgramDetailPage() {
       )}
 
       <section className="space-y-4">
-        <h2 className="chip">{program.invoke_count ? 'Recent calls and invokes' : 'Recent calls'}</h2>
+        <h2 className="chip">{program.invoke_count ? t('program.recentCallsInvokes') : t('program.recentCalls')}</h2>
         <TransactionsTable
           transactions={program.recent_calls}
           hideColumns={['action']}
-          emptyMessage="This program has not been called yet"
+          emptyMessage={t('program.empty')}
         />
       </section>
     </div>

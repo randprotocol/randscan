@@ -22,9 +22,15 @@ const walk = (d) => {
 walk(join(SRC, 'app'));
 walk(join(SRC, 'components'));
 
+// Text between a generic's angle brackets or inside an expression, not JSX: `Column<…>(t: …): X`.
+const CODE = /=>|\)\s*:|^\s*\(|\?\s*$|\w\?\.|\bstring\b.*:/;
+
 const ok = (text) => {
   const t = text.trim().replace(/&[a-z]+;|&#\d+;/g, ' ').trim();
   if (!/[A-Za-z]{2,}/.test(t)) return true;
+  if (CODE.test(t)) return true;
+  // protocol identifiers: H_IN, rand_getHead, cs8
+  if (/^[A-Za-z][A-Za-z0-9]*_[A-Za-z0-9_]+$/.test(t)) return true;
   if (ALLOW.has(t)) return true;
   // every word an allowed token, a number or punctuation ("RAND", "zUSD / USDT")
   return t.split(/[\s/·,()–—:+×-]+/).filter(Boolean).every((w) => ALLOW.has(w) || !/[A-Za-z]{2,}/.test(w));

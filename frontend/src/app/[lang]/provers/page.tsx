@@ -1,13 +1,14 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { Column, DataTable } from '@/components/DataTable';
 import { CopyButton } from '@/components/Hash';
 import { StatsCard, StatsCardSkeleton, StatsRow } from '@/components/StatsCard';
 import { DetailRow, ErrorState, PageHeader, Panel } from '@/components/States';
 import { useProvers } from '@/hooks/useApi';
-import { cn, formatAmount, formatDateTime, formatLocation, formatNumber } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { useFmt, useT, type Fmt } from '@/i18n/client';
 import type { NodeInfo, ProverView } from '@/types';
 
 // Leaflet touches `window` at import time, so the map is client-only.
@@ -28,29 +29,29 @@ interface MemberRow {
   geo: NodeInfo['geo'];
 }
 
-const memberColumns: Column<MemberRow>[] = [
+const memberColumnsFor = (t: (key: string) => string, fmt: Fmt): Column<MemberRow>[] => [
   {
     key: 'host',
-    header: 'Host',
+    header: t('provers.columns.host'),
     render: (m) => <span className="font-mono text-strong">{m.label}</span>,
   },
   {
     key: 'prover',
-    header: 'Prover',
+    header: t('provers.columns.prover'),
     render: (m) => <span className="text-soft">{m.prover.name}</span>,
   },
   {
     key: 'location',
-    header: 'Location',
+    header: t('provers.columns.location'),
     render: (m) => (
       <span className={cn(m.geo ? 'text-soft' : 'text-mute')}>
-        {m.geo ? formatLocation(m.geo) : 'Not located yet'}
+        {m.geo ? fmt.location(m.geo) : t('provers.notLocated')}
       </span>
     ),
   },
   {
     key: 'org',
-    header: 'Network',
+    header: t('provers.columns.network'),
     render: (m) => (m.geo?.org ? <span className="text-soft">{m.geo.org}</span> : <span className="text-mute">—</span>),
   },
 ];
@@ -60,99 +61,114 @@ function escapeHtml(value: string): string {
 }
 
 /** The map popup for a member host: the host, its prover, where it is. */
-function memberPopup(node: NodeInfo): string {
+function memberPopup(node: NodeInfo, fmt: Fmt): string {
   const [label, prover] = node.peer_id.split('\u0000');
   return (
     '<div style="min-width:190px;font-size:12px;line-height:1.55">' +
     `<div style="font-weight:500;color:var(--color-text-strong)">${escapeHtml(label)}</div>` +
     `<div style="color:var(--color-text-soft)">${escapeHtml(prover ?? '')}</div>` +
-    `<div style="margin-top:5px;color:var(--color-text)">${escapeHtml(formatLocation(node.geo))}</div>` +
+    `<div style="margin-top:5px;color:var(--color-text)">${escapeHtml(fmt.location(node.geo))}</div>` +
     (node.geo?.org ? `<div style="color:var(--color-text-mute)">${escapeHtml(node.geo.org)}</div>` : '') +
     '</div>'
   );
 }
 
 function StatusBadge({ prover }: { prover: ProverView }) {
-  if (prover.up) return <span className="badge badge-bridge">Answering</span>;
-  if (prover.checked_at_ms === null) return <span className="badge badge-neutral">Not checked yet</span>;
-  return <span className="badge badge-neutral">Not answering</span>;
+  const { t } = useT();
+  if (prover.up) return <span className="badge badge-bridge">{t('provers.status.answering')}</span>;
+  if (prover.checked_at_ms === null)
+    return <span className="badge badge-neutral">{t('provers.status.notChecked')}</span>;
+  return <span className="badge badge-neutral">{t('provers.status.notAnswering')}</span>;
 }
 
 function ProverPanel({ prover }: { prover: ProverView }) {
   const info = prover.info;
   const q = info?.queue ?? null;
+  const { t, tp } = useT();
+  const fmt = useFmt();
   return (
     <Panel title={prover.name} actions={<StatusBadge prover={prover} />}>
-      <DetailRow label="Endpoint">
+      <DetailRow label={t('provers.panel.endpoint')}>
         <span className="inline-flex items-center gap-1.5">
           <span className="break-all font-mono text-text">{prover.url}</span>
           <CopyButton value={prover.url} />
         </span>
       </DetailRow>
-      <DetailRow label="Operator">{prover.operator}</DetailRow>
-      <DetailRow label="Fingerprint">
+      <DetailRow label={t('provers.panel.operator')}>{prover.operator}</DetailRow>
+      <DetailRow label={t('provers.panel.fingerprint')}>
         <span className="inline-flex flex-wrap items-center gap-2">
           <span className="font-mono text-strong">{prover.fingerprint}</span>
           {prover.fingerprint_matches === false && (
             <span className="badge badge-neutral">
-              the endpoint reports {info?.kem_fingerprint ?? 'another key'}
+              {info?.kem_fingerprint
+                ? t('provers.panel.endpointReports', { fingerprint: info.kem_fingerprint })
+                : t('provers.panel.endpointReportsOther')}
             </span>
           )}
         </span>
       </DetailRow>
-      <DetailRow label="Capacity">
+      <DetailRow label={t('provers.panel.capacity')}>
         {q ? (
           <span>
-            <span className="font-mono text-strong">{formatNumber(q.proving)}</span> proving ·{' '}
-            <span className="font-mono">{formatNumber(q.depth)}</span> waiting ·{' '}
-            <span className="font-mono">{formatNumber(q.max)}</span>{' '}
-            {q.max === 1 ? 'slot' : 'slots'}
-            <span className="text-mute"> (one bundle at a time per member)</span>
+            {tp('provers.panel.capacityValue', q.max, {
+              proving: fmt.number(q.proving),
+              depth: fmt.number(q.depth),
+            })}
+            <span className="text-mute"> {t('provers.panel.capacityNote')}</span>
           </span>
         ) : (
           <span className="text-mute">—</span>
         )}
       </DetailRow>
-      <DetailRow label="Fee">
+      <DetailRow label={t('provers.panel.fee')}>
         {info ? (
           info.fee ? (
-            <span className="font-mono">{formatAmount(info.fee.amount)} a bundle</span>
+            <span className="font-mono">{t('provers.panel.feeValue', { amount: fmt.amount(info.fee.amount) })}</span>
           ) : (
-            <span>Free</span>
+            <span>{t('provers.panel.free')}</span>
           )
         ) : (
           <span className="text-mute">—</span>
         )}
       </DetailRow>
-      <DetailRow label="Proves">
+      <DetailRow label={t('provers.panel.proves')}>
         {info ? (
           <span className="text-soft">
-            {info.witness_kinds.length > 0 ? info.witness_kinds.join(', ').replace('_', '-') + ' jobs' : '—'} on{' '}
-            {info.backend === 'cuda' ? 'GPU' : 'CPU'} · build {info.version ?? 'unknown'}
+            {t('provers.panel.provesValue', {
+              jobs:
+                info.witness_kinds.length > 0
+                  ? t('provers.panel.jobs', { kinds: info.witness_kinds.join(', ').replace('_', '-') })
+                  : '—',
+              backend: info.backend === 'cuda' ? 'GPU' : 'CPU',
+              version: info.version ?? t('provers.panel.unknownBuild'),
+            })}
           </span>
         ) : (
           <span className="text-mute">—</span>
         )}
       </DetailRow>
-      <DetailRow label="Last checked">
+      <DetailRow label={t('provers.panel.lastChecked')}>
         {prover.checked_at_ms === null ? (
           <span className="text-mute">—</span>
         ) : (
           <span className="text-soft">
-            {formatDateTime(prover.checked_at_ms)}
+            {fmt.dateTime(prover.checked_at_ms)}
             {!prover.up && prover.last_up_ms !== null && (
-              <span className="text-mute"> · last answered {formatDateTime(prover.last_up_ms)}</span>
+              <span className="text-mute">
+                {' '}
+                · {t('provers.panel.lastAnswered', { time: fmt.dateTime(prover.last_up_ms) })}
+              </span>
             )}
           </span>
         )}
       </DetailRow>
       {!prover.up && prover.error && (
-        <DetailRow label="Error">
+        <DetailRow label={t('provers.panel.error')}>
           <span className="break-all text-xs text-mute">{prover.error}</span>
         </DetailRow>
       )}
       {prover.pairing_url && (
-        <DetailRow label="Pairing">
+        <DetailRow label={t('provers.panel.pairing')}>
           <a href={prover.pairing_url} target="_blank" rel="noopener noreferrer" className="link break-all">
             {prover.pairing_url}
           </a>
@@ -164,6 +180,10 @@ function ProverPanel({ prover }: { prover: ProverView }) {
 
 export default function ProversPage() {
   const { data: provers, error, isLoading, mutate } = useProvers();
+  const { t, rich } = useT();
+  const fmt = useFmt();
+  const memberColumns = memberColumnsFor(t, fmt);
+  const popup = useCallback((node: NodeInfo) => memberPopup(node, fmt), [fmt]);
 
   const members = useMemo<MemberRow[]>(
     () =>
@@ -202,8 +222,8 @@ export default function ProversPage() {
   if (error && !provers) {
     return (
       <>
-        <PageHeader title="Provers" />
-        <ErrorState message="Could not load the provers." onRetry={() => void mutate()} />
+        <PageHeader title={t('provers.title')} />
+        <ErrorState message={t('provers.error')} onRetry={() => void mutate()} />
       </>
     );
   }
@@ -211,8 +231,8 @@ export default function ProversPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Provers"
-        subtitle="Delegated provers: where a wallet that cannot prove itself sends its bundle, and where those machines are"
+        title={t('provers.title')}
+        subtitle={t('provers.subtitle')}
       />
 
       <StatsRow columns={4}>
@@ -221,32 +241,34 @@ export default function ProversPage() {
         ) : (
           <>
             <StatsCard
-              title="Provers"
-              value={formatNumber(summary.provers)}
-              subtitle={`${formatNumber(summary.up)} answering`}
+              title={t('provers.stats.provers')}
+              value={fmt.number(summary.provers)}
+              subtitle={t('provers.stats.answering', { count: fmt.number(summary.up) })}
             />
-            <StatsCard title="Prover hosts" value={formatNumber(summary.members)} />
-            <StatsCard title="Countries" value={formatNumber(summary.countries)} />
-            <StatsCard title="Job slots" value={formatNumber(summary.slots)} subtitle="free and busy, answering provers" />
+            <StatsCard title={t('provers.stats.hosts')} value={fmt.number(summary.members)} />
+            <StatsCard title={t('provers.stats.countries')} value={fmt.number(summary.countries)} />
+            <StatsCard
+              title={t('provers.stats.slots')}
+              value={fmt.number(summary.slots)}
+              subtitle={t('provers.stats.slotsSub')}
+            />
           </>
         )}
       </StatsRow>
 
-      <NodeMap nodes={mapNodes} popup={memberPopup} />
+      <NodeMap nodes={mapNodes} popup={popup} />
 
       <section className="space-y-4">
-        <h2 className="chip">Prover hosts</h2>
+        <h2 className="chip">{t('provers.hosts')}</h2>
         <DataTable
           columns={memberColumns}
           data={members}
           keyExtractor={(m) => m.key}
           isLoading={isLoading && !provers}
-          emptyMessage="No prover is known to this explorer"
+          emptyMessage={t('provers.empty')}
         />
         <p className="text-xs text-mute">
-          A pool answers at one address and hands each job to a member host with a free slot, so a
-          host is placed here by the explorer&apos;s own list, not discovered on the network.
-          Locations come from each host&apos;s public IP; the addresses themselves are not shown.
+          {t('provers.hostsHelp')}
         </p>
       </section>
 
@@ -257,10 +279,7 @@ export default function ProversPage() {
       </div>
 
       <p className="text-xs text-mute">
-        A delegated prover makes a wallet&apos;s bundle proof from a job sealed to its key. It is
-        sent the wallet&apos;s viewing key, never its spend key: whoever runs it can read that
-        wallet&apos;s history, and nothing more. Anyone can run their own (<code>rand-prover</code>)
-        and pair a wallet with it instead.
+        {rich('provers.help')}
       </p>
     </div>
   );

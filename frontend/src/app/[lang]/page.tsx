@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { StatsCard, StatsCardSkeleton, StatsRow } from '@/components/StatsCard';
 import { BlocksTable, TransactionsTable } from '@/components/Tables';
@@ -8,20 +7,16 @@ import { Hash } from '@/components/Hash';
 import { LiveIndicator, SectionHeading } from '@/components/States';
 import { useLatestBlocks, useLatestTransactions, useStats } from '@/hooks/useApi';
 import { useNewBlocks, useNewTransactions, useStatsUpdates } from '@/hooks/useWebSocket';
-import {
-  formatAmount,
-  formatBinaryBytes,
-  formatDurationMs,
-  formatNumber,
-  formatStake,
-  TOKEN_SYMBOL,
-} from '@/lib/utils';
+import { TOKEN_SYMBOL } from '@/lib/utils';
+import { L, useFmt, useT } from '@/i18n/client';
 import type { BlockSummary, NetworkStats, TransactionSummary } from '@/types';
 
 const LATEST_LIMIT = 10;
 
 export default function DashboardPage() {
   const { data: fetchedStats, isLoading: statsLoading } = useStats();
+  const { t, tp, rich } = useT();
+  const fmt = useFmt();
   const { data: fetchedBlocks, isLoading: blocksLoading } = useLatestBlocks(LATEST_LIMIT);
   const { data: fetchedTxs, isLoading: txsLoading } = useLatestTransactions(LATEST_LIMIT);
 
@@ -71,12 +66,12 @@ export default function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-4xl font-semibold tracking-tight text-strong">
-            Rand Protocol Explorer
+            {t('home.title')}
           </h1>
           <p className="mt-2 text-sm text-soft">
             {stats
-              ? `Chain ${stats.chain_id}`
-              : 'Connecting to the network…'}
+              ? t('home.chain', { id: stats.chain_id })
+              : t('home.connecting')}
           </p>
         </div>
         <LiveIndicator isConnected={isConnected} />
@@ -89,28 +84,28 @@ export default function DashboardPage() {
         ) : (
           <>
             <StatsCard
-              title="Block height"
-              value={formatNumber(stats?.height ?? 0)}
-              subtitle={stats?.node_syncing ? 'Node syncing' : 'In sync'}
+              title={t('home.blockHeight')}
+              value={fmt.number(stats?.height ?? 0)}
+              subtitle={stats?.node_syncing ? t('home.nodeSyncing') : t('home.inSync')}
             />
             <StatsCard
-              title="Validators"
+              title={t('home.validators')}
               value={
                 stats
-                  ? `${formatNumber(stats.active_validator_count)} / ${formatNumber(stats.validator_count)}`
+                  ? `${fmt.number(stats.active_validator_count)} / ${fmt.number(stats.validator_count)}`
                   : '0'
               }
-              subtitle={stats ? formatStake(stats.total_stake, 'active stake') : undefined}
+              subtitle={stats ? fmt.stake(stats.total_stake, t('home.activeStake')) : undefined}
             />
             <StatsCard
-              title="Transactions"
-              value={formatNumber(stats?.total_transactions ?? 0)}
-              subtitle={stats ? `${formatNumber(stats.program_count)} programs` : undefined}
+              title={t('home.transactions')}
+              value={fmt.number(stats?.total_transactions ?? 0)}
+              subtitle={stats ? tp('home.programs', stats.program_count) : undefined}
             />
             <StatsCard
-              title="Notes"
-              value={formatNumber(stats?.notes ?? 0)}
-              subtitle={stats ? `${formatNumber(stats.nullifiers)} spent` : undefined}
+              title={t('home.notes')}
+              value={fmt.number(stats?.notes ?? 0)}
+              subtitle={stats ? t('home.spent', { count: fmt.number(stats.nullifiers) }) : undefined}
             />
           </>
         )}
@@ -118,19 +113,19 @@ export default function DashboardPage() {
 
       {/* Secondary stats */}
       <StatsRow columns={5}>
-        <MiniStat label="Avg block time" value={stats ? formatDurationMs(stats.avg_block_time_ms) : '—'} />
-        <MiniStat label="Peers" value={stats ? formatNumber(stats.peer_count) : '—'} />
-        <MiniStat label="Mempool" value={stats ? formatNumber(stats.mempool_size) : '—'} />
+        <MiniStat label={t('home.avgBlockTime')} value={stats ? fmt.duration(stats.avg_block_time_ms) : '—'} />
+        <MiniStat label={t('home.peers')} value={stats ? fmt.number(stats.peer_count) : '—'} />
+        <MiniStat label={t('home.mempool')} value={stats ? fmt.number(stats.mempool_size) : '—'} />
         <MiniStat
-          label="Epoch"
+          label={t('home.epoch')}
           value={
             stats && stats.epoch !== null
-              ? `${formatNumber(stats.epoch)} (${formatNumber(stats.epoch_blocks ?? 0)} blocks)`
+              ? tp('home.epochValue', stats.epoch_blocks ?? 0, { epoch: fmt.number(stats.epoch) })
               : '—'
           }
         />
         <MiniStat
-          label="Current leader"
+          label={t('home.currentLeader')}
           value={
             stats?.current_leader ? (
               <Hash
@@ -150,32 +145,34 @@ export default function DashboardPage() {
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
           <span>
             {stats.total_supply !== '0'
-              ? `Total supply ${formatAmount(stats.total_supply)}`
-              : 'Supply audit unavailable'}
+              ? t('home.facts.totalSupply', { amount: fmt.amount(stats.total_supply) })
+              : t('home.facts.supplyUnavailable')}
           </span>
-          <span>· view {formatNumber(stats.view)}</span>
+          <span>· {t('home.facts.view', { view: fmt.number(stats.view) })}</span>
           <span className="inline-flex items-center gap-1">
-            · tree root{' '}
+            · {t('home.facts.treeRoot')}{' '}
             {stats.tree_root ? <Hash value={stats.tree_root} start={8} end={6} /> : '—'}
           </span>
           <span className="inline-flex items-center gap-1">
-            · bundle guest{' '}
+            · {t('home.facts.bundleGuest')}{' '}
             {stats.hc_bundle ? <Hash value={stats.hc_bundle} start={8} end={6} /> : '—'}
           </span>
-          <span>· faucet {stats.faucet ? 'enabled' : 'disabled'}</span>
-          <span>· confidential calls {stats.confidential ? 'on' : 'off'}</span>
+          <span>· {stats.faucet ? t('home.facts.faucetOn') : t('home.facts.faucetOff')}</span>
+          <span>· {stats.confidential ? t('home.facts.confidentialOn') : t('home.facts.confidentialOff')}</span>
           <span>
-            · {TOKEN_SYMBOL} has {stats.decimals} decimals
+            · {tp('home.facts.decimals', stats.decimals, { symbol: TOKEN_SYMBOL })}
           </span>
           {stats.genesis_hash && (
             <span className="inline-flex items-center gap-1">
-              · genesis <Hash value={stats.genesis_hash} start={8} end={6} />
+              · {t('home.facts.genesis')} <Hash value={stats.genesis_hash} start={8} end={6} />
             </span>
           )}
           {stats.node_version && (
             <span>
-              · node {stats.node_version}
-              {stats.node_git_sha ? ` (${stats.node_git_sha.slice(0, 7)})` : ''}
+              ·{' '}
+              {stats.node_git_sha
+                ? t('home.facts.nodeSha', { version: stats.node_version, sha: stats.node_git_sha.slice(0, 7) })
+                : t('home.facts.node', { version: stats.node_version })}
             </span>
           )}
         </p>
@@ -183,31 +180,34 @@ export default function DashboardPage() {
 
       {stats?.limits && (
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
-          <span>Limits: programs {formatNumber(stats.limits.max_program_words)} words</span>
-          <span>· proofs {formatBinaryBytes(stats.limits.max_proof_bytes)}</span>
-          <span>· blocks {formatBinaryBytes(stats.limits.max_block_bytes)}</span>
-          <span>· call envelopes {formatBinaryBytes(stats.limits.max_call_envelope_bytes)}</span>
+          <span>{tp('home.limits.programs', stats.limits.max_program_words)}</span>
+          <span>· {t('home.limits.proofs', { size: fmt.binaryBytes(stats.limits.max_proof_bytes) })}</span>
+          <span>· {t('home.limits.blocks', { size: fmt.binaryBytes(stats.limits.max_block_bytes) })}</span>
+          <span>· {t('home.limits.callEnvelopes', { size: fmt.binaryBytes(stats.limits.max_call_envelope_bytes) })}</span>
           <span>
-            · public input{' '}
+            ·{' '}
             {stats.limits.max_program_public_words > 0
-              ? `${formatNumber(stats.limits.max_program_public_words)} words`
-              : 'off'}
+              ? tp('home.limits.publicInput', stats.limits.max_program_public_words)
+              : t('home.limits.publicInputOff')}
           </span>
           <span>
-            · note envelopes{' '}
+            ·{' '}
             {stats.limits.envelope_bytes
-              ? `${formatNumber(stats.limits.envelope_bytes)} B (memo)`
-              : '1,348 B (no memo)'}
+              ? t('home.limits.noteEnvelopesMemo', { bytes: fmt.number(stats.limits.envelope_bytes) })
+              : t('home.limits.noteEnvelopesNoMemo', { bytes: fmt.number(1348) })}
           </span>
-          <span>· v0.6 rules {stats.limits.hardening_v6 ? 'on' : 'off'}</span>
+          <span>· {stats.limits.hardening_v6 ? t('home.limits.v6On') : t('home.limits.v6Off')}</span>
           <span className="inline-flex items-center gap-1">
-            · auth guest{' '}
-            {stats.limits.hc_auth ? <Hash value={stats.limits.hc_auth} start={8} end={6} /> : 'none'}
+            · {t('home.limits.authGuest')}{' '}
+            {stats.limits.hc_auth ? <Hash value={stats.limits.hc_auth} start={8} end={6} /> : t('home.limits.none')}
           </span>
-          <span>· proof window {formatNumber(stats.limits.proof_window_blocks ?? 256)} blocks</span>
+          <span>· {tp('home.limits.proofWindow', stats.limits.proof_window_blocks ?? 256)}</span>
           {stats.limits.binding_domain != null && (
             <span>
-              · bindings over {stats.limits.binding_domain === 1 ? 'the genesis hash' : 'the chain id'}
+              ·{' '}
+              {stats.limits.binding_domain === 1
+                ? t('home.limits.bindingsGenesis')
+                : t('home.limits.bindingsChainId')}
             </span>
           )}
         </p>
@@ -215,17 +215,19 @@ export default function DashboardPage() {
 
       {stats?.limits && (stats.limits.testnet || stats.limits.admission_by_vote || stats.limits.slashing) && (
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
-          <span>Network:{stats.limits.testnet ? ' testnet (the genesis marker)' : ' mainnet'}</span>
+          <span>{stats.limits.testnet ? t('home.network.testnet') : t('home.network.mainnet')}</span>
           {stats.limits.admission_by_vote && (
             <span>
-              · new validators admitted by the set&apos;s vote (<Link href="/validators" className="link">admitted keys</Link>)
+              · {rich('home.network.admission')}
             </span>
           )}
           <span>
-            · equivocation slashing{' '}
+            ·{' '}
             {stats.limits.slashing
-              ? `${(stats.limits.slashing.equivocation_bps / 100).toFixed(2)}% of stake, jailed ${formatNumber(stats.limits.slashing.jail_epochs)} epochs`
-              : 'off'}
+              ? tp('home.network.slashing', stats.limits.slashing.jail_epochs, {
+                  percent: fmt.percentage(stats.limits.slashing.equivocation_bps / 100),
+                })
+              : t('home.network.slashingOff')}
           </span>
         </p>
       )}
@@ -233,39 +235,45 @@ export default function DashboardPage() {
       {stats?.limits && stats.limits.gas_metering && (
         <p className="flex flex-wrap items-center gap-x-2 text-xs text-mute">
           <span>
-            Gas:{' '}
             {stats.limits.gas_metering === 'circuit'
-              ? "the chain's own section, metered in-circuit"
-              : "this node's policy, priced off the proof header"}
+              ? t('home.gas.circuit')
+              : t('home.gas.policy')}
           </span>
           <span>
-            · {formatAmount((stats.gas_prices ?? stats.limits).gas_price ?? '0')} per gas
+            · {t('home.gas.perGas', { amount: fmt.amount((stats.gas_prices ?? stats.limits).gas_price ?? '0') })}
           </span>
           <span>
-            · {formatAmount((stats.gas_prices ?? stats.limits).byte_price ?? '0')} per KiB
+            · {t('home.gas.perKiB', { amount: fmt.amount((stats.gas_prices ?? stats.limits).byte_price ?? '0') })}
           </span>
           {(stats.limits.max_gas_price || stats.limits.max_byte_price) && (
             <span>
-              · ceilings {formatAmount(stats.limits.max_gas_price ?? '0')} / gas,{' '}
-              {formatAmount(stats.limits.max_byte_price ?? '0')} / KiB
-              {stats.limits.byte_load === 'paying' ? ' (only paying bytes move the byte price)' : ''}
+              ·{' '}
+              {t(stats.limits.byte_load === 'paying' ? 'home.gas.ceilingsPaying' : 'home.gas.ceilings', {
+                gas: fmt.amount(stats.limits.max_gas_price ?? '0'),
+                byte: fmt.amount(stats.limits.max_byte_price ?? '0'),
+              })}
             </span>
           )}
           {stats.limits.bundle_gas_limit !== null && (
-            <span>· every bundle declares {formatNumber(stats.limits.bundle_gas_limit)} gas</span>
+            <span>· {t('home.gas.bundleLimit', { gas: fmt.number(stats.limits.bundle_gas_limit) })}</span>
           )}
           <span>
-            · prices{' '}
+            ·{' '}
             {stats.limits.adjust_bps !== null
-              ? `move ${(stats.limits.adjust_bps / 100).toFixed(2).replace(/\.?0+$/, '')}% a block by fullness`
-              : 'fixed'}
+              ? t('home.gas.pricesMove', {
+                  percent: (stats.limits.adjust_bps / 100).toFixed(2).replace(/\.?0+$/, ''),
+                })
+              : t('home.gas.pricesFixed')}
           </span>
           {stats.limits.program_state && (
             <span>
-              · program state on: {formatAmount(stats.limits.program_state.cell_fee)} a cell
-              created, at most {formatNumber(stats.limits.program_state.max_reads)} reads,{' '}
-              {formatNumber(stats.limits.program_state.max_writes)} writes and{' '}
-              {formatNumber(stats.limits.program_state.max_payouts)} payouts an invoke
+              ·{' '}
+              {t('home.gas.programState', {
+                fee: fmt.amount(stats.limits.program_state.cell_fee),
+                reads: fmt.number(stats.limits.program_state.max_reads),
+                writes: fmt.number(stats.limits.program_state.max_writes),
+                payouts: fmt.number(stats.limits.program_state.max_payouts),
+              })}
             </span>
           )}
         </p>
@@ -275,11 +283,11 @@ export default function DashboardPage() {
       <div className="grid gap-6 xl:grid-cols-2">
         <section className="space-y-4">
           <SectionHeading
-            label="Latest blocks"
+            label={t('home.latestBlocks')}
             actions={
-              <Link href="/blocks" className="link text-sm">
-                View all →
-              </Link>
+              <L href="/blocks" className="link text-sm">
+                {t('home.viewAll')}
+              </L>
             }
           />
           <BlocksTable blocks={blocks} isLoading={blocksLoading && blocks.length === 0} />
@@ -287,11 +295,11 @@ export default function DashboardPage() {
 
         <section className="space-y-4">
           <SectionHeading
-            label="Latest transactions"
+            label={t('home.latestTransactions')}
             actions={
-              <Link href="/transactions" className="link text-sm">
-                View all →
-              </Link>
+              <L href="/transactions" className="link text-sm">
+                {t('home.viewAll')}
+              </L>
             }
           />
           <TransactionsTable

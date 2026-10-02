@@ -1,10 +1,10 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { PageHeader, Panel } from '@/components/States';
 import { useValidator } from '@/hooks/useApi';
+import { L, useT } from '@/i18n/client';
 
 /**
  * The shielded chain has no accounts. Old links (and old habits) land here; explain, and point
@@ -14,38 +14,26 @@ export default function NoAccountPage() {
   const params = useParams<{ address: string }>();
   const address = decodeURIComponent(params.address);
   const { data: validator } = useValidator(address);
+  const { t, rich } = useT();
 
   return (
     <div className="space-y-6">
-      <PageHeader title="No accounts on this chain" subtitle={<Hash value={address} full copyable />} />
+      <PageHeader title={t('account.title')} subtitle={<Hash value={address} full copyable />} />
 
       <Panel>
         <div className="space-y-3 py-3 text-sm text-soft">
-          <p>
-            RAND is a fully shielded chain. A balance is a set of notes only its owner&apos;s
-            viewing key can open, and a transaction carries no sender, recipient or amount: only
-            commitments, nullifiers, sealed envelopes, the fee and a proof.
-          </p>
-          <p>
-            There is therefore nothing the explorer can show for an address. What is public is
-            the validator register (stake, rewards, unbonding queue), the commitment tree and the
-            nullifier set, program deployments, call receipts and the bridge&apos;s own state.
-          </p>
+          <p>{t('account.shielded')}</p>
+          <p>{t('account.nothingToShow')}</p>
           {validator ? (
-            <p>
-              This address is a validator:{' '}
-              <Link href={`/validators/${address}`} className="link">
-                view its register entry →
-              </Link>
-            </p>
+            <p>{rich('account.isValidator', { href: `/validators/${address}` })}</p>
           ) : (
             <p className="flex flex-wrap gap-4">
-              <Link href="/validators" className="link">
-                Validators →
-              </Link>
-              <Link href="/notes" className="link">
-                Notes (commitment tree) →
-              </Link>
+              <L href="/validators" className="link">
+                {t('account.validators')}
+              </L>
+              <L href="/notes" className="link">
+                {t('account.notes')}
+              </L>
             </p>
           )}
         </div>

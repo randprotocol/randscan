@@ -407,6 +407,12 @@ export const BRIDGE_SOURCE_CHAINS: { id: number; name: string }[] = [
 ];
 
 /** "Ethereum" for a known bridge chain id, "chain 9" otherwise. */
+/** The name of a known bridge chain, or null; pages pass it to fmt.bridgeChain, which words the fallback. */
+export function knownBridgeChainName(id: number | null | undefined): string | null {
+  if (id === null || id === undefined) return null;
+  return BRIDGE_CHAIN_NAMES[id] ?? null;
+}
+
 export function bridgeChainName(id: number | null | undefined): string {
   if (id === null || id === undefined) return '—';
   return BRIDGE_CHAIN_NAMES[id] ?? `chain ${id}`;
@@ -430,7 +436,7 @@ export function formatMintWindow(secs: number): string {
 
 /** "Ethereum (2)" for a known bridge chain id, "chain 9" otherwise. */
 export function formatBridgeChain(id: number | null | undefined): string {
-  return EN.bridgeChain(id, id === null || id === undefined ? null : BRIDGE_CHAIN_NAMES[id]);
+  return EN.bridgeChain(id, knownBridgeChainName(id));
 }
 
 /** Bridged units as a decimal number of tokens (8 decimals) with the raw units alongside. */

@@ -1,25 +1,14 @@
 'use client';
 
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { Hash } from '@/components/Hash';
 import { KindBadge } from '@/components/KindBadge';
 import { TransactionOpener } from '@/components/TransactionOpener';
 import { DetailSkeleton } from '@/components/Loading';
 import { DetailRow, ErrorState, NotFoundState, PageHeader, Panel } from '@/components/States';
 import { isNotFound, useTokens, useTransaction } from '@/hooks/useApi';
-import {
-  formatAmount,
-  formatBridgeAddress,
-  formatBridgeChain,
-  formatBytes,
-  formatDateTime,
-  formatNumber,
-  formatTimestamp,
-  formatTokenAmount,
-  getKindLabel,
-  resolveToken,
-} from '@/lib/utils';
+import { formatBridgeAddress, knownBridgeChainName, resolveToken } from '@/lib/utils';
+import { L, useFmt, useT } from '@/i18n/client';
 import type { BridgeFeeNote, Bundle, Payout, ProgramCell, Receipt, TokenInfo, TransactionDetail } from '@/types';
 
 export default function TransactionDetailPage() {
@@ -28,6 +17,8 @@ export default function TransactionDetailPage() {
   const { data: tx, error, isLoading, mutate } = useTransaction(hash);
   const { data: tokenList } = useTokens();
   const tokens = tokenList?.tokens ?? [];
+  const { t } = useT();
+  const fmt = useFmt();
 
   if (isLoading && !tx) {
     return <DetailSkeleton />;
@@ -36,64 +27,64 @@ export default function TransactionDetailPage() {
   if (error && isNotFound(error)) {
     return (
       <NotFoundState
-        title="Transaction not found"
-        message={`No transaction matches "${hash}". Only committed transactions are indexed.`}
+        title={t('tx.notFound')}
+        message={t('tx.notFoundMessage', { hash })}
         backHref="/transactions"
-        backLabel="Back to transactions"
+        backLabel={t('tx.back')}
       />
     );
   }
 
   if (error || !tx) {
-    return <ErrorState message="Could not load this transaction." onRetry={() => void mutate()} />;
+    return <ErrorState message={t('tx.loadError')} onRetry={() => void mutate()} />;
   }
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Transaction"
+        title={t('tx.title')}
         subtitle={<Hash value={tx.hash} full copyable />}
         actions={<KindBadge kind={tx.kind} />}
       />
 
-      <Panel title="Overview">
-        <DetailRow label="Hash">
+      <Panel title={t('tx.overview')}>
+        <DetailRow label={t('tx.hash')}>
           <Hash value={tx.hash} full />
         </DetailRow>
-        <DetailRow label="Kind">
+        <DetailRow label={t('tx.kind')}>
           <KindBadge kind={tx.kind} />
         </DetailRow>
-        <DetailRow label="Block">
+        <DetailRow label={t('tx.block')}>
           <span className="inline-flex flex-wrap items-center gap-2">
-            <Link href={`/blocks/${tx.height}`} className="link font-mono">
-              #{formatNumber(tx.height)}
-            </Link>
+            <L href={`/blocks/${tx.height}`} className="link font-mono">
+              #{fmt.number(tx.height)}
+            </L>
             <span className="text-mute">·</span>
             <Hash value={tx.block_hash} href={`/blocks/${tx.block_hash}`} />
           </span>
         </DetailRow>
-        <DetailRow label="Index in block">
-          <span className="font-mono">{formatNumber(tx.tx_index)}</span>
+        <DetailRow label={t('tx.indexInBlock')}>
+          <span className="font-mono">{fmt.number(tx.tx_index)}</span>
         </DetailRow>
-        <DetailRow label="Timestamp">
+        <DetailRow label={t('tx.timestamp')}>
           <span>
-            {formatDateTime(tx.timestamp_ms)}{' '}
-            <span className="text-mute">({formatTimestamp(tx.timestamp_ms)})</span>
+            {fmt.dateTime(tx.timestamp_ms)}{' '}
+            <span className="text-mute">({fmt.ago(tx.timestamp_ms)})</span>
           </span>
         </DetailRow>
-        <DetailRow label="Fee">
+        <DetailRow label={t('tx.fee')}>
           {tx.has_bundle ? (
-            formatAmount(tx.fee)
+            fmt.amount(tx.fee)
           ) : (
-            <span className="text-mute">None (no bundle)</span>
+            <span className="text-mute">{t('tx.noFee')}</span>
           )}
         </DetailRow>
-        <DetailRow label="Bundle">
+        <DetailRow label={t('tx.bundle')}>
           {tx.has_bundle ? (
-            <span>Yes: paid from the sender&apos;s own notes, proved with a STARK</span>
+            <span>{t('tx.bundleYes')}</span>
           ) : (
             <span className="inline-flex flex-wrap items-center gap-2">
-              <span>No: signed by validator or guardian quorum</span>
+              <span>{t('tx.bundleNo')}</span>
               {tx.validator ? (
                 <Hash value={tx.validator} href={`/validators/${tx.validator}`} />
               ) : (
@@ -102,8 +93,8 @@ export default function TransactionDetailPage() {
             </span>
           )}
         </DetailRow>
-        <DetailRow label="Chain ID">
-          <span className="font-mono">{formatNumber(tx.chain_id)}</span>
+        <DetailRow label={t('tx.chainId')}>
+          <span className="font-mono">{fmt.number(tx.chain_id)}</span>
         </DetailRow>
       </Panel>
 
@@ -123,19 +114,20 @@ export default function TransactionDetailPage() {
 // ---------------------------------------------------------------------------
 
 function CellTable({ cells, written }: { cells: ProgramCell[]; written: boolean }) {
+  const { t } = useT();
   const zero = '0'.repeat(64);
   return (
     <ul className="space-y-1.5">
       {cells.map((c) => (
         <li key={c.key} className="flex flex-col gap-0.5 text-xs">
           <span className="inline-flex items-center gap-2">
-            <span className="w-10 flex-shrink-0 text-mute">key</span>
+            <span className="w-10 flex-shrink-0 text-mute">{t('tx.cells.key')}</span>
             <Hash value={c.key} start={10} end={8} className="text-xs" />
           </span>
           <span className="inline-flex items-center gap-2">
-            <span className="w-10 flex-shrink-0 text-mute">{written ? 'wrote' : 'read'}</span>
+            <span className="w-10 flex-shrink-0 text-mute">{written ? t('tx.cells.wrote') : t('tx.cells.read')}</span>
             {c.value === zero ? (
-              <span className="text-mute">{written ? 'zeros — the cell is deleted' : 'zeros — the cell did not exist'}</span>
+              <span className="text-mute">{written ? t('tx.cells.zerosDeleted') : t('tx.cells.zerosAbsent')}</span>
             ) : (
               <Hash value={c.value} start={10} end={8} className="text-xs" />
             )}
@@ -147,25 +139,27 @@ function CellTable({ cells, written }: { cells: ProgramCell[]; written: boolean 
 }
 
 function PayoutList({ payouts, tokens }: { payouts: Payout[]; tokens: TokenInfo[] }) {
+  const { t } = useT();
+  const fmt = useFmt();
   return (
     <ul className="space-y-2">
       {payouts.map((p, i) => (
         <li key={p.cm} className="flex flex-col gap-0.5">
           <span>
-            <span className="font-semibold text-strong">{formatTokenAmount(p.amount, p.asset, tokens)}</span>
+            <span className="font-semibold text-strong">{fmt.tokenAmount(p.amount, p.asset, tokens)}</span>
             {p.asset !== 0 && (
               <span className="text-xs text-mute">
                 {' '}· <AssetLink index={p.asset} tokens={tokens} />
               </span>
             )}
-            <span className="text-xs text-mute"> · payout {i + 1}</span>
+            <span className="text-xs text-mute"> · {t('tx.payout.nth', { n: i + 1 })}</span>
           </span>
           <span className="inline-flex items-center gap-2 text-xs">
-            <span className="w-14 flex-shrink-0 text-mute">to</span>
+            <span className="w-14 flex-shrink-0 text-mute">{t('tx.payout.to')}</span>
             <Hash value={p.recipient} start={12} end={8} className="text-xs" />
           </span>
           <span className="inline-flex items-center gap-2 text-xs">
-            <span className="w-14 flex-shrink-0 text-mute">note</span>
+            <span className="w-14 flex-shrink-0 text-mute">{t('tx.payout.note')}</span>
             <Hash value={p.cm} href={`/notes/${p.cm}`} start={10} end={8} className="text-xs" />
           </span>
         </li>
@@ -175,64 +169,61 @@ function PayoutList({ payouts, tokens }: { payouts: Payout[]; tokens: TokenInfo[
 }
 
 function InvokePanel({ tx, tokens, title }: { tx: TransactionDetail; tokens: TokenInfo[]; title: string }) {
-  const t = tx.transition ?? null;
+  const { t } = useT();
+  const fmt = useFmt();
+  const tr = tx.transition ?? null;
   const bundle = tx.bundle;
-  const inflow = t?.inflow ?? 'none';
+  const inflow = tr?.inflow ?? 'none';
   return (
     <Panel title={title}>
-      <DetailRow label="Program">
+      <DetailRow label={t('tx.program')}>
         {tx.program ? (
           <Hash value={tx.program} href={`/programs/${tx.program}`} full />
         ) : (
           <span className="text-mute">—</span>
         )}
       </DetailRow>
-      <DetailRow label="Call proof size">
-        <span className="font-mono">{formatBytes(tx.call_proof_len)}</span>
+      <DetailRow label={t('tx.callProofSize')}>
+        <span className="font-mono">{fmt.bytes(tx.call_proof_len)}</span>
       </DetailRow>
-      <DetailRow label="Input transcript">
+      <DetailRow label={t('tx.inputTranscript')}>
         {tx.input_envelope_len === null ? (
-          <span className="text-mute">None published</span>
+          <span className="text-mute">{t('tx.invoke.nonePublished')}</span>
         ) : (
-          <span className="font-mono">{formatBytes(tx.input_envelope_len)} sealed</span>
+          <span className="font-mono">{t('tx.sealed', { size: fmt.bytes(tx.input_envelope_len) })}</span>
         )}
       </DetailRow>
-      <DetailRow label="Into the vault">
+      <DetailRow label={t('tx.invoke.intoVault')}>
         {bundle && bundle.burn_r !== '0' ? (
-          <span className="font-semibold text-strong">{formatAmount(bundle.burn_r)}</span>
+          <span className="font-semibold text-strong">{fmt.amount(bundle.burn_r)}</span>
         ) : (
-          <span className="text-mute">no RAND</span>
+          <span className="text-mute">{t('tx.invoke.noRand')}</span>
         )}
         {bundle && bundle.burn_a !== '0' && (
           <span>
-            {bundle.burn_r !== '0' ? ' and ' : ''}
+            {bundle.burn_r !== '0' ? ` ${t('tx.invoke.and')} ` : ''}
             <span className="font-semibold text-strong">
-              {formatTokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}
+              {fmt.tokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}
             </span>{' '}
             <span className="text-mute">
-              {inflow === 'burn' ? "— destroyed (the program's own token)" : '— deposited'}
+              {inflow === 'burn' ? t('tx.invoke.destroyed') : t('tx.invoke.deposited')}
             </span>
           </span>
         )}
       </DetailRow>
-      <DetailRow label={`Cells read (${t?.reads.length ?? 0})`}>
-        {t && t.reads.length > 0 ? <CellTable cells={t.reads} written={false} /> : <span className="text-mute">none</span>}
+      <DetailRow label={t('tx.invoke.cellsRead', { count: fmt.number(tr?.reads.length ?? 0) })}>
+        {tr && tr.reads.length > 0 ? <CellTable cells={tr.reads} written={false} /> : <span className="text-mute">{t('tx.invoke.none')}</span>}
       </DetailRow>
-      <DetailRow label={`Cells written (${t?.writes.length ?? 0})`}>
-        {t && t.writes.length > 0 ? <CellTable cells={t.writes} written /> : <span className="text-mute">none</span>}
+      <DetailRow label={t('tx.invoke.cellsWritten', { count: fmt.number(tr?.writes.length ?? 0) })}>
+        {tr && tr.writes.length > 0 ? <CellTable cells={tr.writes} written /> : <span className="text-mute">{t('tx.invoke.none')}</span>}
       </DetailRow>
-      <DetailRow label={`Paid out (${t?.pays.length ?? 0})`}>
-        {t && t.pays.length > 0 ? <PayoutList payouts={t.pays} tokens={tokens} /> : <span className="text-mute">nothing left the vault</span>}
+      <DetailRow label={t('tx.invoke.paidOut', { count: fmt.number(tr?.pays.length ?? 0) })}>
+        {tr && tr.pays.length > 0 ? <PayoutList payouts={tr.pays} tokens={tokens} /> : <span className="text-mute">{t('tx.invoke.nothingLeft')}</span>}
       </DetailRow>
-      <DetailRow label={`Minted (${t?.mints.length ?? 0})`}>
-        {t && t.mints.length > 0 ? <PayoutList payouts={t.mints} tokens={tokens} /> : <span className="text-mute">nothing</span>}
+      <DetailRow label={t('tx.invoke.minted', { count: fmt.number(tr?.mints.length ?? 0) })}>
+        {tr && tr.mints.length > 0 ? <PayoutList payouts={tr.mints} tokens={tokens} /> : <span className="text-mute">{t('tx.invoke.nothing')}</span>}
       </DetailRow>
-      <p className="px-4 py-3 text-xs text-mute">
-        A call whose proof vouches for exactly this transition, which the ledger applied: the
-        reads had to hold the values shown or the transaction was refused, and every payout is a
-        note the chain computed from the words above, so its recipient finds it as they find a
-        mint. Who paid in is private; what moved is not.
-      </p>
+      <p className="px-4 py-3 text-xs text-mute">{t('tx.invoke.help')}</p>
     </Panel>
   );
 }
@@ -242,69 +233,67 @@ function InvokePanel({ tx, tokens, title }: { tx: TransactionDetail; tokens: Tok
 // ---------------------------------------------------------------------------
 
 function BundlePanel({ bundle, tokens }: { bundle: Bundle; tokens: TokenInfo[] }) {
+  const { t } = useT();
+  const fmt = useFmt();
   const burned = bundle.burn_a !== '0' || bundle.burn_r !== '0';
   return (
-    <Panel title="Bundle">
-      <DetailRow label="Anchor">
+    <Panel title={t('tx.bundle')}>
+      <DetailRow label={t('tx.bundlePanel.anchor')}>
         <Hash value={bundle.anchor} full />
       </DetailRow>
       {bundle.nullifiers.map((nf, i) => (
-        <DetailRow key={`nf-${i}`} label={`Nullifier ${i + 1}${i < 2 ? ' (asset)' : ' (RAND)'}`}>
+        <DetailRow key={`nf-${i}`} label={t(i < 2 ? 'tx.bundlePanel.nullifierAsset' : 'tx.bundlePanel.nullifierRand', { n: i + 1 })}>
           <Hash value={nf} full />
         </DetailRow>
       ))}
       {bundle.commitments.map((cm, i) => (
-        <DetailRow key={`cm-${i}`} label={`Commitment ${i + 1}${i < 2 ? ' (asset)' : ' (RAND)'}`}>
+        <DetailRow key={`cm-${i}`} label={t(i < 2 ? 'tx.bundlePanel.commitmentAsset' : 'tx.bundlePanel.commitmentRand', { n: i + 1 })}>
           <Hash value={cm} href={`/notes/${cm}`} full />
         </DetailRow>
       ))}
-      <DetailRow label="Fee">{formatAmount(bundle.fee)}</DetailRow>
-      <DetailRow label="Burned">
+      <DetailRow label={t('tx.fee')}>{fmt.amount(bundle.fee)}</DetailRow>
+      <DetailRow label={t('tx.bundlePanel.burned')}>
         {!burned ? (
-          <span className="text-mute">Nothing burned</span>
+          <span className="text-mute">{t('tx.bundlePanel.nothingBurned')}</span>
         ) : (
           <span className="font-semibold text-strong">
-            {bundle.burn_r !== '0' && <span>{formatAmount(bundle.burn_r)} (RAND)</span>}
+            {bundle.burn_r !== '0' && <span>{fmt.amount(bundle.burn_r)} (RAND)</span>}
             {bundle.burn_a !== '0' && (
-              <span>{formatTokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}</span>
+              <span>{fmt.tokenAmount(bundle.burn_a, bundle.burn_asset, tokens)}</span>
             )}
           </span>
         )}
       </DetailRow>
-      <DetailRow label="Time (target height)">
-        <Link href={`/blocks/${bundle.time}`} className="link font-mono">
-          #{formatNumber(bundle.time)}
-        </Link>
+      <DetailRow label={t('tx.bundlePanel.time')}>
+        <L href={`/blocks/${bundle.time}`} className="link font-mono">
+          #{fmt.number(bundle.time)}
+        </L>
       </DetailRow>
-      <DetailRow label="Proof size">
-        <span className="font-mono">{formatBytes(bundle.proof_len)}</span>
+      <DetailRow label={t('tx.bundlePanel.proofSize')}>
+        <span className="font-mono">{fmt.bytes(bundle.proof_len)}</span>
       </DetailRow>
-      <DetailRow label="Envelope sizes">
+      <DetailRow label={t('tx.bundlePanel.envelopeSizes')}>
         <span className="font-mono">
-          {bundle.envelope_len.map((n) => formatBytes(n)).join(' · ')}
+          {bundle.envelope_len.map((n) => fmt.bytes(n)).join(' · ')}
         </span>
       </DetailRow>
       {bundle.auth_proof_len > 0 && bundle.auth_commit ? (
         <>
-          <DetailRow label="Auth commitment">
+          <DetailRow label={t('tx.bundlePanel.authCommit')}>
             <Hash value={bundle.auth_commit} full />
           </DetailRow>
-          <DetailRow label="Auth proof size">
-            <span className="font-mono">{formatBytes(bundle.auth_proof_len)}</span>
+          <DetailRow label={t('tx.bundlePanel.authProofSize')}>
+            <span className="font-mono">{fmt.bytes(bundle.auth_proof_len)}</span>
           </DetailRow>
         </>
       ) : (
-        <DetailRow label="Authorisation">
-          <span className="text-mute">Inside the bundle proof (no separate auth proof on this chain)</span>
+        <DetailRow label={t('tx.bundlePanel.authorisation')}>
+          <span className="text-mute">{t('tx.bundlePanel.authInside')}</span>
         </DetailRow>
       )}
       <p className="px-4 py-3 text-xs text-mute">
-        Four slots, dummies included: slots 1–2 carry a private asset (RAND or any RPL token) and
-        slots 3–4 always RAND. There is no public asset field — a transfer of RAND and a transfer
-        of any RPL token are the same shape, field for field. The proof and the envelopes are
-        reported by size only.
-        {bundle.auth_proof_len > 0 &&
-          ' Split authorisation: the bundle proof was made from the viewing key and publishes the auth commitment; a second, small proof over the spend key must match it, so a delegated prover never holds the spend key.'}
+        {t('tx.bundlePanel.help')}
+        {bundle.auth_proof_len > 0 && ` ${t('tx.bundlePanel.splitAuth')}`}
       </p>
     </Panel>
   );
@@ -327,9 +316,10 @@ function ValidatorRow({ label, address }: { label: string; address: string | nul
 }
 
 function PqSignersRow({ signers }: { signers: number[] | null }) {
+  const { t } = useT();
   if (!signers || signers.length === 0) return null;
   return (
-    <DetailRow label="PQ guardian co-signers">
+    <DetailRow label={t('tx.pqCoSigners')}>
       <span className="font-mono">{signers.map((i) => `#${i}`).join(', ')}</span>
     </DetailRow>
   );
@@ -338,12 +328,14 @@ function PqSignersRow({ signers }: { signers: number[] | null }) {
 /** A resolved token's symbol as a link to its page, or "asset #N" when this build's cached
  * registry does not (yet) know the index. */
 function FeeNoteRow({ note, tokens }: { note: BridgeFeeNote | null; tokens: TokenInfo[] }) {
+  const { t } = useT();
+  const fmt = useFmt();
   if (!note) return null;
   return (
-    <DetailRow label="Bridge fee">
+    <DetailRow label={t('tx.bridgeFee')}>
       <span className="inline-flex flex-wrap items-center gap-2">
-        <span>{formatTokenAmount(note.amount, note.asset, tokens)}</span>
-        <span className="text-xs text-mute">a note to the fee recipient, leaf</span>
+        <span>{fmt.tokenAmount(note.amount, note.asset, tokens)}</span>
+        <span className="text-xs text-mute">{t('tx.feeNoteLeaf')}</span>
         <Hash value={note.commitment} href={`/notes/${note.commitment}`} start={10} end={6} />
       </span>
     </DetailRow>
@@ -351,29 +343,29 @@ function FeeNoteRow({ note, tokens }: { note: BridgeFeeNote | null; tokens: Toke
 }
 
 function AssetLink({ index, tokens }: { index: number | null; tokens: TokenInfo[] }) {
+  const { t } = useT();
   if (index === null) return <span className="text-mute">—</span>;
   if (index === 0) return <span className="font-mono">RAND</span>;
   const token = resolveToken(tokens, index);
-  if (!token) return <span className="font-mono">asset #{index}</span>;
+  if (!token) return <span className="font-mono">{t('tx.assetIndex', { index })}</span>;
   return (
-    <Link href={`/tokens/${token.id_text}`} className="link font-mono">
+    <L href={`/tokens/${token.id_text}`} className="link font-mono">
       {token.symbol} (#{index})
-    </Link>
+    </L>
   );
 }
 
 function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] }) {
-  const title = `${getKindLabel(tx.kind)} details`;
+  const { t, tp, rich } = useT();
+  const fmt = useFmt();
+  const title = t('tx.kindDetails', { kind: t(`kinds.${tx.kind}.label`) });
+  const chain = (id: number | null | undefined) =>
+    fmt.bridgeChain(id, knownBridgeChainName(id));
 
   if (tx.kind === 'transfer') {
     return (
       <Panel title={title}>
-        <p className="px-4 py-3 text-sm text-mute">
-          A plain shielded transfer of RAND or of any RPL token — the asset is private, so this
-          page cannot say which one moved. Up to two notes spent, up to two created, and the fee.
-          Who paid whom, how much and in what asset is known only to the two parties and to
-          whoever they hand a viewing key or a transaction key.
-        </p>
+        <p className="px-4 py-3 text-sm text-mute">{t('tx.transfer.help')}</p>
       </Panel>
     );
   }
@@ -381,17 +373,14 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'mint') {
     return (
       <Panel title={title}>
-        <DetailRow label="Deposit note">
+        <DetailRow label={t('tx.mint.depositNote')}>
           {tx.cm ? <Hash value={tx.cm} href={`/notes/${tx.cm}`} full /> : <span className="text-mute">—</span>}
         </DetailRow>
-        <DetailRow label="Amount">
-          <span className="text-base font-semibold text-strong">{formatAmount(tx.amount)}</span>
+        <DetailRow label={t('tx.amount')}>
+          <span className="text-base font-semibold text-strong">{fmt.amount(tx.amount)}</span>
         </DetailRow>
-        <ValidatorRow label="Minted by" address={tx.validator} />
-        <p className="px-4 py-3 text-xs text-mute">
-          A testnet faucet deposit. The amount is public in this one transaction; the note it
-          created is indistinguishable from any other afterwards.
-        </p>
+        <ValidatorRow label={t('tx.mint.mintedBy')} address={tx.validator} />
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.mint.help')}</p>
       </Panel>
     );
   }
@@ -399,16 +388,16 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'deploy') {
     return (
       <Panel title={title}>
-        <DetailRow label="Program">
+        <DetailRow label={t('tx.program')}>
           {tx.program ? (
             <Hash value={tx.program} href={`/programs/${tx.program}`} full />
           ) : (
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Words length">
+        <DetailRow label={t('tx.deploy.wordsLength')}>
           <span className="font-mono">
-            {tx.words_len === null ? '—' : `${formatNumber(tx.words_len)} words`}
+            {tx.words_len === null ? '—' : tp('tx.deploy.words', tx.words_len)}
           </span>
         </DetailRow>
       </Panel>
@@ -418,28 +407,24 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'call') {
     return (
       <Panel title={title}>
-        <DetailRow label="Program">
+        <DetailRow label={t('tx.program')}>
           {tx.program ? (
             <Hash value={tx.program} href={`/programs/${tx.program}`} full />
           ) : (
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Call proof size">
-          <span className="font-mono">{formatBytes(tx.call_proof_len)}</span>
+        <DetailRow label={t('tx.callProofSize')}>
+          <span className="font-mono">{fmt.bytes(tx.call_proof_len)}</span>
         </DetailRow>
-        <DetailRow label="Input transcript">
+        <DetailRow label={t('tx.inputTranscript')}>
           {tx.input_envelope_len === null ? (
-            <span className="text-mute">None published (the caller chose --no-envelope)</span>
+            <span className="text-mute">{t('tx.call.nonePublished')}</span>
           ) : (
-            <span className="font-mono">{formatBytes(tx.input_envelope_len)} sealed</span>
+            <span className="font-mono">{t('tx.sealed', { size: fmt.bytes(tx.input_envelope_len) })}</span>
           )}
         </DetailRow>
-        <p className="px-4 py-3 text-xs text-mute">
-          The call&apos;s private inputs never leave the wallet in the clear. When a transcript is
-          published it opens only for the caller&apos;s viewing key, a per-call key, or the
-          auditor the caller named.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.call.help')}</p>
       </Panel>
     );
   }
@@ -451,39 +436,39 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'bond' || tx.kind === 'unbond' || tx.kind === 'withdraw') {
     return (
       <Panel title={title}>
-        <ValidatorRow label="Validator" address={tx.validator} />
-        <DetailRow label="Amount">
-          <span className="text-base font-semibold text-strong">{formatAmount(tx.amount)}</span>
+        <ValidatorRow label={t('tx.staking.validator')} address={tx.validator} />
+        <DetailRow label={t('tx.amount')}>
+          <span className="text-base font-semibold text-strong">{fmt.amount(tx.amount)}</span>
         </DetailRow>
         {tx.kind === 'bond' && (
-          <DetailRow label="Registration">
+          <DetailRow label={t('tx.staking.registration')}>
             {tx.registered ? (
-              <span className="badge badge-accent">New validator</span>
+              <span className="badge badge-accent">{t('tx.staking.newValidator')}</span>
             ) : (
-              <span className="text-mute">Existing validator</span>
+              <span className="text-mute">{t('tx.staking.existingValidator')}</span>
             )}
           </DetailRow>
         )}
         {tx.kind !== 'bond' && (
-          <DetailRow label="Register nonce">
+          <DetailRow label={t('tx.staking.registerNonce')}>
             <span className="font-mono">
-              {tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}
+              {tx.action_nonce === null ? '—' : fmt.number(tx.action_nonce)}
             </span>
           </DetailRow>
         )}
         {tx.kind === 'withdraw' && tx.note_time !== null && (
-          <DetailRow label="Note time">
-            <Link href={`/blocks/${tx.note_time}`} className="link font-mono">
-              #{formatNumber(tx.note_time)}
-            </Link>
+          <DetailRow label={t('tx.noteTime')}>
+            <L href={`/blocks/${tx.note_time}`} className="link font-mono">
+              #{fmt.number(tx.note_time)}
+            </L>
           </DetailRow>
         )}
         <p className="px-4 py-3 text-xs text-mute">
           {tx.kind === 'bond'
-            ? 'Value left the pool (the bundle’s burn) into the validator’s public stake.'
+            ? t('tx.staking.bondHelp')
             : tx.kind === 'unbond'
-              ? 'Stake moved to the unbonding queue, signed by the validator’s key.'
-              : 'Released stake and rewards became one new note of public amount at the validator’s payout address.'}
+              ? t('tx.staking.unbondHelp')
+              : t('tx.staking.withdrawHelp')}
         </p>
       </Panel>
     );
@@ -492,27 +477,27 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'bridge_burn') {
     return (
       <Panel title={title}>
-        <DetailRow label="Asset">
+        <DetailRow label={t('tx.asset')}>
           <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
-        <DetailRow label="Amount burned">
+        <DetailRow label={t('tx.amountBurned')}>
           <span className="text-base font-semibold text-strong">
-            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+            {fmt.tokenAmount(tx.amount, tx.asset_index, tokens)}
           </span>
         </DetailRow>
         {tx.release_amount != null && (
-          <DetailRow label="Released on the source chain">
-            <span>{formatTokenAmount(tx.release_amount, tx.asset_index, tokens)}</span>
+          <DetailRow label={t('tx.bridgeBurn.released')}>
+            <span>{fmt.tokenAmount(tx.release_amount, tx.asset_index, tokens)}</span>
           </DetailRow>
         )}
         <FeeNoteRow note={tx.fee_note ?? null} tokens={tokens} />
-        <DetailRow label="Relayer fee">
-          <span>{formatTokenAmount(tx.relayer_fee, tx.asset_index, tokens)}</span>
+        <DetailRow label={t('tx.bridgeBurn.relayerFee')}>
+          <span>{fmt.tokenAmount(tx.relayer_fee, tx.asset_index, tokens)}</span>
         </DetailRow>
-        <DetailRow label="Destination chain">
-          <span>{formatBridgeChain(tx.to_chain)}</span>
+        <DetailRow label={t('tx.bridgeBurn.destChain')}>
+          <span>{chain(tx.to_chain)}</span>
         </DetailRow>
-        <DetailRow label="Destination address">
+        <DetailRow label={t('tx.bridgeBurn.destAddress')}>
           {tx.bridge_to ? (
             <span className="font-mono break-all" title={tx.bridge_to}>
               {formatBridgeAddress(tx.bridge_to)}
@@ -521,7 +506,7 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Coin redeemed">
+        <DetailRow label={t('tx.bridgeBurn.coinRedeemed')}>
           {tx.bridge_token ? (
             <span className="font-mono break-all" title={tx.bridge_token}>
               {formatBridgeAddress(tx.bridge_token)}
@@ -530,11 +515,7 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <p className="px-4 py-3 text-xs text-mute">
-          One hidden-asset bundle carries the whole burn: its <code>burn_a</code> and{' '}
-          <code>burn_asset</code> are this action&apos;s asset and amount, and its fee pays the
-          bridge fee in RAND.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{rich('tx.bridgeBurn.help')}</p>
       </Panel>
     );
   }
@@ -542,58 +523,55 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'bridge_attest') {
     return (
       <Panel title={title}>
-        <DetailRow label="Attestation size">
-          <span className="font-mono">{formatBytes(tx.attestation_len)}</span>
+        <DetailRow label={t('tx.attest.size')}>
+          <span className="font-mono">{fmt.bytes(tx.attestation_len)}</span>
         </DetailRow>
-        <DetailRow label="Recipient">
+        <DetailRow label={t('tx.recipient')}>
           {tx.recipient ? (
             <Hash value={tx.recipient} full />
           ) : (
             <span className="text-mute">—</span>
           )}
         </DetailRow>
-        <DetailRow label="Asset">
+        <DetailRow label={t('tx.asset')}>
           <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
-        <DetailRow label="Amount">
+        <DetailRow label={t('tx.amount')}>
           {tx.amount === null ? (
-            <span className="text-mute">Guardian-set rotation, no deposit</span>
+            <span className="text-mute">{t('tx.attest.rotation')}</span>
           ) : (
             <span className="text-base font-semibold text-strong">
-              {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
-              {tx.fee_note ? <span className="ms-2 text-xs font-normal text-mute">gross, locked on the source chain</span> : null}
+              {fmt.tokenAmount(tx.amount, tx.asset_index, tokens)}
+              {tx.fee_note ? <span className="ms-2 text-xs font-normal text-mute">{t('tx.attest.gross')}</span> : null}
             </span>
           )}
         </DetailRow>
         {tx.fee_note && tx.deposit_amount != null && (
-          <DetailRow label="Deposited to the recipient">
-            <span>{formatTokenAmount(tx.deposit_amount, tx.asset_index, tokens)}</span>
+          <DetailRow label={t('tx.attest.deposited')}>
+            <span>{fmt.tokenAmount(tx.deposit_amount, tx.asset_index, tokens)}</span>
           </DetailRow>
         )}
         <FeeNoteRow note={tx.fee_note ?? null} tokens={tokens} />
-        <DetailRow label="Note time">
+        <DetailRow label={t('tx.noteTime')}>
           {tx.note_time === null ? (
             <span className="text-mute">—</span>
           ) : (
-            <Link href={`/blocks/${tx.note_time}`} className="link font-mono">
-              #{formatNumber(tx.note_time)}
-            </Link>
+            <L href={`/blocks/${tx.note_time}`} className="link font-mono">
+              #{fmt.number(tx.note_time)}
+            </L>
           )}
         </DetailRow>
-        <DetailRow label="Deposit commitment">
+        <DetailRow label={t('tx.attest.commitment')}>
           {tx.commitment ? (
             <Hash value={tx.commitment} href={`/notes/${tx.commitment}`} full />
           ) : (
-            <span className="text-mute">— (rotation)</span>
+            <span className="text-mute">{t('tx.attest.rotationShort')}</span>
           )}
         </DetailRow>
         <PqSignersRow signers={tx.pq_signers} />
         <p className="px-4 py-3 text-xs text-mute">
-          A guardian-signed message that deposits a bridged asset as a note for the recipient.
-          The amount is public here and nowhere else.
-          {tx.fee_note
-            ? ' Under the chain’s bridge fee the gross is locked and split into two notes: the recipient’s, and a fee note to the fee recipient. The fee note has no envelope, so no viewing key finds it by decryption; its owner rebuilds it from the fields above.'
-            : ''}
+          {t('tx.attest.help')}
+          {tx.fee_note ? ` ${t('tx.attest.feeHelp')}` : ''}
         </p>
       </Panel>
     );
@@ -603,62 +581,54 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
     const action = tx.token_action?.kind === 'register_token' ? tx.token_action : null;
     return (
       <Panel title={title}>
-        <DetailRow label="Token">
-          <Link href={`/tokens/${(tx.asset_index !== null && resolveToken(tokens, tx.asset_index)?.id_text) || tx.asset_index}`} className="link">
+        <DetailRow label={t('tx.token')}>
+          <L href={`/tokens/${(tx.asset_index !== null && resolveToken(tokens, tx.asset_index)?.id_text) || tx.asset_index}`} className="link">
             {action?.symbol ?? `#${tx.asset_index}`}
-          </Link>
+          </L>
         </DetailRow>
-        <DetailRow label="Name">{action?.name ?? '—'}</DetailRow>
-        <DetailRow label="Decimals">
-          <span className="font-mono">{action ? formatNumber(action.decimals) : '—'}</span>
+        <DetailRow label={t('tx.name')}>{action?.name ?? '—'}</DetailRow>
+        <DetailRow label={t('tx.decimals')}>
+          <span className="font-mono">{action ? fmt.number(action.decimals) : '—'}</span>
         </DetailRow>
-        <DetailRow label="Authority">
+        <DetailRow label={t('tx.authority')}>
           <span className="font-mono">{action?.authority ?? '—'}</span>
         </DetailRow>
-        <DetailRow label="Registry index">
-          <span className="font-mono">#{formatNumber(tx.asset_index)}</span>
+        <DetailRow label={t('tx.registryIndex')}>
+          <span className="font-mono">#{fmt.number(tx.asset_index)}</span>
         </DetailRow>
-        <DetailRow label="Initial mint">
+        <DetailRow label={t('tx.registerToken.initialMint')}>
           {action?.initial ? (
             <span className="text-base font-semibold text-strong">
-              {formatTokenAmount(action.initial.amount, tx.asset_index, tokens)} to{' '}
+              {t('tx.registerToken.amountTo', { amount: fmt.tokenAmount(action.initial.amount, tx.asset_index, tokens) })}{' '}
               <Hash value={action.initial.recipient} />
             </span>
           ) : (
-            <span className="text-mute">None</span>
+            <span className="text-mute">{t('tx.none')}</span>
           )}
         </DetailRow>
-        <p className="px-4 py-3 text-xs text-mute">
-          A token&apos;s registration and its initial mint are public by design, as a bridge
-          deposit is (spec §4) — only a later transfer of the token&apos;s notes is shielded.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.registerToken.help')}</p>
       </Panel>
     );
   }
 
   if (tx.kind === 'token_mint') {
-    const action = tx.token_action?.kind === 'token_mint' ? tx.token_action : null;
     return (
       <Panel title={title}>
-        <DetailRow label="Asset">
+        <DetailRow label={t('tx.asset')}>
           <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
-        <DetailRow label="Amount">
+        <DetailRow label={t('tx.amount')}>
           <span className="text-base font-semibold text-strong">
-            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+            {fmt.tokenAmount(tx.amount, tx.asset_index, tokens)}
           </span>
         </DetailRow>
-        <DetailRow label="Recipient">
+        <DetailRow label={t('tx.recipient')}>
           {tx.recipient ? <Hash value={tx.recipient} full /> : <span className="text-mute">—</span>}
         </DetailRow>
-        <DetailRow label="Mint nonce">
-          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        <DetailRow label={t('tx.mintNonce')}>
+          <span className="font-mono">{tx.action_nonce === null ? '—' : fmt.number(tx.action_nonce)}</span>
         </DetailRow>
-        <p className="px-4 py-3 text-xs text-mute">
-          Every word of the minted note is here (its sender is the chain&apos;s fixed mint tag),
-          so the recipient rebuilds it with nothing decrypted, whatever envelope{action ? '' : ''}{' '}
-          the minter published.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.tokenMint.help')}</p>
       </Panel>
     );
   }
@@ -667,17 +637,17 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
     const action = tx.token_action?.kind === 'set_authority' ? tx.token_action : null;
     return (
       <Panel title={title}>
-        <DetailRow label="Asset">
+        <DetailRow label={t('tx.asset')}>
           <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
-        <DetailRow label="Nonce">
-          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        <DetailRow label={t('tx.nonce')}>
+          <span className="font-mono">{tx.action_nonce === null ? '—' : fmt.number(tx.action_nonce)}</span>
         </DetailRow>
-        <DetailRow label="New authority">
+        <DetailRow label={t('tx.setAuthority.newAuthority')}>
           {action?.new_authority ? (
             <Hash value={action.new_authority} href={`/validators/${action.new_authority}`} full />
           ) : (
-            <span className="text-mute">None (renounced — this token can never be minted again)</span>
+            <span className="text-mute">{t('tx.setAuthority.renounced')}</span>
           )}
         </DetailRow>
       </Panel>
@@ -687,19 +657,15 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   if (tx.kind === 'token_burn') {
     return (
       <Panel title={title}>
-        <DetailRow label="Asset">
+        <DetailRow label={t('tx.asset')}>
           <AssetLink index={tx.asset_index} tokens={tokens} />
         </DetailRow>
-        <DetailRow label="Amount burned">
+        <DetailRow label={t('tx.amountBurned')}>
           <span className="text-base font-semibold text-strong">
-            {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+            {fmt.tokenAmount(tx.amount, tx.asset_index, tokens)}
           </span>
         </DetailRow>
-        <p className="px-4 py-3 text-xs text-mute">
-          A holder burn: public by design, since it is what makes the token&apos;s total supply
-          auditable. A transfer of the same token is a plain shielded transfer — its asset stays
-          private.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.tokenBurn.help')}</p>
       </Panel>
     );
   }
@@ -710,14 +676,14 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
     const signers = action && 'pq_signers' in action ? action.pq_signers : null;
     return (
       <Panel title={title}>
-        <DetailRow label="Nonce">
-          <span className="font-mono">{nonce === null ? '—' : formatNumber(nonce)}</span>
+        <DetailRow label={t('tx.nonce')}>
+          <span className="font-mono">{nonce === null ? '—' : fmt.number(nonce)}</span>
         </DetailRow>
         <PqSignersRow signers={signers ?? null} />
         <p className="px-4 py-3 text-xs text-mute">
           {tx.kind === 'pause_mints'
-            ? 'While paused, every transfer attest is refused; burns and guardian-set rotations stay open. Signed by the genesis pause key alone.'
-            : 'Lifting the pause needs the PQ guardian quorum — the pause key can never unpause by itself.'}
+            ? t('tx.pause.pauseHelp')
+            : t('tx.pause.unpauseHelp')}
         </p>
       </Panel>
     );
@@ -729,35 +695,33 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
       <Panel title={title}>
         {action?.kind === 'register_bridged_token' && (
           <>
-            <DetailRow label="Name">{action.name}</DetailRow>
-            <DetailRow label="Symbol">{action.symbol}</DetailRow>
-            <DetailRow label="Source chain">{formatBridgeChain(action.chain)}</DetailRow>
-            <DetailRow label="Source token">
+            <DetailRow label={t('tx.name')}>{action.name}</DetailRow>
+            <DetailRow label={t('tx.symbol')}>{action.symbol}</DetailRow>
+            <DetailRow label={t('tx.sourceChain')}>{chain(action.chain)}</DetailRow>
+            <DetailRow label={t('tx.sourceToken')}>
               <span className="font-mono break-all">{formatBridgeAddress(action.token)}</span>
             </DetailRow>
-            <DetailRow label="Source decimals">
-              <span className="font-mono">{formatNumber(action.decimals)}</span>
+            <DetailRow label={t('tx.sourceDecimals')}>
+              <span className="font-mono">{fmt.number(action.decimals)}</span>
             </DetailRow>
           </>
         )}
         {action?.kind === 'list_backing' && (
           <>
-            <DetailRow label="Token">
+            <DetailRow label={t('tx.token')}>
               <AssetLink index={action.token_index} tokens={tokens} />
             </DetailRow>
-            <DetailRow label="Source chain">{formatBridgeChain(action.chain)}</DetailRow>
-            <DetailRow label="Source token">
+            <DetailRow label={t('tx.sourceChain')}>{chain(action.chain)}</DetailRow>
+            <DetailRow label={t('tx.sourceToken')}>
               <span className="font-mono break-all">{formatBridgeAddress(action.token)}</span>
             </DetailRow>
-            <DetailRow label="Source decimals">
-              <span className="font-mono">{formatNumber(action.decimals)}</span>
+            <DetailRow label={t('tx.sourceDecimals')}>
+              <span className="font-mono">{fmt.number(action.decimals)}</span>
             </DetailRow>
           </>
         )}
         <PqSignersRow signers={tx.pq_signers} />
-        <p className="px-4 py-3 text-xs text-mute">
-          Authorised by the PQ guardian quorum, on a RAND fee bundle its submitter pays.
-        </p>
+        <p className="px-4 py-3 text-xs text-mute">{t('tx.governance.help')}</p>
       </Panel>
     );
   }
@@ -773,36 +737,36 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
     const delayed = tx.kind.endsWith('_v2');
     return (
       <Panel title={title}>
-        <DetailRow label="Rotation nonce">
-          <span className="font-mono">{tx.action_nonce === null ? '—' : formatNumber(tx.action_nonce)}</span>
+        <DetailRow label={t('tx.rotation.nonce')}>
+          <span className="font-mono">{tx.action_nonce === null ? '—' : fmt.number(tx.action_nonce)}</span>
         </DetailRow>
         {action && 'new_pq_guardians' in action && (
-          <DetailRow label="New PQ guardian set">
-            <span className="font-mono">{formatNumber(action.new_pq_guardians.length)} Dilithium2 keys</span>
+          <DetailRow label={t('tx.rotation.newSet')}>
+            <span className="font-mono">{tp('tx.rotation.keys', action.new_pq_guardians.length)}</span>
           </DetailRow>
         )}
         {action && 'new_pause_key' in action && (
-          <DetailRow label="New pause key">
+          <DetailRow label={t('tx.rotation.newPauseKey')}>
             <Hash value={action.new_pause_key} start={16} end={8} />
           </DetailRow>
         )}
         {action?.kind === 'rotate_pq_guardians_v2' && (
-          <DetailRow label="Proofs of possession">
-            <span className="font-mono">{formatNumber(action.possession_signatures)}</span>
+          <DetailRow label={t('tx.rotation.possession')}>
+            <span className="font-mono">{fmt.number(action.possession_signatures)}</span>
           </DetailRow>
         )}
         {action?.kind === 'cancel_rotation' && (
-          <DetailRow label="Cancelled">
-            <span>{action.rotation_kind === 'pause_key' ? 'the pending pause-key rotation' : 'the pending PQ guardian rotation'}</span>
+          <DetailRow label={t('tx.rotation.cancelled')}>
+            <span>{action.rotation_kind === 'pause_key' ? t('tx.rotation.pendingPauseKey') : t('tx.rotation.pendingGuardians')}</span>
           </DetailRow>
         )}
         {tx.kind !== 'cancel_rotation' && <PqSignersRow signers={tx.pq_signers} />}
         <p className="px-4 py-3 text-xs text-mute">
           {tx.kind === 'cancel_rotation'
-            ? 'A rotation signed but not yet in effect, withdrawn before its delay ran out (audit v6, BRG-14).'
+            ? t('tx.rotation.cancelHelp')
             : delayed
-              ? 'Signed by the current PQ guardian quorum, with every new holder’s proof of possession; it takes effect after the genesis rotation delay (see the bridge page) unless cancelled.'
-              : 'Signed by the PQ guardian quorum of the set before the rotation (bridge rules v2).'}
+              ? t('tx.rotation.delayedHelp')
+              : t('tx.rotation.help')}
         </p>
       </Panel>
     );
@@ -814,11 +778,11 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
       <Panel title={title}>
         {action?.kind === 'admit_validator' && (
           <>
-            <ValidatorRow label="Candidate" address={action.candidate} />
-            <DetailRow label="Voters">
-              <span className="font-mono">{formatNumber(action.voters.length)} validators</span>
+            <ValidatorRow label={t('tx.admit.candidate')} address={action.candidate} />
+            <DetailRow label={t('tx.admit.voters')}>
+              <span className="font-mono">{tp('tx.admit.validators', action.voters.length)}</span>
             </DetailRow>
-            <DetailRow label="Voted by">
+            <DetailRow label={t('tx.admit.votedBy')}>
               <span className="flex flex-col gap-1">
                 {action.voters.map((v) => (
                   <Hash key={v} value={v} href={`/validators/${v}`} start={10} end={6} />
@@ -829,26 +793,26 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
         )}
         {action?.kind === 'slash_equivocation' && (
           <>
-            <ValidatorRow label="Offender" address={action.offender} />
-            <DetailRow label="View">
-              <span className="font-mono">{formatNumber(action.view)}</span>
+            <ValidatorRow label={t('tx.slash.offender')} address={action.offender} />
+            <DetailRow label={t('tx.slash.view')}>
+              <span className="font-mono">{fmt.number(action.view)}</span>
             </DetailRow>
-            <DetailRow label="First header">
+            <DetailRow label={t('tx.slash.firstHeader')}>
               <span className="font-mono">
-                #{formatNumber(action.first.height)} <Hash value={action.first.hash} start={10} end={6} />
+                #{fmt.number(action.first.height)} <Hash value={action.first.hash} start={10} end={6} />
               </span>
             </DetailRow>
-            <DetailRow label="Second header">
+            <DetailRow label={t('tx.slash.secondHeader')}>
               <span className="font-mono">
-                #{formatNumber(action.second.height)} <Hash value={action.second.hash} start={10} end={6} />
+                #{fmt.number(action.second.height)} <Hash value={action.second.hash} start={10} end={6} />
               </span>
             </DetailRow>
           </>
         )}
         <p className="px-4 py-3 text-xs text-mute">
           {tx.kind === 'admit_validator'
-            ? 'The validator set’s vote letting this key register with a bond, on a chain that admits validators by vote (audit v6, STAKE-2). Bundle-less and fee-less.'
-            : 'Two headers one validator key signed for the same view: the evidence of a leader equivocation, slashed by the genesis slashing rule (audit v6, STAKE-1).'}
+            ? t('tx.admit.help')
+            : t('tx.slash.help')}
         </p>
       </Panel>
     );
@@ -857,10 +821,7 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
   // other
   return (
     <Panel title={title}>
-      <p className="px-4 py-3 text-sm text-mute">
-        This transaction kind is newer than this explorer build. It was indexed with its hash,
-        bundle, fee and block; decoded fields will appear after the explorer is updated.
-      </p>
+      <p className="px-4 py-3 text-sm text-mute">{t('tx.unknownKind.help')}</p>
     </Panel>
   );
 }
@@ -870,61 +831,57 @@ function KindPanel({ tx, tokens }: { tx: TransactionDetail; tokens: TokenInfo[] 
 // ---------------------------------------------------------------------------
 
 function ReceiptPanel({ receipt }: { receipt: Receipt | null }) {
+  const { t } = useT();
+  const fmt = useFmt();
   if (!receipt) {
     return (
-      <Panel title="Receipt">
-        <div className="py-6 text-sm text-mute">
-          No receipt has been indexed for this call or invoke.
-        </div>
+      <Panel title={t('tx.receipt.title')}>
+        <div className="py-6 text-sm text-mute">{t('tx.receipt.none')}</div>
       </Panel>
     );
   }
 
   return (
-    <Panel title="Receipt">
-      <DetailRow label="Program">
+    <Panel title={t('tx.receipt.title')}>
+      <DetailRow label={t('tx.program')}>
         <Hash value={receipt.program} href={`/programs/${receipt.program}`} full />
       </DetailRow>
-      <DetailRow label="Tier">
-        <span className="font-mono">{formatNumber(receipt.tier)}</span>
+      <DetailRow label={t('tx.receipt.tier')}>
+        <span className="font-mono">{fmt.number(receipt.tier)}</span>
       </DetailRow>
-      <DetailRow label="Position">
+      <DetailRow label={t('tx.receipt.position')}>
         <span className="inline-flex flex-wrap items-center gap-2">
-          <Link href={`/blocks/${receipt.height}`} className="link font-mono">
-            #{formatNumber(receipt.height)}
-          </Link>
-          <span className="text-mute">· index {formatNumber(receipt.index)}</span>
+          <L href={`/blocks/${receipt.height}`} className="link font-mono">
+            #{fmt.number(receipt.height)}
+          </L>
+          <span className="text-mute">· {t('tx.receipt.index', { index: fmt.number(receipt.index) })}</span>
         </span>
       </DetailRow>
-      <DetailRow label="Input commitment (H_IN)">
+      <DetailRow label={t('tx.receipt.hIn')}>
         {receipt.h_in ? <Hash value={receipt.h_in} full /> : <span className="text-mute">—</span>}
       </DetailRow>
-      <DetailRow label="Public input (H_PUB)">
+      <DetailRow label={t('tx.receipt.hPub')}>
         {receipt.h_pub ? (
           <Hash value={receipt.h_pub} full />
         ) : (
-          <span className="text-mute">Empty — the program was deployed without a public input</span>
+          <span className="text-mute">{t('tx.receipt.hPubEmpty')}</span>
         )}
       </DetailRow>
-      <DetailRow label="Outputs">
+      <DetailRow label={t('tx.receipt.outputs')}>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           {receipt.outputs.map((output, index) => (
             <div key={index} className="rounded border border-border bg-bg-soft px-3 py-2">
               <div className="text-xs font-semibold text-soft">
-                out {index}
+                {t('tx.receipt.out', { index })}
               </div>
               <div className="truncate font-mono text-sm text-text" title={String(output)}>
-                {formatNumber(output)}
+                {fmt.number(output)}
               </div>
             </div>
           ))}
         </div>
       </DetailRow>
-      <p className="px-4 py-3 text-xs text-mute">
-        The eight public output words are recorded and nothing else moves: value moves only
-        through the bundle that paid for the call. H_IN is a salted digest of the private inputs
-        and discloses nothing on its own.
-      </p>
+      <p className="px-4 py-3 text-xs text-mute">{t('tx.receipt.help')}</p>
     </Panel>
   );
 }

@@ -1,56 +1,57 @@
 'use client';
 
-import Link from 'next/link';
 import { Column, DataTable } from './DataTable';
 import { Hash } from './Hash';
 import { KindBadge } from './KindBadge';
 import { useTokens } from '@/hooks/useApi';
-import { formatAmount, formatTokenAmount, formatNumber, formatTimestamp } from '@/lib/utils';
+import { L, useFmt, useT, type Fmt } from '@/i18n/client';
 import type { BlockSummary, TokenInfo, TransactionSummary } from '@/types';
 
 // ---------------------------------------------------------------------------
 // Blocks
 // ---------------------------------------------------------------------------
 
-export function blockColumns(): Column<BlockSummary>[] {
+type TFn = ReturnType<typeof useT>['t'];
+
+export function blockColumns(t: TFn, fmt: Fmt): Column<BlockSummary>[] {
   return [
     {
       key: 'height',
-      header: 'Height',
+      header: t('components.tables.blocks.height'),
       render: (block) => (
-        <Link href={`/blocks/${block.height}`} className="link font-mono">
-          {formatNumber(block.height)}
-        </Link>
+        <L href={`/blocks/${block.height}`} className="link font-mono">
+          {fmt.number(block.height)}
+        </L>
       ),
     },
     {
       key: 'hash',
-      header: 'Hash',
+      header: t('components.tables.blocks.hash'),
       render: (block) => <Hash value={block.hash} href={`/blocks/${block.hash}`} />,
     },
     {
       key: 'proposer',
-      header: 'Proposer',
+      header: t('components.tables.blocks.proposer'),
       render: (block) => (
         <Hash value={block.proposer} href={`/validators/${block.proposer}`} start={6} end={6} />
       ),
     },
     {
       key: 'tx_count',
-      header: 'Txs',
-      render: (block) => <span className="font-mono text-soft">{formatNumber(block.tx_count)}</span>,
+      header: t('components.tables.blocks.txs'),
+      render: (block) => <span className="font-mono text-soft">{fmt.number(block.tx_count)}</span>,
     },
     {
       key: 'view',
-      header: 'View',
-      render: (block) => <span className="font-mono text-soft">{formatNumber(block.view)}</span>,
+      header: t('components.tables.blocks.view'),
+      render: (block) => <span className="font-mono text-soft">{fmt.number(block.view)}</span>,
     },
     {
       key: 'timestamp_ms',
-      header: 'Age',
+      header: t('components.tables.blocks.age'),
       render: (block) => (
         <span className="text-mute" title={String(block.timestamp_ms)}>
-          {formatTimestamp(block.timestamp_ms)}
+          {fmt.ago(block.timestamp_ms)}
         </span>
       ),
     },
@@ -64,13 +65,15 @@ interface BlocksTableProps {
 }
 
 export function BlocksTable({ blocks, isLoading, emptyMessage }: BlocksTableProps) {
+  const { t } = useT();
+  const fmt = useFmt();
   return (
     <DataTable
-      columns={blockColumns()}
+      columns={blockColumns(t, fmt)}
       data={blocks}
       keyExtractor={(block) => block.hash}
       isLoading={isLoading}
-      emptyMessage={emptyMessage ?? 'No blocks indexed yet'}
+      emptyMessage={emptyMessage ?? t('components.tables.blocks.empty')}
     />
   );
 }
@@ -85,7 +88,7 @@ export function BlocksTable({ blocks, isLoading, emptyMessage }: BlocksTableProp
  * nothing, by design — its asset is private, and `tokens` (the cached registry) resolves an RPL
  * amount's index to its symbol ("12.50 zUSD") rather than a bare unit count.
  */
-function actionCell(tx: TransactionSummary, tokens?: TokenInfo[]) {
+function actionCell(tx: TransactionSummary, t: TFn, fmt: Fmt, tokens?: TokenInfo[]) {
   const parts: React.ReactNode[] = [];
   if (tx.program) {
     parts.push(
@@ -106,64 +109,68 @@ function actionCell(tx: TransactionSummary, tokens?: TokenInfo[]) {
   if (tx.amount !== null) {
     parts.push(
       <span key="amount" className="font-mono text-text">
-        {formatTokenAmount(tx.amount, tx.asset_index, tokens)}
+        {fmt.tokenAmount(tx.amount, tx.asset_index, tokens)}
       </span>
     );
   }
   if (parts.length === 0) {
     return (
-      <span className="text-mute" title="Sender, receiver and amount are hidden inside the bundle">
-        {tx.kind === 'transfer' ? 'shielded' : '—'}
+      <span className="text-mute" title={t('components.tables.txs.hiddenTitle')}>
+        {tx.kind === 'transfer' ? t('components.tables.txs.shielded') : '—'}
       </span>
     );
   }
   return <span className="inline-flex flex-wrap items-center gap-2">{parts}</span>;
 }
 
-export function transactionColumns(tokens?: TokenInfo[]): Column<TransactionSummary>[] {
+export function transactionColumns(
+  t: TFn,
+  fmt: Fmt,
+  tokens?: TokenInfo[]
+): Column<TransactionSummary>[] {
   return [
     {
       key: 'hash',
-      header: 'Tx hash',
+      header: t('components.tables.txs.hash'),
       render: (tx) => <Hash value={tx.hash} href={`/transactions/${tx.hash}`} />,
     },
     {
       key: 'kind',
-      header: 'Kind',
+      header: t('components.tables.txs.kind'),
       render: (tx) => <KindBadge kind={tx.kind} short />,
     },
     {
       key: 'height',
-      header: 'Height',
+      header: t('components.tables.txs.height'),
       render: (tx) => (
-        <Link href={`/blocks/${tx.height}`} className="link font-mono">
-          {formatNumber(tx.height)}
-        </Link>
+        <L href={`/blocks/${tx.height}`} className="link font-mono">
+          {fmt.number(tx.height)}
+        </L>
       ),
     },
     {
       key: 'action',
-      header: 'Action',
-      render: (tx) => actionCell(tx, tokens),
+      header: t('components.tables.txs.action'),
+      render: (tx) => actionCell(tx, t, fmt, tokens),
     },
     {
       key: 'fee',
-      header: 'Fee',
+      header: t('components.tables.txs.fee'),
       render: (tx) =>
         tx.has_bundle ? (
-          <span className="font-mono text-mute">{formatAmount(tx.fee)}</span>
+          <span className="font-mono text-mute">{fmt.amount(tx.fee)}</span>
         ) : (
-          <span className="text-mute" title="Validator-signed action: no bundle, no fee">
+          <span className="text-mute" title={t('components.tables.txs.noFeeTitle')}>
             —
           </span>
         ),
     },
     {
       key: 'timestamp_ms',
-      header: 'Age',
+      header: t('components.tables.txs.age'),
       render: (tx) => (
         <span className="text-mute" title={String(tx.timestamp_ms)}>
-          {formatTimestamp(tx.timestamp_ms)}
+          {fmt.ago(tx.timestamp_ms)}
         </span>
       ),
     },
@@ -185,7 +192,9 @@ export function TransactionsTable({
   hideColumns = [],
 }: TransactionsTableProps) {
   const { data: tokenList } = useTokens();
-  const columns = transactionColumns(tokenList?.tokens).filter((column) => !hideColumns.includes(column.key));
+  const { t } = useT();
+  const fmt = useFmt();
+  const columns = transactionColumns(t, fmt, tokenList?.tokens).filter((column) => !hideColumns.includes(column.key));
 
   return (
     <DataTable
@@ -193,7 +202,7 @@ export function TransactionsTable({
       data={transactions}
       keyExtractor={(tx) => tx.hash}
       isLoading={isLoading}
-      emptyMessage={emptyMessage ?? 'No transactions found'}
+      emptyMessage={emptyMessage ?? t('components.tables.txs.empty')}
     />
   );
 }

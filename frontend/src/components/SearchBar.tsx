@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useLocalizePath, useT } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 interface SearchBarProps {
@@ -14,18 +15,20 @@ interface SearchBarProps {
 /** Navigates to `/search?q=…`; the API decides what the query refers to. */
 export function SearchBar({
   className,
-  placeholder = 'Search by height, hash, address or program',
+  placeholder,
   defaultValue = '',
   autoFocus = false,
 }: SearchBarProps) {
   const router = useRouter();
+  const { t } = useT();
+  const l = useLocalizePath();
   const [query, setQuery] = useState(defaultValue);
 
   const handleSubmit = (event: React.FormEvent) => {
     event.preventDefault();
     const trimmed = query.trim();
     if (!trimmed) return;
-    router.push(`/search?q=${encodeURIComponent(trimmed)}`);
+    router.push(l(`/search?q=${encodeURIComponent(trimmed)}`));
   };
 
   return (
@@ -43,11 +46,11 @@ export function SearchBar({
         type="text"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder={placeholder}
+        placeholder={placeholder ?? t('components.search.placeholder')}
         // eslint-disable-next-line jsx-a11y/no-autofocus
         autoFocus={autoFocus}
         spellCheck={false}
-        aria-label="Search the explorer"
+        aria-label={t('components.search.ariaLabel')}
         className="input rounded-sm py-1.5 ps-8 pe-3"
       />
     </form>

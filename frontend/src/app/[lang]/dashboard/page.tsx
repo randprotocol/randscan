@@ -8,12 +8,9 @@ import { DetailRow, ErrorState, PageHeader, Panel } from '@/components/States';
 import { ChangePasswordForm } from '@/components/PasswordForms';
 import { useApiKeys, useMe } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { copyToClipboard, formatDateTime, formatNumber } from '@/lib/utils';
+import { copyToClipboard } from '@/lib/utils';
+import { useFmt, useLocalizePath, useT } from '@/i18n/client';
 import type { ApiKey, CreatedApiKey } from '@/types';
-
-function when(iso: string | null): string {
-  return iso ? formatDateTime(Date.parse(iso)) : '—';
-}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -27,10 +24,14 @@ export default function DashboardPage() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const signingOut = useRef(false);
+  const { t, tp, rich } = useT();
+  const fmt = useFmt();
+  const localize = useLocalizePath();
+  const when = (iso: string | null): string => (iso ? fmt.dateTime(Date.parse(iso)) : '—');
 
   useEffect(() => {
-    if (!meLoading && me === null && !signingOut.current) router.replace('/login');
-  }, [me, meLoading, router]);
+    if (!meLoading && me === null && !signingOut.current) router.replace(localize('/login'));
+  }, [me, meLoading, router, localize]);
 
   if (meError) return <ErrorState onRetry={() => void mutate('me')} />;
   if (!me) return <DetailSkeleton />;
@@ -46,7 +47,7 @@ export default function DashboardPage() {
       setName('');
       await refreshKeys();
     } catch (err) {
-      setError(err instanceof api.ApiError ? err.message : 'Request failed');
+      setError(err instanceof api.ApiError ? err.message : t('dashboard.requestFailed'));
     } finally {
       setBusy(false);
     }
@@ -59,7 +60,7 @@ export default function DashboardPage() {
       if (created?.id === key.id) setCreated(null);
       await refreshKeys();
     } catch (err) {
-      setError(err instanceof api.ApiError ? err.message : 'Request failed');
+      setError(err instanceof api.ApiError ? err.message : t('dashboard.requestFailed'));
     }
   };
 
@@ -68,10 +69,10 @@ export default function DashboardPage() {
     try {
       await api.logout();
       await mutate('me', null, { revalidate: false });
-      router.push('/');
+      router.push(localize('/'));
     } catch (err) {
       signingOut.current = false;
-      setError(err instanceof api.ApiError ? err.message : 'Request failed');
+      setError(err instanceof api.ApiError ? err.message : t('dashboard.requestFailed'));
     }
   };
 
@@ -81,22 +82,21 @@ export default function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader
-        label="Account"
-        title="API keys"
+        label={t('dashboard.account')}
+        title={t('dashboard.title')}
         subtitle={me.email}
         actions={
           <button type="button" onClick={onLogout} className="btn-secondary">
-            Sign out
+            {t('dashboard.signOut')}
           </button>
         }
       />
 
       {created && (
-        <Panel title="New key">
+        <Panel title={t('dashboard.newKey.title')}>
           <div className="py-3">
             <p className="text-sm text-soft">
-              Copy your key now. For security it is shown only once; if you lose it, revoke it and
-              create another.
+              {t('dashboard.newKey.copyNow')}
             </p>
             <div className="mt-3 flex flex-wrap items-center gap-3">
               <code className="break-all rounded border border-border bg-surface-2 px-3 py-2 font-mono text-sm text-strong">
@@ -107,7 +107,7 @@ export default function DashboardPage() {
                 className="btn-secondary"
                 onClick={async () => setCopied(await copyToClipboard(created.key))}
               >
-                {copied ? 'Copied' : 'Copy'}
+                {copied ? t('common.copied') : t('common.copy')}
               </button>
             </div>
             <pre className="mt-4 overflow-x-auto rounded border border-border bg-surface-2 p-3 font-mono text-xs text-soft">
@@ -117,16 +117,16 @@ export default function DashboardPage() {
         </Panel>
       )}
 
-      <Panel title="Create a key">
+      <Panel title={t('dashboard.create.title')}>
         <form onSubmit={onCreate} className="flex flex-wrap items-end gap-3 py-3">
           <div className="min-w-[16rem] flex-1">
             <label htmlFor="key-name" className="field-label">
-              Name
+              {t('dashboard.create.name')}
             </label>
             <input
               id="key-name"
               className="input"
-              placeholder="e.g. exchange deposit watcher"
+              placeholder={t('dashboard.create.placeholder')}
               maxLength={64}
               required
               value={name}
@@ -134,7 +134,7 @@ export default function DashboardPage() {
             />
           </div>
           <button type="submit" disabled={busy || active.length >= 10} className="btn-primary disabled:opacity-60">
-            New key
+            {t('dashboard.create.submit')}
           </button>
         </form>
         {error && (
@@ -143,24 +143,14 @@ export default function DashboardPage() {
           </div>
         )}
         <p className="pb-3 text-xs text-mute">
-          Up to 10 active keys. Keyed requests get 600 requests per minute; anonymous traffic gets
-          60 per IP. See the{' '}
-          <a
-            href="https://github.com/randprotocol/randscan/blob/main/docs/api.md"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="link"
-          >
-            API guide
-          </a>
-          .
+          {rich('dashboard.create.limits')}
         </p>
       </Panel>
 
-      <Panel title={`Active keys (${active.length})`}>
-        {keysError && <ErrorState message="Could not load your keys." onRetry={() => void refreshKeys()} />}
+      <Panel title={t('dashboard.activeKeys', { count: fmt.number(active.length) })}>
+        {keysError && <ErrorState message={t('dashboard.keysError')} onRetry={() => void refreshKeys()} />}
         {!keysError && active.length === 0 && (
-          <p className="py-4 text-sm text-mute">No active keys yet.</p>
+          <p className="py-4 text-sm text-mute">{t('dashboard.noActiveKeys')}</p>
         )}
         {active.map((k) => (
           <DetailRow key={k.id} label={k.name}>
@@ -168,12 +158,14 @@ export default function DashboardPage() {
               <div className="text-sm">
                 <span className="font-mono text-strong">rsk_{k.prefix}…</span>
                 <span className="ms-3 text-mute">
-                  created {when(k.created_at)} · last used {when(k.last_used_at)} ·{' '}
-                  {formatNumber(k.request_count)} requests
+                  {tp('dashboard.activeKeyMeta', k.request_count, {
+                    created: when(k.created_at),
+                    lastUsed: when(k.last_used_at),
+                  })}
                 </span>
               </div>
               <button type="button" onClick={() => onRevoke(k)} className="btn-secondary text-negative">
-                Revoke
+                {t('dashboard.revoke')}
               </button>
             </div>
           </DetailRow>
@@ -181,26 +173,26 @@ export default function DashboardPage() {
       </Panel>
 
       {revoked.length > 0 && (
-        <Panel title={`Revoked keys (${revoked.length})`}>
+        <Panel title={t('dashboard.revokedKeys', { count: fmt.number(revoked.length) })}>
           {revoked.map((k) => (
             <DetailRow key={k.id} label={k.name}>
               <span className="font-mono text-mute">rsk_{k.prefix}…</span>
               <span className="ms-3 text-sm text-mute">
-                revoked {when(k.revoked_at)} · {formatNumber(k.request_count)} requests
+                {tp('dashboard.revokedKeyMeta', k.request_count, { revoked: when(k.revoked_at) })}
               </span>
             </DetailRow>
           ))}
         </Panel>
       )}
 
-      <Panel title="Change password">
+      <Panel title={t('dashboard.changePassword')}>
         <ChangePasswordForm />
       </Panel>
 
-      <Panel title="Account">
-        <DetailRow label="Email">{me.email}</DetailRow>
-        <DetailRow label="Member since">{when(me.created_at)}</DetailRow>
-        <DetailRow label="Last sign-in">{when(me.last_login_at)}</DetailRow>
+      <Panel title={t('dashboard.account')}>
+        <DetailRow label={t('dashboard.email')}>{me.email}</DetailRow>
+        <DetailRow label={t('dashboard.memberSince')}>{when(me.created_at)}</DetailRow>
+        <DetailRow label={t('dashboard.lastSignIn')}>{when(me.last_login_at)}</DetailRow>
       </Panel>
     </div>
   );

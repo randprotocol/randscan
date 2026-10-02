@@ -1,11 +1,10 @@
 'use client';
 
-import Link from 'next/link';
 import { Column, DataTable } from '@/components/DataTable';
 import { Hash } from '@/components/Hash';
 import { ErrorState, PageHeader } from '@/components/States';
 import { useAdmittedValidators, useValidators } from '@/hooks/useApi';
-import { formatNumber, formatPercentage, formatStake, formatTimestamp } from '@/lib/utils';
+import { L, useFmt, useT, type Fmt } from '@/i18n/client';
 import type { Validator } from '@/types';
 
 function pendingTotal(v: Validator): bigint {
@@ -18,50 +17,50 @@ function pendingTotal(v: Validator): bigint {
   }, BigInt(0));
 }
 
-const columns: Column<Validator>[] = [
+const validatorColumns = (t: (key: string) => string, fmt: Fmt): Column<Validator>[] => [
   {
     key: 'address',
-    header: 'Validator',
+    header: t('validators.columns.validator'),
     render: (validator) => (
       <Hash value={validator.address} href={`/validators/${validator.address}`} start={10} end={6} />
     ),
   },
   {
     key: 'active',
-    header: 'Epoch set',
+    header: t('validators.columns.epochSet'),
     render: (validator) =>
       validator.active ? (
-        <span className="badge badge-accent">Active</span>
+        <span className="badge badge-accent">{t('validators.active')}</span>
       ) : (
-        <span className="badge badge-neutral">Inactive</span>
+        <span className="badge badge-neutral">{t('validators.inactive')}</span>
       ),
   },
   {
     key: 'stake',
-    header: 'Stake',
-    render: (validator) => <span className="text-text">{formatStake(validator.stake)}</span>,
+    header: t('validators.columns.stake'),
+    render: (validator) => <span className="text-text">{fmt.stake(validator.stake)}</span>,
   },
   {
     key: 'rewards',
-    header: 'Rewards',
-    render: (validator) => <span className="text-soft">{formatStake(validator.rewards)}</span>,
+    header: t('validators.columns.rewards'),
+    render: (validator) => <span className="text-soft">{fmt.stake(validator.rewards)}</span>,
   },
   {
     key: 'pending',
-    header: 'Unbonding',
+    header: t('validators.columns.unbonding'),
     render: (validator) =>
       validator.pending.length === 0 ? (
         <span className="text-mute">—</span>
       ) : (
         <span className="text-soft">
-          {formatStake(pendingTotal(validator))}
+          {fmt.stake(pendingTotal(validator))}
           <span className="ms-1 text-mute">({validator.pending.length})</span>
         </span>
       ),
   },
   {
     key: 'share_percent',
-    header: 'Share',
+    header: t('validators.columns.share'),
     render: (validator) => (
       <div className="flex items-center gap-2">
         <div className="h-1.5 w-20 overflow-hidden rounded-full bg-surface-2">
@@ -70,31 +69,31 @@ const columns: Column<Validator>[] = [
             style={{ width: `${Math.min(100, Math.max(0, validator.share_percent))}%` }}
           />
         </div>
-        <span className="text-soft">{formatPercentage(validator.share_percent)}</span>
+        <span className="text-soft">{fmt.percentage(validator.share_percent)}</span>
       </div>
     ),
   },
   {
     key: 'blocks_proposed',
-    header: 'Blocks proposed',
+    header: t('validators.columns.blocksProposed'),
     render: (validator) => (
-      <span className="text-soft">{formatNumber(validator.blocks_proposed)}</span>
+      <span className="text-soft">{fmt.number(validator.blocks_proposed)}</span>
     ),
   },
   {
     key: 'last_proposed',
-    header: 'Last proposed',
+    header: t('validators.columns.lastProposed'),
     render: (validator) =>
       validator.last_proposed_height === null ? (
-        <span className="text-mute">Never</span>
+        <span className="text-mute">{t('validators.never')}</span>
       ) : (
         <span className="text-soft">
-          <Link href={`/blocks/${validator.last_proposed_height}`} className="link font-mono">
-            #{formatNumber(validator.last_proposed_height)}
-          </Link>
+          <L href={`/blocks/${validator.last_proposed_height}`} className="link font-mono">
+            #{fmt.number(validator.last_proposed_height)}
+          </L>
           {validator.last_proposed_timestamp_ms !== null && (
             <span className="ms-2 text-mute">
-              {formatTimestamp(validator.last_proposed_timestamp_ms)}
+              {fmt.ago(validator.last_proposed_timestamp_ms)}
             </span>
           )}
         </span>
@@ -105,12 +104,15 @@ const columns: Column<Validator>[] = [
 export default function ValidatorsPage() {
   const { data, error, isLoading, mutate } = useValidators();
   const { data: admitted } = useAdmittedValidators();
+  const { t, tp, rich } = useT();
+  const fmt = useFmt();
+  const columns = validatorColumns(t, fmt);
 
   if (error && !data) {
     return (
       <>
-        <PageHeader title="Validators" />
-        <ErrorState message="Could not load the validator register." onRetry={() => void mutate()} />
+        <PageHeader title={t('validators.title')} />
+        <ErrorState message={t('validators.error')} onRetry={() => void mutate()} />
       </>
     );
   }
@@ -127,11 +129,15 @@ export default function ValidatorsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Validators"
+        title={t('validators.title')}
         subtitle={
           data
-            ? `${formatNumber(active.length)} active of ${formatNumber(data.length)} registered · ${formatStake(activeStake, 'active stake')}`
-            : 'Loading validators…'
+            ? t('validators.subtitle', {
+                active: fmt.number(active.length),
+                total: fmt.number(data.length),
+                stake: fmt.stake(activeStake, t('validators.activeStake')),
+              })
+            : t('validators.loading')
         }
       />
 
@@ -140,17 +146,16 @@ export default function ValidatorsPage() {
         data={data ?? []}
         keyExtractor={(validator) => validator.address}
         isLoading={isLoading && !data}
-        emptyMessage="No validators reported"
+        emptyMessage={t('validators.empty')}
       />
 
       {admitted?.admission_by_vote && (
         <div className="text-xs text-mute">
           <p>
-            New validators are admitted by the set&apos;s vote (audit v6): a bond that registers a new key
-            needs an <code>admit_validator</code> first.{' '}
+            {rich('validators.admission')}{' '}
             {admitted.admitted.length === 0
-              ? 'No key is admitted and waiting to register.'
-              : `${formatNumber(admitted.admitted.length)} admitted, not yet registered:`}
+              ? t('validators.noneAdmitted')
+              : tp('validators.admittedWaiting', admitted.admitted.length)}
           </p>
           {admitted.admitted.length > 0 && (
             <ul className="mt-1 space-y-0.5">
@@ -165,9 +170,7 @@ export default function ValidatorsPage() {
       )}
 
       <p className="text-xs text-mute">
-        The register is the one place this chain stores amounts in the clear. Active validators are
-        the set running the current epoch; the leader of view v is the active entry v mod n in
-        address order.
+        {t('validators.help')}
       </p>
     </div>
   );

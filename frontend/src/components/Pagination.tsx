@@ -1,5 +1,6 @@
 'use client';
 
+import { useT } from '@/i18n/client';
 import { cn } from '@/lib/utils';
 
 interface PaginationProps {
@@ -10,6 +11,7 @@ interface PaginationProps {
 }
 
 export function Pagination({ currentPage, totalPages, onPageChange, className }: PaginationProps) {
+  const { t } = useT();
   if (totalPages <= 1) return null;
 
   const pages: (number | 'ellipsis')[] = [];
@@ -48,6 +50,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         type="button"
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
+        aria-label={t('common.previousPage')}
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded border border-border text-sm transition-colors',
           currentPage === 1
@@ -88,6 +91,7 @@ export function Pagination({ currentPage, totalPages, onPageChange, className }:
         type="button"
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
+        aria-label={t('common.nextPage')}
         className={cn(
           'flex h-8 w-8 items-center justify-center rounded border border-border text-sm transition-colors',
           currentPage === totalPages

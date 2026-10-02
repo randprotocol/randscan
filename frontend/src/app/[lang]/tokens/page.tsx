@@ -1,87 +1,92 @@
 'use client';
 
-import Link from 'next/link';
 import { Column, DataTable } from '@/components/DataTable';
 import { Hash } from '@/components/Hash';
 import { ErrorState, PageHeader } from '@/components/States';
 import { useTokens } from '@/hooks/useApi';
-import { formatNumber, formatUnits } from '@/lib/utils';
+import { L, useFmt, useT, type Fmt } from '@/i18n/client';
 import type { TokenInfo } from '@/types';
 
-function authorityLabel(info: TokenInfo): string {
+type T = ReturnType<typeof useT>;
+
+function authorityLabel(info: TokenInfo, { t, tp }: T): string {
   switch (info.authority.kind) {
     case 'none':
-      return 'None (fixed supply)';
+      return t('tokens.authority.none');
     case 'key':
-      return 'Key-signed';
+      return t('tokens.authority.key');
     case 'bridge':
-      return `Bridge (${info.authority.backings.length} backing${info.authority.backings.length === 1 ? '' : 's'})`;
+      return tp('tokens.authority.bridge', info.authority.backings.length);
     case 'program':
-      return 'Program';
+      return t('tokens.authority.program');
   }
 }
 
-const columns: Column<TokenInfo>[] = [
+const tokenColumns = (tr: T, fmt: Fmt): Column<TokenInfo>[] => [
   {
     key: 'symbol',
-    header: 'Token',
+    header: tr.t('tokens.columns.token'),
     render: (t) => (
       <span className="flex flex-col">
-        <Link href={`/tokens/${t.id_text}`} className="link font-medium">
+        <L href={`/tokens/${t.id_text}`} className="link font-medium">
           {t.symbol}
-        </Link>
+        </L>
         <span className="text-xs text-mute">{t.name}</span>
       </span>
     ),
   },
   {
     key: 'index',
-    header: 'Index',
-    render: (t) => <span className="font-mono">#{formatNumber(t.index)}</span>,
+    header: tr.t('tokens.columns.index'),
+    render: (t) => <span className="font-mono">#{fmt.number(t.index)}</span>,
   },
   {
     key: 'decimals',
-    header: 'Decimals',
-    render: (t) => <span className="font-mono">{formatNumber(t.decimals)}</span>,
+    header: tr.t('tokens.columns.decimals'),
+    render: (t) => <span className="font-mono">{fmt.number(t.decimals)}</span>,
   },
   {
     key: 'authority',
-    header: 'Authority',
-    render: (t) => <span>{authorityLabel(t)}</span>,
+    header: tr.t('tokens.columns.authority'),
+    render: (t) => <span>{authorityLabel(t, tr)}</span>,
   },
   {
     key: 'total_supply',
-    header: 'Total supply',
+    header: tr.t('tokens.columns.totalSupply'),
     render: (t) => (
       <span className="font-mono text-strong">
-        {formatUnits(t.total_supply, t.decimals)} {t.symbol}
+        {fmt.units(t.total_supply, t.decimals)} {t.symbol}
       </span>
     ),
   },
   {
     key: 'registered_at',
-    header: 'Registered at',
+    header: tr.t('tokens.columns.registeredAt'),
     render: (t) => (
-      <Link href={`/blocks/${t.registered_at}`} className="link font-mono">
-        #{formatNumber(t.registered_at)}
-      </Link>
+      <L href={`/blocks/${t.registered_at}`} className="link font-mono">
+        #{fmt.number(t.registered_at)}
+      </L>
     ),
   },
   {
     key: 'id_text',
-    header: 'Token id',
+    header: tr.t('tokens.columns.tokenId'),
     render: (t) => <Hash value={t.id_text} start={10} end={6} />,
   },
 ];
 
 export default function TokensPage() {
   const { data, error, isLoading, mutate } = useTokens();
+  const tr = useT();
+  const { t, tp } = tr;
+  const fmt = useFmt();
+  const columns = tokenColumns(tr, fmt);
 
   if (error && !data) {
     return (
       <>
-        <PageHeader title="Tokens" />
-        <ErrorState message="Could not load the token registry." onRetry={() => void mutate()} />
+        <PageHeader title={t('tokens.title')} />
+        <ErrorState message={t('tokens.error')} onRetry={() => void mutate()} />
       </>
     );
   }
@@ -89,10 +94,9 @@ export default function TokensPage() {
   if (data && !data.enabled) {
     return (
       <div className="space-y-6">
-        <PageHeader title="Tokens" subtitle="The RPL token standard" />
+        <PageHeader title={t('tokens.title')} subtitle={t('tokens.standard')} />
         <p className="rounded border border-border-soft bg-bg-soft px-4 py-6 text-sm text-mute">
-          This chain has no token registry: no RPL token has been registered, and this build&apos;s
-          node predates the token RPC. Every transfer is RAND.
+          {t('tokens.disabled')}
         </p>
       </div>
     );
@@ -101,15 +105,15 @@ export default function TokensPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Tokens"
+        title={t('tokens.title')}
         subtitle={
           data
-            ? `${formatNumber(data.tokens.length)} RPL token${data.tokens.length === 1 ? '' : 's'} registered${
-                data.registration_fee !== null
-                  ? ` · registration fee ${formatUnits(data.registration_fee)} RAND`
-                  : ''
-              }`
-            : 'Loading the token registry…'
+            ? data.registration_fee !== null
+              ? tp('tokens.registeredWithFee', data.tokens.length, {
+                  fee: fmt.units(data.registration_fee),
+                })
+              : tp('tokens.registered', data.tokens.length)
+            : t('tokens.loading')
         }
       />
 
@@ -118,15 +122,11 @@ export default function TokensPage() {
         data={data?.tokens ?? []}
         keyExtractor={(t) => String(t.index)}
         isLoading={isLoading && !data}
-        emptyMessage="No RPL token has been registered yet"
+        emptyMessage={t('tokens.empty')}
       />
 
       <p className="text-xs text-mute">
-        A token&apos;s registration and its mints are public by design (spec §4) — the amount and
-        symbol here are exact. What is private is who holds a token&apos;s notes and who a
-        transfer moved them between: a transfer of any token is indistinguishable from a plain
-        RAND payment on the public pages, and a token&apos;s registry index never appears on a
-        transfer&apos;s bundle.
+        {t('tokens.help')}
       </p>
     </div>
   );

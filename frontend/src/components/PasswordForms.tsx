@@ -1,17 +1,19 @@
 'use client';
 
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState } from 'react';
 import { useSWRConfig } from 'swr';
 import * as api from '@/lib/api';
+import { L, useLocalizePath, useT } from '@/i18n/client';
 
-function errorMessage(err: unknown): string {
-  return err instanceof api.ApiError ? err.message : 'Request failed';
+/** The API's own message as received; the fallback is ours. */
+function errorMessage(err: unknown, fallback: string): string {
+  return err instanceof api.ApiError ? err.message : fallback;
 }
 
 /** /forgot: asks for an email and always reports success (no account enumeration). */
 export function ForgotPasswordForm() {
+  const { t, rich } = useT();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +27,7 @@ export function ForgotPasswordForm() {
       await api.forgotPassword(email);
       setSent(true);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t('auth.form.requestFailed')));
     } finally {
       setBusy(false);
     }
@@ -33,26 +35,22 @@ export function ForgotPasswordForm() {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold tracking-tight text-strong">Forgot your password?</h1>
+      <h1 className="text-3xl font-semibold tracking-tight text-strong">{t('auth.forgot.title')}</h1>
       <p className="mt-2 text-sm text-soft">
-        Enter your account email and we will send a link to choose a new password. The link works
-        for one hour.
+        {t('auth.forgot.intro')}
       </p>
       {sent ? (
         <div className="card-padded mt-6 space-y-3">
-          <p className="text-sm text-text">
-            If an account exists for <span className="font-mono">{email.trim()}</span>, a reset link is
-            on its way. Check your spam folder if it does not arrive within a few minutes.
-          </p>
-          <Link href="/login" className="link text-sm">
-            Back to sign in
-          </Link>
+          <p className="text-sm text-text">{rich('auth.forgot.sent', { email: email.trim() })}</p>
+          <L href="/login" className="link text-sm">
+            {t('auth.forgot.backToSignIn')}
+          </L>
         </div>
       ) : (
         <form onSubmit={onSubmit} className="card-padded mt-6 space-y-4">
           <div>
             <label htmlFor="email" className="field-label">
-              Email
+              {t('auth.form.email')}
             </label>
             <input
               id="email"
@@ -70,13 +68,13 @@ export function ForgotPasswordForm() {
             </div>
           )}
           <button type="submit" disabled={busy} className="btn-primary w-full justify-center disabled:opacity-60">
-            {busy ? 'Please wait…' : 'Send reset link'}
+            {busy ? t('auth.form.pleaseWait') : t('auth.forgot.button')}
           </button>
           <p className="text-center text-sm text-soft">
-            Remembered it?{' '}
-            <Link href="/login" className="link">
-              Sign in
-            </Link>
+            {t('auth.forgot.remembered')}{' '}
+            <L href="/login" className="link">
+              {t('auth.forgot.signIn')}
+            </L>
           </p>
         </form>
       )}
@@ -87,6 +85,8 @@ export function ForgotPasswordForm() {
 /** /reset?token=…: sets a new password with the emailed token, then signs the user in. */
 export function ResetPasswordForm() {
   const router = useRouter();
+  const { t } = useT();
+  const l = useLocalizePath();
   const { mutate } = useSWRConfig();
   const token = (useSearchParams().get('token') ?? '').trim();
   const [password, setPassword] = useState('');
@@ -98,16 +98,16 @@ export function ResetPasswordForm() {
     event.preventDefault();
     setError(null);
     if (password !== confirm) {
-      setError('The two passwords do not match.');
+      setError(t('auth.reset.mismatch'));
       return;
     }
     setBusy(true);
     try {
       const user = await api.resetPassword(token, password);
       await mutate('me', user, { revalidate: false });
-      router.push('/dashboard');
+      router.push(l('/dashboard'));
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t('auth.form.requestFailed')));
       setBusy(false);
     }
   };
@@ -115,12 +115,12 @@ export function ResetPasswordForm() {
   if (!token) {
     return (
       <div className="mx-auto max-w-md">
-        <h1 className="text-3xl font-semibold tracking-tight text-strong">Reset password</h1>
+        <h1 className="text-3xl font-semibold tracking-tight text-strong">{t('auth.reset.title')}</h1>
         <div className="card-padded mt-6 space-y-3">
-          <p className="text-sm text-text">This link is missing its token. Open the link from the email, or request a new one.</p>
-          <Link href="/forgot" className="link text-sm">
-            Request a new link
-          </Link>
+          <p className="text-sm text-text">{t('auth.reset.missingToken')}</p>
+          <L href="/forgot" className="link text-sm">
+            {t('auth.reset.requestLink')}
+          </L>
         </div>
       </div>
     );
@@ -128,12 +128,12 @@ export function ResetPasswordForm() {
 
   return (
     <div className="mx-auto max-w-md">
-      <h1 className="text-3xl font-semibold tracking-tight text-strong">Choose a new password</h1>
-      <p className="mt-2 text-sm text-soft">You will be signed out of every other device.</p>
+      <h1 className="text-3xl font-semibold tracking-tight text-strong">{t('auth.reset.choose')}</h1>
+      <p className="mt-2 text-sm text-soft">{t('auth.reset.signedOut')}</p>
       <form onSubmit={onSubmit} className="card-padded mt-6 space-y-4">
         <div>
           <label htmlFor="password" className="field-label">
-            New password
+            {t('auth.reset.newPassword')}
           </label>
           <input
             id="password"
@@ -146,11 +146,11 @@ export function ResetPasswordForm() {
             onChange={(e) => setPassword(e.target.value)}
             className="input"
           />
-          <p className="mt-1.5 text-xs text-mute">At least 10 characters.</p>
+          <p className="mt-1.5 text-xs text-mute">{t('auth.form.minLength')}</p>
         </div>
         <div>
           <label htmlFor="confirm" className="field-label">
-            Confirm new password
+            {t('auth.reset.confirm')}
           </label>
           <input
             id="confirm"
@@ -170,13 +170,13 @@ export function ResetPasswordForm() {
           </div>
         )}
         <button type="submit" disabled={busy} className="btn-primary w-full justify-center disabled:opacity-60">
-          {busy ? 'Please wait…' : 'Set new password'}
+          {busy ? t('auth.form.pleaseWait') : t('auth.reset.button')}
         </button>
         <p className="text-center text-sm text-soft">
-          Link expired?{' '}
-          <Link href="/forgot" className="link">
-            Request a new one
-          </Link>
+          {t('auth.reset.expired')}{' '}
+          <L href="/forgot" className="link">
+            {t('auth.reset.requestNew')}
+          </L>
         </p>
       </form>
     </div>
@@ -185,6 +185,7 @@ export function ResetPasswordForm() {
 
 /** Dashboard panel body: change the password of the signed-in user. */
 export function ChangePasswordForm() {
+  const { t } = useT();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
   const [done, setDone] = useState(false);
@@ -202,7 +203,7 @@ export function ChangePasswordForm() {
       setNext('');
       setDone(true);
     } catch (err) {
-      setError(errorMessage(err));
+      setError(errorMessage(err, t('auth.form.requestFailed')));
     } finally {
       setBusy(false);
     }
@@ -213,7 +214,7 @@ export function ChangePasswordForm() {
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="current-password" className="field-label">
-            Current password
+            {t('auth.change.current')}
           </label>
           <input
             id="current-password"
@@ -227,7 +228,7 @@ export function ChangePasswordForm() {
         </div>
         <div>
           <label htmlFor="new-password" className="field-label">
-            New password
+            {t('auth.reset.newPassword')}
           </label>
           <input
             id="new-password"
@@ -247,9 +248,9 @@ export function ChangePasswordForm() {
           {error}
         </div>
       )}
-      {done && <p className="text-sm text-positive">Password changed. Other devices have been signed out.</p>}
+      {done && <p className="text-sm text-positive">{t('auth.change.done')}</p>}
       <button type="submit" disabled={busy} className="btn-secondary disabled:opacity-60">
-        {busy ? 'Please wait…' : 'Change password'}
+        {busy ? t('auth.form.pleaseWait') : t('auth.change.button')}
       </button>
     </form>
   );

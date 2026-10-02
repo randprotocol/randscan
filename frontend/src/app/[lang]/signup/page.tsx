@@ -1,7 +1,13 @@
 import type { Metadata } from 'next';
 import { AuthForm } from '@/components/AuthForm';
+import { serverT } from '@/i18n/server';
 
-export const metadata: Metadata = { title: 'Create account — RandScan' };
+type P = { params: Promise<{ lang: string }> };
+
+export async function generateMetadata({ params }: P): Promise<Metadata> {
+  const { t } = await serverT(params);
+  return { title: t('auth.signup.metaTitle') };
+}
 
 export default function SignupPage() {
   return <AuthForm mode="signup" />;

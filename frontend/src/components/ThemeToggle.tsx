@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/i18n/client';
 
 type Theme = 'light' | 'dark';
 
@@ -28,6 +29,7 @@ function storedTheme(): Theme | null {
 export function ThemeToggle() {
   const [theme, setTheme] = useState<Theme>('dark');
   const [mounted, setMounted] = useState(false);
+  const { t } = useT();
 
   useEffect(() => {
     setTheme(currentTheme());
@@ -59,8 +61,8 @@ export function ThemeToggle() {
       type="button"
       onClick={toggle}
       className="btn-icon"
-      aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
-      title={theme === 'dark' ? 'Light theme' : 'Dark theme'}
+      aria-label={theme === 'dark' ? t('components.theme.toLight') : t('components.theme.toDark')}
+      title={theme === 'dark' ? t('components.theme.light') : t('components.theme.dark')}
     >
       {/* Before mount the stored theme is unknown, so render the moon as a
           neutral placeholder to keep server and client markup identical. */}

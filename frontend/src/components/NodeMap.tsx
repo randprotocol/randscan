@@ -3,13 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
-import {
-  formatConnectedTime,
-  formatEndpoint,
-  formatLocation,
-  getNodeRoleLabel,
-  shortenHash,
-} from '@/lib/utils';
+import { useFmt, useT, type Fmt } from '@/i18n/client';
+import { formatEndpoint, getNodeRoleLabel, shortenHash } from '@/lib/utils';
 import type { NodeInfo } from '@/types';
 
 const TILE_DARK =
@@ -80,12 +75,14 @@ function escapeHtml(value: string): string {
     .replace(/"/g, '&quot;');
 }
 
-function popupHtml(node: NodeInfo): string {
+type TFn = ReturnType<typeof useT>['t'];
+
+function popupHtml(node: NodeInfo, t: TFn, fmt: Fmt): string {
   const rows: string[] = [];
 
-  const label = node.is_self
-    ? `${getNodeRoleLabel(node.role)} · this node`
-    : getNodeRoleLabel(node.role);
+  const known = ['validator', 'observer', 'peer'].includes(node.role);
+  const role = known ? t(`roles.${node.role}`) : getNodeRoleLabel(node.role);
+  const label = node.is_self ? t('components.nodeMap.thisNode', { role }) : role;
 
   rows.push(
     `<div style="font-weight:500;color:var(--color-text-strong);margin-bottom:3px">${escapeHtml(label)}</div>`
@@ -104,7 +101,7 @@ function popupHtml(node: NodeInfo): string {
   }
 
   rows.push(
-    `<div style="margin-top:5px;color:var(--color-text)">${escapeHtml(formatLocation(node.geo))}</div>`
+    `<div style="margin-top:5px;color:var(--color-text)">${escapeHtml(fmt.location(node.geo))}</div>`
   );
 
   if (node.geo?.org) {
@@ -113,8 +110,8 @@ function popupHtml(node: NodeInfo): string {
 
   if (node.connected_secs !== null) {
     rows.push(
-      `<div style="margin-top:5px;color:var(--color-text-mute)">Connected ${escapeHtml(
-        formatConnectedTime(node.connected_secs)
+      `<div style="margin-top:5px;color:var(--color-text-mute)">${escapeHtml(
+        t('components.nodeMap.connected', { time: fmt.connected(node.connected_secs) })
       )}</div>`
     );
   }
@@ -122,7 +119,9 @@ function popupHtml(node: NodeInfo): string {
   rows.push(
     `<button type="button" data-copy="${escapeHtml(node.peer_id)}" ` +
       'style="margin-top:9px;border:1px solid var(--color-border);background:var(--color-surface-2);' +
-      'color:var(--color-accent);border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">Copy peer id</button>'
+      'color:var(--color-accent);border-radius:3px;padding:3px 8px;font-size:11px;cursor:pointer">' +
+      escapeHtml(t('components.nodeMap.copyPeerId')) +
+      '</button>'
   );
 
   return `<div style="min-width:190px;font-size:12px;line-height:1.55">${rows.join('')}</div>`;
@@ -140,6 +139,11 @@ export default function NodeMap({ nodes, popup }: NodeMapProps) {
   const layerRef = useRef<L.LayerGroup | null>(null);
   const tileRef = useRef<L.TileLayer | null>(null);
   const [dark, setDark] = useState(false);
+  const { t } = useT();
+  const fmt = useFmt();
+  // The click handler is wired once at mount; it reads the current translator through this ref.
+  const tRef = useRef(t);
+  tRef.current = t;
 
   // Track the theme so tiles and marker colours follow the toggle.
   useEffect(() => {
@@ -187,7 +191,7 @@ export default function NodeMap({ nodes, popup }: NodeMapProps) {
       const value = target.getAttribute('data-copy');
       if (!value) return;
       void navigator.clipboard?.writeText(value).then(() => {
-        target.textContent = 'Copied';
+        target.textContent = tRef.current('common.copied');
       });
     };
     map.getContainer().addEventListener('click', onPopupClick);
@@ -237,7 +241,7 @@ export default function NodeMap({ nodes, popup }: NodeMapProps) {
         fillColor: color,
         fillOpacity: 0.35,
       })
-        .bindPopup((popup ?? popupHtml)(node))
+        .bindPopup(popup ? popup(node) : popupHtml(node, t, fmt))
         .addTo(layer);
     }
 
@@ -247,7 +251,7 @@ export default function NodeMap({ nodes, popup }: NodeMapProps) {
     } else {
       map.setView([20, 0], 2);
     }
-  }, [nodes, dark, colorFor, popup]);
+  }, [nodes, dark, colorFor, popup, t, fmt]);
 
   return (
     <div className="card overflow-hidden">

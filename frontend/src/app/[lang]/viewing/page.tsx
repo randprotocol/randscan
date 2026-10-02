@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
 import { Column, DataTable } from '@/components/DataTable';
 import { Hash } from '@/components/Hash';
@@ -10,7 +9,8 @@ import { StatsCard, StatsRow } from '@/components/StatsCard';
 import { PageHeader } from '@/components/States';
 import { useTokens } from '@/hooks/useApi';
 import * as api from '@/lib/api';
-import { formatAmount, formatTokenAmount, formatNumber, tokenBalances, type TokenBalance } from '@/lib/utils';
+import { tokenBalances, type TokenBalance } from '@/lib/utils';
+import { L, useFmt, useT, type Fmt } from '@/i18n/client';
 import { keyInfo, openNote, rebuildNote, type KeyInfo, type OpenedNote } from '@/lib/viewing';
 import type { TokenInfo } from '@/types';
 
@@ -26,73 +26,81 @@ interface HistoryRow {
 /** `tokens` resolves a received/sent note's `asset` index to its symbol and decimals — the same
  * registry a wallet's own `resolve_asset` reads through, so a zUSD note renders "12.50 zUSD"
  * rather than a bare unit count. */
-function buildColumns(tokens: TokenInfo[] | undefined): Column<HistoryRow>[] {
+function buildColumns(
+  tokens: TokenInfo[] | undefined,
+  t: (key: string) => string,
+  fmt: Fmt,
+): Column<HistoryRow>[] {
   return [
     {
       key: 'leaf',
-      header: 'Leaf',
+      header: t('viewing.leaf'),
       render: (r) => (
-        <Link href={`/notes/${r.cm}`} className="link font-mono">
-          #{formatNumber(r.leaf_index)}
-        </Link>
+        <L href={`/notes/${r.cm}`} className="link font-mono">
+          #{fmt.number(r.leaf_index)}
+        </L>
       ),
     },
     {
       key: 'height',
-      header: 'Height',
+      header: t('viewing.height'),
       render: (r) => (
-        <Link href={`/blocks/${r.height}`} className="link font-mono">
-          {formatNumber(r.height)}
-        </Link>
+        <L href={`/blocks/${r.height}`} className="link font-mono">
+          {fmt.number(r.height)}
+        </L>
       ),
     },
     {
       key: 'tx',
-      header: 'Transaction',
+      header: t('viewing.transaction'),
       render: (r) =>
-        r.tx_hash ? <Hash value={r.tx_hash} href={`/transactions/${r.tx_hash}`} /> : <span className="text-mute">{r.height === 0 ? 'genesis' : 'deposit'}</span>,
+        r.tx_hash ? <Hash value={r.tx_hash} href={`/transactions/${r.tx_hash}`} /> : <span className="text-mute">{r.height === 0 ? t('viewing.genesis') : t('viewing.deposit')}</span>,
     },
-    { key: 'role', header: 'Role', render: (r) => <RoleBadge role={r.note.role} /> },
+    { key: 'role', header: t('viewing.role'), render: (r) => <RoleBadge role={r.note.role} /> },
     {
       key: 'amount',
-      header: 'Amount',
-      render: (r) => <span className="font-mono text-text">{formatTokenAmount(r.note.amount, r.note.asset, tokens)}</span>,
+      header: t('viewing.amount'),
+      render: (r) => <span className="font-mono text-text">{fmt.tokenAmount(r.note.amount, r.note.asset, tokens)}</span>,
     },
     {
       key: 'counterparty',
-      header: 'Counterparty (pk)',
+      header: t('viewing.counterparty'),
       render: (r) => <Hash value={r.note.role === 'received' ? r.note.from : r.note.pk} start={8} end={6} />,
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('viewing.status'),
       render: (r) => (r.note.role === 'received' ? <SpentCell spent={r.spent} /> : <span className="text-mute">—</span>),
     },
   ];
 }
 
-function buildBalanceColumns(tokens: TokenInfo[] | undefined): Column<TokenBalance>[] {
+function buildBalanceColumns(
+  tokens: TokenInfo[] | undefined,
+  t: (key: string, vars?: Record<string, string | number>) => string,
+  fmt: Fmt,
+): Column<TokenBalance>[] {
   return [
     {
       key: 'token',
-      header: 'Token',
+      header: t('viewing.token'),
       render: (b) =>
         b.asset === 0 ? (
           <span className="text-text">RAND</span>
         ) : b.token ? (
-          <Link href={`/tokens/${b.token.id_text}`} className="link">
+          <L href={`/tokens/${b.token.id_text}`} className="link">
             {b.token.symbol} <span className="text-mute">{b.token.name}</span>
-          </Link>
+          </L>
         ) : (
-          <span className="text-mute">asset #{b.asset}</span>
+          <span className="text-mute">{t('viewing.assetIndex', { index: b.asset })}</span>
         ),
     },
     {
       key: 'balance',
-      header: 'Spendable balance',
-      render: (b) => <span className="font-mono text-text">{formatTokenAmount(b.units.toString(), b.asset, tokens)}</span>,
+      header: t('viewing.spendable'),
+      render: (b) => <span className="font-mono text-text">{fmt.tokenAmount(b.units.toString(), b.asset, tokens)}</span>,
     },
-    { key: 'notes', header: 'Unspent notes', render: (b) => <span className="font-mono">{formatNumber(b.notes)}</span> },
+    { key: 'notes', header: t('viewing.unspentNotes'), render: (b) => <span className="font-mono">{fmt.number(b.notes)}</span> },
   ];
 }
 
@@ -103,7 +111,9 @@ export default function ViewingPage() {
   const [info, setInfo] = useState<KeyInfo | null>(null);
   const [rows, setRows] = useState<HistoryRow[] | null>(null);
   const { data: tokenList } = useTokens();
-  const columns = buildColumns(tokenList?.tokens);
+  const { t, tp } = useT();
+  const fmt = useFmt();
+  const columns = buildColumns(tokenList?.tokens, t, fmt);
 
   const run = async ({ kind, key }: SubmittedKey) => {
     setBusy(true);
@@ -160,14 +170,14 @@ export default function ViewingPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="My history"
-        subtitle="Scan the commitment tree with your viewing key. The explorer never sees the key; every envelope is opened in your browser."
+        title={t('viewing.title')}
+        subtitle={t('viewing.subtitle')}
       />
 
-      <KeyPanel kinds={['viewing']} onOpen={run} busy={busy} title="Scan with a viewing key">
+      <KeyPanel kinds={['viewing']} onOpen={run} busy={busy} title={t('viewing.scanTitle')}>
         {progress && (
           <p className="border-t border-border-soft py-3 text-sm text-mute">
-            scanned {formatNumber(progress.scanned)} of {formatNumber(progress.total)} leaves
+            {tp('viewing.scanned', progress.total, { scanned: fmt.number(progress.scanned) })}
             {busy ? '…' : ''}
           </p>
         )}
@@ -177,24 +187,37 @@ export default function ViewingPage() {
       {info && rows && (
         <>
           <StatsRow columns={4}>
-            <StatsCard title="Spendable balance" value={formatAmount(balance.toString())} subtitle="unspent notes received, RAND; tokens below" />
-            <StatsCard title="Notes received" value={formatNumber(received.length)} subtitle={`${formatNumber(received.filter((r) => r.spent.state === 'unspent').length)} unspent`} />
-            <StatsCard title="Notes sent" value={formatNumber(rows.filter((r) => r.note.role === 'sent').length)} />
             <StatsCard
-              title="Address"
+              title={t('viewing.spendable')}
+              value={fmt.amount(balance.toString())}
+              subtitle={t('viewing.spendableHelp')}
+            />
+            <StatsCard
+              title={t('viewing.notesReceived')}
+              value={fmt.number(received.length)}
+              subtitle={t('viewing.unspentCount', {
+                count: fmt.number(received.filter((r) => r.spent.state === 'unspent').length),
+              })}
+            />
+            <StatsCard
+              title={t('viewing.notesSent')}
+              value={fmt.number(rows.filter((r) => r.note.role === 'sent').length)}
+            />
+            <StatsCard
+              title={t('viewing.address')}
               value={info.address ? `${info.address.slice(0, 14)}…${info.address.slice(-6)}` : '—'}
-              subtitle={info.pk ? `pk ${info.pk.slice(0, 12)}…` : undefined}
+              subtitle={info.pk ? t('viewing.pk', { pk: info.pk.slice(0, 12) }) : undefined}
             />
           </StatsRow>
           {info.address && (
             <p className="text-xs text-mute">
-              Shielded address: <Hash value={info.address} start={20} end={10} />
+              {t('viewing.shieldedAddress')} <Hash value={info.address} start={20} end={10} />
             </p>
           )}
-          <DataTable columns={buildBalanceColumns(tokenList?.tokens)} data={balances} keyExtractor={(b) => String(b.asset)} />
-          <DataTable columns={columns} data={rows} keyExtractor={(r) => r.cm} emptyMessage="This key opens no note on the chain" />
+          <DataTable columns={buildBalanceColumns(tokenList?.tokens, t, fmt)} data={balances} keyExtractor={(b) => String(b.asset)} />
+          <DataTable columns={columns} data={rows} keyExtractor={(r) => r.cm} emptyMessage={t('viewing.empty')} />
           <p className="text-xs text-mute">
-            Every row was decrypted in this browser and its commitment recomputed from the plaintext. A change note appears as received.
+            {t('viewing.footnote')}
           </p>
         </>
       )}
