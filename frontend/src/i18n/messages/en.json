@@ -1,0 +1,28 @@
+{
+  "common": {
+    "siteName": "RandScan",
+    "metaTitle": "RandScan — Rand Protocol Explorer",
+    "metaDescription": "Explore blocks, transactions, accounts, validators and confidential programs on the Rand Protocol network.",
+    "language": "Language",
+    "englishGoverns": "This translation is provided for convenience; the English text governs.",
+    "loading": "Loading…",
+    "retry": "Retry",
+    "copy": "Copy",
+    "copied": "Copied",
+    "live": "Live",
+    "offline": "Offline",
+    "notFound": "Not found",
+    "backToDashboard": "Back to dashboard",
+    "somethingWrong": "Something went wrong",
+    "apiUnreachable": "The explorer API could not be reached. Please try again.",
+    "previousPage": "Previous page",
+    "nextPage": "Next page"
+  },
+  "fmt": {
+    "units": "units",
+    "assetUnits": "{units} units of asset #{index}",
+    "bridged": "{tokens} tokens ({units} units)",
+    "chain": "chain {id}",
+    "unknownLocation": "Unknown location"
+  }
+}

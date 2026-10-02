@@ -1,7 +1,12 @@
 import type { TokenInfo, TransactionKind } from '@/types';
 
+import { makeFormat, type Format } from '@/i18n/format';
+
 export const TOKEN_SYMBOL = 'RAND';
 export const TOKEN_DECIMALS = 9;
+
+/** The English formatters; a page's own come from useFmt(). */
+const EN: Format = makeFormat('en');
 
 // ---------------------------------------------------------------------------
 // Class names
@@ -17,49 +22,17 @@ export function cn(...classes: (string | undefined | null | false)[]): string {
 
 /** Relative age of a millisecond timestamp, e.g. "12s ago". */
 export function formatTimestamp(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs)) return '—';
-
-  const diff = Date.now() - timestampMs;
-  const seconds = Math.floor(Math.abs(diff) / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  const days = Math.floor(hours / 24);
-
-  if (diff < 0) return 'just now';
-  if (seconds < 60) return seconds <= 1 ? 'just now' : `${seconds}s ago`;
-  if (minutes < 60) return minutes === 1 ? '1 min ago' : `${minutes} mins ago`;
-  if (hours < 24) return hours === 1 ? '1 hour ago' : `${hours} hours ago`;
-  if (days < 7) return days === 1 ? '1 day ago' : `${days} days ago`;
-
-  return new Date(timestampMs).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
+  return EN.ago(timestampMs);
 }
 
 /** Absolute rendering of a millisecond timestamp. */
 export function formatDateTime(timestampMs: number): string {
-  if (!Number.isFinite(timestampMs)) return '—';
-  return new Date(timestampMs).toLocaleString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: true,
-  });
+  return EN.dateTime(timestampMs);
 }
 
 /** Human duration for a millisecond span, e.g. "1.20s" or "2m 5s". */
 export function formatDurationMs(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return '—';
-  if (ms < 1000) return `${Math.round(ms)}ms`;
-  if (ms < 60_000) return `${(ms / 1000).toFixed(2)}s`;
-  const minutes = Math.floor(ms / 60_000);
-  const seconds = Math.round((ms % 60_000) / 1000);
-  return `${minutes}m ${seconds}s`;
+  return EN.duration(ms);
 }
 
 // ---------------------------------------------------------------------------
@@ -86,25 +59,7 @@ export function formatUnits(
   value: string | number | bigint | null | undefined,
   decimals: number = TOKEN_DECIMALS
 ): string {
-  if (value === null || value === undefined) return '0';
-  const units = toBigInt(value);
-  if (units === null) return String(value);
-
-  const negative = units < BigInt(0);
-  const abs = negative ? -units : units;
-  const divisor = BigInt(10) ** BigInt(decimals);
-  const whole = abs / divisor;
-  const fraction = abs % divisor;
-
-  const wholeStr = whole.toLocaleString('en-US');
-  let out = wholeStr;
-
-  if (fraction > BigInt(0)) {
-    const fracStr = fraction.toString().padStart(decimals, '0').replace(/0+$/, '');
-    if (fracStr.length > 0) out = `${wholeStr}.${fracStr}`;
-  }
-
-  return negative ? `-${out}` : out;
+  return EN.units(value, decimals);
 }
 
 /** Same as formatUnits, suffixed with the token symbol. */
@@ -113,7 +68,7 @@ export function formatAmount(
   decimals: number = TOKEN_DECIMALS,
   symbol: string = TOKEN_SYMBOL
 ): string {
-  return `${formatUnits(value, decimals)} ${symbol}`;
+  return EN.amount(value, decimals, symbol);
 }
 
 /**
@@ -124,8 +79,7 @@ export function formatStake(
   value: string | number | bigint | null | undefined,
   suffix = ''
 ): string {
-  const base = formatAmount(value ?? 0);
-  return suffix ? `${base} ${suffix}` : base;
+  return EN.stake(value, suffix);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,30 +87,20 @@ export function formatStake(
 // ---------------------------------------------------------------------------
 
 export function formatNumber(n: number | bigint | null | undefined): string {
-  if (n === null || n === undefined) return '—';
-  if (typeof n === 'number' && !Number.isFinite(n)) return '—';
-  return n.toLocaleString('en-US');
+  return EN.number(n);
 }
 
 export function formatCompactNumber(n: number): string {
-  if (!Number.isFinite(n)) return '—';
-  if (Math.abs(n) < 1000) return n.toString();
-  if (Math.abs(n) < 1_000_000) return `${(n / 1000).toFixed(1)}K`;
-  if (Math.abs(n) < 1_000_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  return `${(n / 1_000_000_000).toFixed(1)}B`;
+  return EN.compact(n);
 }
 
 export function formatPercentage(value: number, decimals: number = 2): string {
-  if (!Number.isFinite(value)) return '—';
-  return `${value.toFixed(decimals)}%`;
+  return EN.percentage(value, decimals);
 }
 
 /** Byte counts, used for zk proof sizes. */
 export function formatBytes(bytes: number | null | undefined): string {
-  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
-  if (bytes < 1024) return `${formatNumber(bytes)} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  return EN.bytes(bytes);
 }
 
 /**
@@ -184,30 +128,12 @@ export function bridgeTokenTotals(
  * "64 KiB". The caps are powers of two, so `formatBytes`' two decimals would only add noise.
  */
 export function formatBinaryBytes(bytes: number | null | undefined): string {
-  if (bytes === null || bytes === undefined || !Number.isFinite(bytes)) return '—';
-  const trim = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
-  if (bytes >= 1024 * 1024) return `${trim(bytes / (1024 * 1024))} MiB`;
-  if (bytes >= 1024) return `${trim(bytes / 1024)} KiB`;
-  return `${formatNumber(bytes)} B`;
+  return EN.binaryBytes(bytes);
 }
 
 /** Uptime in seconds rendered as e.g. "3h 12m", "5m 3s", "2d 4h". */
 export function formatConnectedTime(seconds: number | null | undefined): string {
-  if (seconds === null || seconds === undefined || !Number.isFinite(seconds) || seconds < 0) {
-    return '—';
-  }
-
-  const total = Math.floor(seconds);
-  if (total < 60) return `${total}s`;
-
-  const days = Math.floor(total / 86_400);
-  const hours = Math.floor((total % 86_400) / 3600);
-  const minutes = Math.floor((total % 3600) / 60);
-  const secs = total % 60;
-
-  if (days > 0) return `${days}d ${hours}h`;
-  if (hours > 0) return `${hours}h ${minutes}m`;
-  return `${minutes}m ${secs}s`;
+  return EN.connected(seconds);
 }
 
 // ---------------------------------------------------------------------------
@@ -400,13 +326,14 @@ export function resolveToken(
 export function formatTokenAmount(
   units: string | number | bigint | null | undefined,
   index: number | null | undefined,
-  tokens: TokenInfo[] | null | undefined
+  tokens: TokenInfo[] | null | undefined,
+  fmt: Format = EN
 ): string {
   if (units === null || units === undefined) return '—';
-  if (index === null || index === undefined || index === 0) return formatAmount(units);
+  if (index === null || index === undefined || index === 0) return fmt.amount(units);
   const token = resolveToken(tokens, index);
-  if (!token) return `${formatUnits(units, 0)} units of asset #${index}`;
-  return `${formatUnits(units, token.decimals)} ${token.symbol}`;
+  if (!token) return fmt.assetUnits(units, index);
+  return `${fmt.units(units, token.decimals)} ${token.symbol}`;
 }
 
 /**
@@ -493,35 +420,22 @@ export function formatBridgeUnits(
   units: string | null | undefined,
   symbol?: string | null
 ): string {
-  if (units === null || units === undefined) return '—';
-  return `${formatUnits(units, BRIDGED_DECIMALS)} ${symbol ?? 'units'}`;
+  return EN.bridgeUnits(units, symbol);
 }
 
 /** A mint-cap window in the largest unit that divides it: "24 hours", "90 minutes", "45 seconds". */
 export function formatMintWindow(secs: number): string {
-  for (const [unit, size] of [
-    ['hour', 3600],
-    ['minute', 60],
-  ] as const) {
-    if (secs >= size && secs % size === 0) {
-      const n = secs / size;
-      return `${formatNumber(n)} ${unit}${n === 1 ? '' : 's'}`;
-    }
-  }
-  return `${formatNumber(secs)} second${secs === 1 ? '' : 's'}`;
+  return EN.mintWindow(secs);
 }
 
 /** "Ethereum (2)" for a known bridge chain id, "chain 9" otherwise. */
 export function formatBridgeChain(id: number | null | undefined): string {
-  if (id === null || id === undefined) return '—';
-  const name = BRIDGE_CHAIN_NAMES[id];
-  return name ? `${name} (${id})` : `chain ${id}`;
+  return EN.bridgeChain(id, id === null || id === undefined ? null : BRIDGE_CHAIN_NAMES[id]);
 }
 
 /** Bridged units as a decimal number of tokens (8 decimals) with the raw units alongside. */
 export function formatBridgedAmount(units: string | null | undefined): string {
-  if (units === null || units === undefined) return '—';
-  return `${formatUnits(units, BRIDGED_DECIMALS)} tokens (${formatUnits(units, 0)} units)`;
+  return EN.bridged(units);
 }
 
 /**
@@ -560,13 +474,7 @@ interface GeoLike {
 
 /** "Singapore, SG" style location line; null geo becomes "Unknown location". */
 export function formatLocation(geo: GeoLike | null | undefined): string {
-  if (!geo) return 'Unknown location';
-  const parts = [geo.city, geo.region, geo.country].filter(
-    (part): part is string => typeof part === 'string' && part.trim() !== ''
-  );
-  // A city that repeats as its own region (city states) reads badly twice.
-  const deduped = parts.filter((part, index) => parts.indexOf(part) === index);
-  return deduped.length > 0 ? deduped.join(', ') : 'Unknown location';
+  return EN.location(geo);
 }
 
 /** "1.2.3.4:9000", falling back gracefully when either half is missing. */
