@@ -13,6 +13,8 @@ export const config = {
 
 /** The canonical origin, for the hreflang alternates. */
 const ORIGIN = 'https://randscan.org';
+/** Where redirects point. SITE_ORIGIN=http://localhost:3001 for a local run. */
+const PUBLIC_ORIGIN = process.env.SITE_ORIGIN || ORIGIN;
 const IS_FILE = /\.[a-z0-9]{2,5}$/i;
 /** Set on our own rewrites into the English tree, so a second middleware pass leaves them be. */
 const INTERNAL = 'x-randscan-i18n';
@@ -38,15 +40,20 @@ export function middleware(req: NextRequest) {
   const d = decide({ pathname, search, cookie, country, internal });
   let res: NextResponse;
   if (d.kind === 'redirect') {
-    // Built on https://<Host>: with experimental.trustHostHeader Next's own request URL has the
-    // same origin, so it sends this as a relative Location. A URL built from req.url would carry
-    // the listen address (127.0.0.1:3001) behind Caddy.
-    const host = req.headers.get('host') ?? 'localhost';
-    res = NextResponse.redirect(new URL(d.to, `https://${host}`), d.status);
+    // On the site's public origin: req.url carries the listen address (127.0.0.1:3001) behind
+    // Caddy. www.randscan.org and randscan.com already redirect to randscan.org.
+    res = NextResponse.redirect(new URL(d.to, PUBLIC_ORIGIN), d.status);
   } else if (d.kind === 'rewrite') {
     const headers = new Headers(req.headers);
     headers.set(INTERNAL, '1');
-    res = NextResponse.rewrite(new URL(d.to, req.url), { request: { headers } });
+    // Next serves a rewrite internally only when its origin is that of the server's own request
+    // URL, which is plain http on the listen address. req.url takes its scheme from Caddy's
+    // X-Forwarded-Proto (https), so a rewrite built on it looked external, was proxied as a TLS
+    // request to our own plain-HTTP port, and every English page answered 500. Keep req.url's
+    // host (Next normalises it the same way) and put the scheme back.
+    const target = new URL(d.to, req.url);
+    target.protocol = 'http:';
+    res = NextResponse.rewrite(target, { request: { headers } });
   } else {
     res = NextResponse.next();
   }

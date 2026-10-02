@@ -1,10 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
-  // The middleware's request URL (and so every redirect it issues) is built from the Host header
-  // instead of the listen address: behind Caddy the listen address is 127.0.0.1:3001, and a
-  // redirect to it is useless to a browser. Caddy keeps the original Host.
-  experimental: { trustHostHeader: true },
   async redirects() {
     // /tx/<hash> is the short form wallets link to ("Open in randscan" in Rand Wallet
     // v0.6.8 and earlier); the page lives at /transactions/<hash>. A 0x prefix is
