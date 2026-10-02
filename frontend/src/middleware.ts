@@ -15,12 +15,6 @@ export const config = {
 const ORIGIN = 'https://randscan.org';
 const IS_FILE = /\.[a-z0-9]{2,5}$/i;
 
-/** Where the request really came in: Caddy keeps Host and sets X-Forwarded-Proto. */
-const requestOrigin = (req: NextRequest) => {
-  const proto = req.headers.get('x-forwarded-proto') ?? 'http';
-  const host = req.headers.get('x-forwarded-host') ?? req.headers.get('host') ?? 'localhost';
-  return `${proto}://${host}`;
-};
 
 export function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -33,7 +27,8 @@ export function middleware(req: NextRequest) {
   const d = decide({ pathname, search, cookie, country });
   let res: NextResponse;
   if (d.kind === 'redirect') {
-    res = NextResponse.redirect(new URL(d.to, requestOrigin(req)), d.status);
+    // A relative Location: Next rewrites an absolute one to its own hostname behind a proxy.
+    res = new NextResponse(null, { status: d.status, headers: { Location: d.to } });
   } else if (d.kind === 'rewrite') {
     res = NextResponse.rewrite(new URL(d.to, req.url));
   } else {
