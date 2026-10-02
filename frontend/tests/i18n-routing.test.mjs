@@ -63,3 +63,21 @@ test('the country is looked up whenever the cookie is not a valid language', asy
   assert.equal(needsCountry('/', 'ja'), false);
   assert.equal(needsCountry('/blocks', null), false);
 });
+
+test('a click within the site never switches language; only an arrival from outside does', async () => {
+  const { needsCountry } = await import('../src/i18n/routing.js');
+  assert.equal(needsCountry('/', null, false), true);          // typed, bookmarked, or from another site
+  assert.equal(needsCountry('/', null, true), false);          // the Home link on an English page
+  assert.equal(needsCountry('/', 'xx', true), false);
+  assert.deepEqual(d('/', { country: null, internal: true }), { kind: 'rewrite', to: '/en' });
+});
+
+test('internalReferer: same host only', async () => {
+  const { internalReferer } = await import('../src/i18n/routing.js');
+  assert.equal(internalReferer('https://randscan.org/blocks', 'randscan.org'), true);
+  assert.equal(internalReferer('https://randscan.org/', 'randscan.org'), true);
+  assert.equal(internalReferer('https://www.google.com/', 'randscan.org'), false);
+  assert.equal(internalReferer('https://randscan.org.evil.com/', 'randscan.org'), false);
+  assert.equal(internalReferer(null, 'randscan.org'), false);
+  assert.equal(internalReferer('not a url', 'randscan.org'), false);
+});

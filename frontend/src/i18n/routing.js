@@ -12,10 +12,10 @@ import {
 const HAS_EXTENSION = /\.[a-z0-9]{2,5}$/i;
 
 /**
- * @param {{ pathname: string, search: string, cookie: string | null | undefined, country: string | null | undefined }} req
+ * @param {{ pathname: string, search: string, cookie: string | null | undefined, country: string | null | undefined, internal?: boolean }} req
  * @returns {{ kind: 'next' } | { kind: 'redirect', to: string, status: 302 | 308 } | { kind: 'rewrite', to: string }}
  */
-export function decide({ pathname, search, cookie, country }) {
+export function decide({ pathname, search, cookie, country, internal = false }) {
   const q = search || '';
   if (UNPREFIXED.test(pathname) || HAS_EXTENSION.test(pathname)) return { kind: 'next' };
 
@@ -25,7 +25,7 @@ export function decide({ pathname, search, cookie, country }) {
   }
   if (isLocale(first)) return { kind: 'next' };
 
-  if (pathname === '/') {
+  if (pathname === '/' && (isLocale(cookie) || !internal)) {
     const chosen = isLocale(cookie) ? cookie : localeForCountry(country);
     if (chosen !== DEFAULT_LOCALE) {
       return { kind: 'redirect', to: localizePath(chosen, '/') + q, status: 302 };
@@ -34,9 +34,23 @@ export function decide({ pathname, search, cookie, country }) {
   return { kind: 'rewrite', to: `/${DEFAULT_LOCALE}${pathname === '/' ? '' : pathname}${q}` };
 }
 
-/** Whether a request needs the visitor's country: only the root, and only without a valid choice. */
-export function needsCountry(pathname, cookie) {
-  return pathname === '/' && !isLocale(cookie);
+/**
+ * Whether a request needs the visitor's country: an arrival at the root from outside the site
+ * (typed, bookmarked, a link elsewhere) without a language chosen. A click on Home from a page of
+ * the site is not an arrival, so it never switches the language the visitor is reading.
+ */
+export function needsCountry(pathname, cookie, internal = false) {
+  return pathname === '/' && !isLocale(cookie) && !internal;
+}
+
+/** Whether a Referer is a page of this same host. @param {string | null | undefined} referer @param {string} host */
+export function internalReferer(referer, host) {
+  if (!referer) return false;
+  try {
+    return new URL(referer).host === host;
+  } catch {
+    return false;
+  }
 }
 
 /** The `Link` header: every language's URL for one unprefixed path, then x-default. */

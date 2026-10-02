@@ -119,5 +119,14 @@ fi
 
 sleep 4
 systemctl is-active randscan-api randscan-frontend caddy || true
+
+# Load the language middleware (and the country database) now, and prove the redirect: an
+# Indonesian address arriving at / is sent to /id. Prints the status and target, never fails.
+for _ in 1 2 3 4 5 6 7 8 9 10; do
+    curl -s -o /dev/null --max-time 5 http://127.0.0.1:3001/ && break
+    sleep 1
+done
+echo "language redirect for an Indonesian address: $(curl -s -o /dev/null --max-time 5 -w '%{http_code} %{redirect_url}' -H "Host: $DOMAIN" -H 'X-Forwarded-For: 36.72.1.1' http://127.0.0.1:3001/ || true)"
+
 curl -s http://127.0.0.1:3000/api/v1/health; echo
 curl -s -o /dev/null -w "frontend http %{http_code}\n" http://127.0.0.1:3001/
