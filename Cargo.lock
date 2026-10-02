@@ -1715,7 +1715,7 @@ checksum = "63b8176103e19a2643978565ca18b50549f6101881c443590420e4dc998a3c69"
 
 [[package]]
 name = "randscan-api"
-version = "0.3.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "argon2",
@@ -1748,7 +1748,7 @@ dependencies = [
 
 [[package]]
 name = "randscan-core"
-version = "0.3.0"
+version = "0.7.1"
 dependencies = [
  "bs58",
  "chrono",
@@ -1767,7 +1767,7 @@ dependencies = [
 
 [[package]]
 name = "randscan-db"
-version = "0.3.0"
+version = "0.7.1"
 dependencies = [
  "chrono",
  "randscan-core",
@@ -1781,7 +1781,7 @@ dependencies = [
 
 [[package]]
 name = "randscan-indexer"
-version = "0.3.0"
+version = "0.7.1"
 dependencies = [
  "anyhow",
  "bs58",
@@ -1798,7 +1798,7 @@ dependencies = [
 
 [[package]]
 name = "randscan-ws"
-version = "0.3.0"
+version = "0.7.1"
 dependencies = [
  "axum",
  "futures-util",
